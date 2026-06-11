@@ -35,7 +35,7 @@ app.use("/api/zones", zonesRoutes);
 app.use("/api/crimes", crimeRoutes);
 
 const { sequelize } = db;
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 const startServer = async () => {
   try {
