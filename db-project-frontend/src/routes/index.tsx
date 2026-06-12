@@ -14,6 +14,7 @@ import RegisterPage from "../pages/RegisterPage";
 import CitizenLoginPage from "../pages/CitizenLoginPage";
 import CompleteProfilePage from "../pages/CompleteProfilePage";
 import CitizenDashboardPage from "../pages/CitizenDashboardPage";
+import AuthCallbackPage from "../pages/AuthCallback/AuthCallback";
 
 type TRoute = {
   path: string;
@@ -73,6 +74,10 @@ export const PublicRoutes = () => {
     {
         path: "/report-crime",
         element: <ReportCrimePage/>
+    },
+    {
+        path: "/auth/callback",
+        element: <AuthCallbackPage/>
     },
 
   ];
