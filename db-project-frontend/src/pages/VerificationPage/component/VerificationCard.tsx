@@ -2,6 +2,7 @@
 import { useState } from "react";
 import WhiteButton from "../../../components/WhiteButton";
 import ConfirmationPopup from "./ConfirmationPopup";
+import { API_BASE_URL } from "../../../config/constants";
 
 type VerificationCardProps =
   | {
