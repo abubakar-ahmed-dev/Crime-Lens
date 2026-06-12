@@ -183,32 +183,47 @@ export const loginCitizen = async (req, res) => {
 /**
  * POST /api/citizens/google-auth
  * Authenticate with Google OAuth
+ * This endpoint is called after Supabase OAuth callback to create/update local user profile
  */
 export const googleAuthCitizen = async (req, res) => {
   try {
     const { accessToken } = req.body;
 
     if (!accessToken) {
-      return res.status(400).json({ error: "Missing Google access token" });
+      return res.status(400).json({ error: "Missing access token" });
     }
 
-    // Verify token with Supabase
-    const { data: authData, error: authError } = await supabase.auth.signInWithIdToken({
-      provider: "google",
-      token: accessToken,
-    });
+    // Get the Supabase user using the access token
+    const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
 
-    if (authError) {
-      return res.status(401).json({ error: "Invalid Google token" });
+    if (userError || !user) {
+      console.error("Error getting user from token:", userError);
+      return res.status(401).json({ error: "Invalid access token" });
     }
 
-    // Get user info from Supabase
-    const { email, full_name } = authData.user.user_metadata;
+    // Extract user info
+    const email = user.email;
+    const fullName = user.user_metadata?.full_name ||
+                     user.user_metadata?.name ||
+                     user.user_metadata?.full_name ||
+                     "";
+    const supabaseUserId = user.id;
 
-    // Check if user exists in our database
+    // Check if user exists in our database by supabaseUserId (most reliable for OAuth)
     let submitter = await CrimeReportsSubmitter.findOne({
-      where: { email },
+      where: { supabaseUserId },
     });
+
+    // If not found by supabaseUserId, check by email (handles email changes)
+    if (!submitter && email) {
+      submitter = await CrimeReportsSubmitter.findOne({
+        where: { email },
+      });
+      // Update supabaseUserId if found by email but missing supabaseUserId
+      if (submitter && !submitter.supabaseUserId) {
+        await submitter.update({ supabaseUserId });
+      }
+    }
 
     // Create profile if it doesn't exist
     if (!submitter) {
@@ -216,9 +231,9 @@ export const googleAuthCitizen = async (req, res) => {
 
       submitter = await CrimeReportsSubmitter.create({
         submitterCnic: tempCnic,
-        supabaseUserId: authData.user.id,
+        supabaseUserId,
         email,
-        fullName: full_name || "",
+        fullName,
         isProfileComplete: false,
       });
     }
@@ -234,14 +249,54 @@ export const googleAuthCitizen = async (req, res) => {
         address: submitter.address,
         isProfileComplete: submitter.isProfileComplete,
       },
-      session: {
-        accessToken: authData.session.access_token,
-        refreshToken: authData.session.refresh_token,
-        expiresIn: authData.session.expires_in,
-      },
     });
   } catch (error) {
     console.error("Google auth error:", error);
+
+    // Handle unique constraint errors - user already exists
+    if (error.name === "SequelizeUniqueConstraintError") {
+      const field = error.errors?.[0]?.path;
+
+      // Try to find the existing user and return their profile
+      try {
+        let submitter;
+        if (field === "supabaseUserId") {
+          const { data: { user } } = await supabase.auth.getUser(req.body.accessToken);
+          if (user) {
+            submitter = await CrimeReportsSubmitter.findOne({
+              where: { supabaseUserId: user.id },
+            });
+          }
+        } else if (field === "email") {
+          const { data: { user } } = await supabase.auth.getUser(req.body.accessToken);
+          if (user) {
+            submitter = await CrimeReportsSubmitter.findOne({
+              where: { email: user.email },
+            });
+          }
+        }
+
+        if (submitter) {
+          return res.json({
+            message: "Google authentication successful",
+            user: {
+              id: submitter.submitterCnic,
+              email: submitter.email,
+              fullName: submitter.fullName,
+              contact: submitter.contact,
+              cnic: submitter.submitterCnic,
+              address: submitter.address,
+              isProfileComplete: submitter.isProfileComplete,
+            },
+          });
+        }
+      } catch (retryError) {
+        console.error("Retry error:", retryError);
+      }
+
+      return res.status(409).json({ error: `${field} already exists` });
+    }
+
     res.status(500).json({ error: "Failed to authenticate with Google" });
   }
 };

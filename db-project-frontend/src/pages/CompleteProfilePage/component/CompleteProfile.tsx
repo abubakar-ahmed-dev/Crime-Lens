@@ -18,20 +18,27 @@ export default function CompleteProfile() {
 
   // Redirect if not authenticated or profile is already complete
   useEffect(() => {
-    if (!isCitizenAuthenticated) {
+    // Check both state and localStorage for authentication
+    const citizenFromStorage = localStorage.getItem("citizen");
+    const isAuthenticated = isCitizenAuthenticated || !!citizenFromStorage;
+
+    if (!isAuthenticated) {
       navigate("/login-citizen");
       return;
     }
 
-    if (citizen?.isProfileComplete) {
+    // Parse citizen data from state or storage
+    const citizenData = citizen || (citizenFromStorage ? JSON.parse(citizenFromStorage) : null);
+
+    if (citizenData?.isProfileComplete) {
       navigate("/citizen-dashboard");
       return;
     }
 
     // Pre-fill data if available
-    if (citizen?.cnic) setFormData((prev) => ({ ...prev, cnic: citizen.cnic || "" }));
-    if (citizen?.contact) setFormData((prev) => ({ ...prev, contact: citizen.contact || "" }));
-    if (citizen?.address) setFormData((prev) => ({ ...prev, address: citizen.address || "" }));
+    if (citizenData?.cnic) setFormData((prev) => ({ ...prev, cnic: citizenData.cnic || "" }));
+    if (citizenData?.contact) setFormData((prev) => ({ ...prev, contact: citizenData.contact || "" }));
+    if (citizenData?.address) setFormData((prev) => ({ ...prev, address: citizenData.address || "" }));
   }, [citizen, isCitizenAuthenticated, navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

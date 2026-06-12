@@ -13,13 +13,20 @@ export default function CitizenDashboard() {
 
   // Redirect if not authenticated
   useEffect(() => {
-    if (!isCitizenAuthenticated) {
+    // Check both state and localStorage for authentication
+    const citizenFromStorage = localStorage.getItem("citizen");
+    const isAuthenticated = isCitizenAuthenticated || !!citizenFromStorage;
+
+    if (!isAuthenticated) {
       navigate("/login-citizen");
       return;
     }
 
+    // Parse citizen data from state or storage
+    const citizenData = citizen || (citizenFromStorage ? JSON.parse(citizenFromStorage) : null);
+
     // Redirect to profile completion if not complete
-    if (citizen && !citizen.isProfileComplete) {
+    if (citizenData && !citizenData.isProfileComplete) {
       navigate("/complete-profile");
       return;
     }

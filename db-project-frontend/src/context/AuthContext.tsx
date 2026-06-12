@@ -9,7 +9,14 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://jgxizgpxxdawc
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpneGl6Z3B4eGRhd2NnZHhybGZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTgzNDE1MzgsImV4cCI6MjAzMzkxNzUzOH0.WNqPkCD2FB9mIUaMVKZLqN9q7wxFkHQKBA_YfTWPlUg";
 
 // Initialize Supabase client for citizen auth
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+    storage: window.localStorage,
+  },
+});
 
 type UserType = {
   id: string;
@@ -109,6 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCitizenToken(session.access_token);
         localStorage.setItem("citizen_token", session.access_token);
         localStorage.setItem("citizen_session", JSON.stringify(session));
+        // Note: Google OAuth profile creation is handled by AuthCallback component
       } else if (event === 'SIGNED_OUT') {
         setCitizenSession(null);
         setCitizenToken(null);
