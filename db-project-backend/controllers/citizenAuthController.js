@@ -6,9 +6,8 @@
  */
 
 import { supabase } from "../config/supabase.js";
-import CrimeReportsSubmitter from "../models/CrimeReportsSubmitter.js";
 import db from "../models/index.js";
-const { sequelize } = db;
+const { sequelize, CrimeReportsSubmitter } = db;
 
 /**
  * POST /api/citizens/register
@@ -36,6 +35,15 @@ export const registerCitizen = async (req, res) => {
       return res.status(400).json({ error: "Password must be at least 6 characters" });
     }
 
+    // Check if email already exists in local database
+    const existingUser = await CrimeReportsSubmitter.findOne({
+      where: { email },
+    });
+
+    if (existingUser) {
+      return res.status(409).json({ error: "Email already registered" });
+    }
+
     // Register user with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
@@ -48,11 +56,27 @@ export const registerCitizen = async (req, res) => {
     });
 
     if (authError) {
+      // Log the full error for debugging
+      console.error("Supabase auth error:", authError);
+
       // Handle duplicate email
-      if (authError.message.includes("already registered")) {
+      if (authError.message.includes("already registered") || authError.message.includes("already exists")) {
         return res.status(409).json({ error: "Email already registered" });
       }
-      return res.status(400).json({ error: authError.message });
+
+      // Handle rate limit errors
+      if (authError.status === 429 || authError.code === "over_email_send_rate_limit") {
+        return res.status(429).json({
+          error: "Too many registration attempts. Please wait a few minutes before trying again.",
+          retryLater: true,
+        });
+      }
+
+      // Return the actual error message from Supabase
+      return res.status(400).json({
+        error: authError.message || "Registration failed",
+        details: authError,
+      });
     }
 
     // Create profile in CrimeReportsSubmitter table
@@ -75,11 +99,24 @@ export const registerCitizen = async (req, res) => {
         fullName: submitter.fullName,
         isProfileComplete: submitter.isProfileComplete,
       },
-      // Note: In production, don't expose session token in response
-      // Client should use Supabase client for auth state
+      session: authData.session ? {
+        accessToken: authData.session.access_token,
+        refreshToken: authData.session.refresh_token,
+        expiresIn: authData.session.expires_in,
+      } : null,
     });
   } catch (error) {
     console.error("Registration error:", error);
+
+    // Handle Sequelize unique constraint errors
+    if (error.name === "SequelizeUniqueConstraintError") {
+      const field = error.errors?.[0]?.path;
+      if (field === "email") {
+        return res.status(409).json({ error: "Email already registered" });
+      }
+      return res.status(409).json({ error: `${field} already exists` });
+    }
+
     res.status(500).json({ error: "Failed to register user" });
   }
 };

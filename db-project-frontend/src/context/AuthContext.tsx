@@ -168,7 +168,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const citizenLogin = async (email: string, password: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/citizens/login`, {
+      const response = await fetch(`${API_BASE_URL}/citizens/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -198,7 +198,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const citizenRegister = async (email: string, password: string, fullName: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/citizens/register`, {
+      const response = await fetch(`${API_BASE_URL}/citizens/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, fullName }),
@@ -211,11 +211,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       setCitizen(data.user);
-      setCitizenSession(data.session);
-      setCitizenToken(data.session.access_token);
+
+      // Only set session/token if it exists (email confirmation might be disabled)
+      if (data.session) {
+        setCitizenSession(data.session);
+        setCitizenToken(data.session.accessToken);
+        localStorage.setItem("citizen_session", JSON.stringify(data.session));
+        localStorage.setItem("citizen_token", data.session.accessToken);
+      }
+
       localStorage.setItem("citizen", JSON.stringify(data.user));
-      localStorage.setItem("citizen_session", JSON.stringify(data.session));
-      localStorage.setItem("citizen_token", data.session.access_token);
 
       return { success: true };
     } catch (err: any) {
@@ -251,16 +256,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const citizenLogout = async () => {
     try {
-      await fetch(`${API_BASE_URL}/api/citizens/logout`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${citizenToken}`,
-        },
-      });
+      // Sign out from Supabase
+      await supabase.auth.signOut();
     } catch (err) {
-      console.error("Logout error:", err);
+      console.error("Supabase logout error:", err);
     } finally {
+      // Always clear local state
       setCitizen(null);
       setCitizenSession(null);
       setCitizenToken(null);
@@ -293,7 +294,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const updateCitizenProfile = async (profileData: { cnic?: string; contact?: string; address?: string }) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/citizens/profile`, {
+      const response = await fetch(`${API_BASE_URL}/citizens/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
