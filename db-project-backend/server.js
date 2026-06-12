@@ -13,6 +13,7 @@ import agentRoutes from "./routes/agentRoutes.js";
 import statsRoutes from "./routes/statsRoutes.js";
 import zonesRoutes from "./routes/zoneRoutes.js";
 import crimeRoutes from "./routes/crimeRoutes.js";
+import citizenAuthRoutes from "./routes/citizenAuthRoutes.js";
 
 dotenv.config();
 
@@ -33,6 +34,7 @@ app.use("/api/agent", agentRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/zones", zonesRoutes);
 app.use("/api/crimes", crimeRoutes);
+app.use("/api/citizens", citizenAuthRoutes);
 
 const { sequelize } = db;
 const PORT = process.env.PORT || 5001;

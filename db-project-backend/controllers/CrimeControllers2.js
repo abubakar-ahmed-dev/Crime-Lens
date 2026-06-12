@@ -384,6 +384,7 @@ export const rejectCrimeReport = async (req, res) => {
 export const reportCrime = async (req, res) => {
   try {
     const {
+      userId, // For authenticated citizens (new)
       fullName,
       cnic,
       contact,
@@ -395,77 +396,89 @@ export const reportCrime = async (req, res) => {
       title,
     } = req.body;
 
-    if (!cnic || !date || !crimeTypeId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Missing required fields" });
+    // Validation: For authenticated users, require userId; for anonymous, require cnic
+    if (userId) {
+      // Authenticated citizen submission
+      if (!date || !crimeTypeId) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Missing required fields" });
+      }
+    } else {
+      // Anonymous submission (legacy)
+      if (!cnic || !date || !crimeTypeId) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Missing required fields" });
+      }
     }
 
-    
   const t = await sequelize.transaction();
 
-    // ---------------------------
-    // 1️⃣ Check if submitter exists
-    // ---------------------------
-    let submitterRecord = await sequelize.query(
-      `
-      SELECT "submitterCnic", "submitterName", "submitterContact"
-      FROM "CrimeReportsSubmitter"
-      WHERE "submitterCnic" = :cnic
-      LIMIT 1;
-      `,
-      {
-        replacements: { cnic },
-        type: QueryTypes.SELECT,
-        transaction: t,
-      }
-    );
-
-    let submitter = submitterRecord[0];
+    let submitterId = userId || cnic;
 
     // ---------------------------
-    // 2️⃣ Create submitter if not exists, else update info
+    // For anonymous submissions: Handle submitter creation/update
     // ---------------------------
-    if (!submitter) {
-      await sequelize.query(
+    if (!userId && cnic) {
+      let submitterRecord = await sequelize.query(
         `
-        INSERT INTO "CrimeReportsSubmitter" ("submitterCnic", "submitterName", "submitterContact")
-        VALUES (:cnic, :name, :contact)
+        SELECT "submitterCnic", "submitterName", "submitterContact"
+        FROM "CrimeReportsSubmitter"
+        WHERE "submitterCnic" = :cnic
+        LIMIT 1;
         `,
         {
-          replacements: { cnic, name: fullName || null, contact: contact || null },
-          type: QueryTypes.INSERT,
+          replacements: { cnic },
+          type: QueryTypes.SELECT,
           transaction: t,
         }
       );
-    } else {
-      // Update existing submitter info
-      if (fullName || contact) {
+
+      let submitter = submitterRecord[0];
+
+      // Create submitter if not exists, else update info
+      if (!submitter) {
         await sequelize.query(
           `
-          UPDATE "CrimeReportsSubmitter"
-          SET 
-            "submitterName" = COALESCE(:name, "submitterName"),
-            "submitterContact" = COALESCE(:contact, "submitterContact")
-          WHERE "submitterCnic" = :cnic
+          INSERT INTO "CrimeReportsSubmitter" ("submitterCnic", "submitterName", "submitterContact")
+          VALUES (:cnic, :name, :contact)
           `,
           {
-            replacements: { cnic, name: fullName, contact },
-            type: QueryTypes.UPDATE,
+            replacements: { cnic, name: fullName || null, contact: contact || null },
+            type: QueryTypes.INSERT,
             transaction: t,
           }
         );
+      } else {
+        // Update existing submitter info
+        if (fullName || contact) {
+          await sequelize.query(
+            `
+            UPDATE "CrimeReportsSubmitter"
+            SET
+              "submitterName" = COALESCE(:name, "submitterName"),
+              "submitterContact" = COALESCE(:contact, "submitterContact")
+            WHERE "submitterCnic" = :cnic
+            `,
+            {
+              replacements: { cnic, name: fullName, contact },
+              type: QueryTypes.UPDATE,
+              transaction: t,
+            }
+          );
+        }
       }
     }
 
     // ---------------------------
-    // 3️⃣ Insert Crime record
+    // Insert Crime record
     // ---------------------------
     const newCrimeRows = await sequelize.query(
       `
-      INSERT INTO "Crime" 
+      INSERT INTO "Crime"
         (title, description, "crimeTypeId", "incidentDate", "reportedAt", status, location, address, "zoneId")
-      VALUES 
+      VALUES
         (:title, :description, :crimeTypeId, :incidentDate, :reportedAt, 'pending', :location, :address, :zoneId)
       RETURNING *
       `,
@@ -488,17 +501,18 @@ export const reportCrime = async (req, res) => {
     const newCrime = newCrimeRows[0][0]; // RETURNING * gives array of inserted row(s)
 
     // ---------------------------
-    // 4️⃣ Insert CrimeSubmission metadata
+    // Insert CrimeSubmission metadata
     // ---------------------------
     const newCrimeSubmissionRows = await sequelize.query(
       `
-      INSERT INTO "CrimeSubmission" ("submitterCnic", "submittedAt", "CrimeId")
-      VALUES (:cnic, :submittedAt, :crimeId)
+      INSERT INTO "CrimeSubmission" ("submitterCnic", "userId", "submittedAt", "CrimeId")
+      VALUES (:cnic, :userId, :submittedAt, :crimeId)
       RETURNING *
       `,
       {
         replacements: {
-          cnic,
+          cnic: userId ? null : cnic, // For authenticated users, submitterCnic is null
+          userId: userId || null, // For anonymous users, userId is null
           submittedAt: new Date(),
           crimeId: newCrime.id,
         },
@@ -510,7 +524,7 @@ export const reportCrime = async (req, res) => {
     const newCrimeSubmission = newCrimeSubmissionRows[0][0];
     await t.commit();
     // ---------------------------
-    // 5️⃣ Response
+    // Response
     // ---------------------------
     res.status(201).json({
       success: true,

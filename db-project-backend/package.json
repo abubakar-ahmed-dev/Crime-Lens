@@ -7,6 +7,9 @@
     "start": "nodemon server.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.108.1",
+    "@types/bcrypt": "^6.0.0",
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",

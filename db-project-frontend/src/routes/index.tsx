@@ -10,6 +10,10 @@ import MapViewPage from "../pages/MapViewPage";
 import MeetDevelopersPage from "../pages/MeetDevelopersPage";
 import StatisticsPage from "../pages/StatisticsPage";
 import ReportCrimePage from "../pages/ReportCrimePage";
+import RegisterPage from "../pages/RegisterPage";
+import CitizenLoginPage from "../pages/CitizenLoginPage";
+import CompleteProfilePage from "../pages/CompleteProfilePage";
+import CitizenDashboardPage from "../pages/CitizenDashboardPage";
 
 type TRoute = {
   path: string;
@@ -29,6 +33,22 @@ export const PublicRoutes = () => {
     {
         path: "/login-admin",
         element: <LoginAdminPage/>
+    },
+    {
+      path: "/login-citizen",
+      element: <CitizenLoginPage/>
+    },
+    {
+      path: "/register",
+      element: <RegisterPage/>
+    },
+    {
+      path: "/complete-profile",
+      element: <CompleteProfilePage/>
+    },
+    {
+      path: "/citizen-dashboard",
+      element: <CitizenDashboardPage/>
     },
     {
         path: "/request-agent",
