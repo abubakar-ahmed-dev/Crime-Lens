@@ -188,9 +188,12 @@ export default function Register() {
         <div className="mt-4 text-center">
           <p className="text-sm text-gray-500">
             Are you an Admin or Police officer?{" "}
-            <Link to="/login-admin" className="text-gray-700 hover:underline">
+            <button
+              onClick={() => navigate("/login", { state: { role: "Administrator" } })}
+              className="text-gray-700 hover:underline"
+            >
               Login here
-            </Link>
+            </button>
           </p>
         </div>
       </div>

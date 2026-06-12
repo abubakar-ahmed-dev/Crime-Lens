@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { loginUser, setAuthToken } from "../services/api";
+import { API_BASE_URL } from "../config/constants";
 
 // Supabase configuration
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://jgxizgpxxdawcgdxrlfe.supabase.co";
@@ -167,7 +168,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const citizenLogin = async (email: string, password: string) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/citizens/login`, {
+      const response = await fetch(`${API_BASE_URL}/api/citizens/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -197,7 +198,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const citizenRegister = async (email: string, password: string, fullName: string) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/citizens/register`, {
+      const response = await fetch(`${API_BASE_URL}/api/citizens/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, fullName }),
@@ -250,7 +251,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const citizenLogout = async () => {
     try {
-      await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/citizens/logout`, {
+      await fetch(`${API_BASE_URL}/api/citizens/logout`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -292,7 +293,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const updateCitizenProfile = async (profileData: { cnic?: string; contact?: string; address?: string }) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/citizens/profile`, {
+      const response = await fetch(`${API_BASE_URL}/api/citizens/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

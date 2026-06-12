@@ -19,7 +19,7 @@ const LoginAdminPolice = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const location = useLocation();
-  const verify_role = location.state.role;
+  const verify_role = location.state?.role;
 
   const NavigateLogin = () => {
     navigate("/login");
