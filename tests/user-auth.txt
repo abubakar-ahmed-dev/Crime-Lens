@@ -1,0 +1,384 @@
+# User Authentication Test Cases
+# CrimeLens - Citizen Auth Implementation
+
+## Test Environment Setup
+- Backend: http://localhost:5001
+- Frontend: http://localhost:5173
+- Browser: Chrome/Edge (DevTools open)
+- Supabase: Configured and accessible
+
+---
+
+## 1. REGISTRATION TESTS
+
+### Test 1.1: Valid Email Registration
+**Steps:**
+1. Navigate to `/register-citizen`
+2. Enter valid email: `test@example.com`
+3. Enter password: `password123` (6+ chars)
+4. Enter full name: `Test User`
+5. Submit form
+
+**Expected Results:**
+- ✅ Registration successful
+- ✅ Redirected to `/complete-profile`
+- ✅ Token stored in localStorage (`citizen_token`)
+- ✅ User data stored in localStorage (`citizen`)
+- ✅ `isProfileComplete: false` in user data
+
+**Bug Check:**
+- [ ] Error if email already registered (should show "Email already registered")
+- [ ] Error if password < 6 characters
+- [ ] Error if invalid email format
+
+---
+
+### Test 1.2: Duplicate Email Registration
+**Steps:**
+1. Try registering with same email twice
+
+**Expected Results:**
+- ✅ Shows "Email already registered" error
+- ✅ No redirect to profile completion
+
+---
+
+### Test 1.3: Invalid Email Format
+**Steps:**
+1. Enter invalid email: `notanemail`
+2. Fill other fields and submit
+
+**Expected Results:**
+- ✅ Shows "Invalid email format" error
+
+---
+
+## 2. LOGIN TESTS
+
+### Test 2.1: Valid Login
+**Steps:**
+1. Navigate to `/login-citizen`
+2. Enter registered email and password
+3. Submit form
+
+**Expected Results:**
+- ✅ Login successful
+- ✅ If `isProfileComplete: false` → redirect to `/complete-profile`
+- ✅ If `isProfileComplete: true` → redirect to `/citizen-dashboard`
+- ✅ Token and session stored in localStorage
+
+---
+
+### Test 2.2: Invalid Credentials
+**Steps:**
+1. Enter correct email with wrong password
+
+**Expected Results:**
+- ✅ Shows "Invalid credentials" error
+- ✅ No redirect
+- ✅ Console shows 401 error (expected)
+
+---
+
+### Test 2.3: Login After Registration
+**Steps:**
+1. Register new account
+2. Immediately login with same credentials
+
+**Expected Results:**
+- ✅ Should work seamlessly (no errors)
+
+---
+
+## 3. PROFILE COMPLETION TESTS
+
+### Test 3.1: Valid Profile Completion
+**Steps:**
+1. Login as new user (incomplete profile)
+2. Navigate to `/complete-profile`
+3. Enter valid CNIC: `12345-1234567-1`
+4. Enter valid contact: `0300-1234567`
+5. Enter address: `Test Address, City`
+6. Submit form
+
+**Expected Results:**
+- ✅ Profile updated successfully
+- ✅ Redirected to `/citizen-dashboard`
+- ✅ `isProfileComplete: true` in localStorage
+- ✅ No console errors
+
+---
+
+### Test 3.2: Invalid CNIC Format
+**Steps:**
+1. Enter invalid CNIC: `1234567890`
+
+**Expected Results:**
+- ✅ Shows "Invalid CNIC format" error
+- ✅ No submission to backend
+
+---
+
+### Test 3.3: Incomplete Form Submission
+**Steps:**
+1. Leave one or more fields empty
+2. Submit form
+
+**Expected Results:**
+- ✅ Shows "Please fill in all fields" error
+
+---
+
+## 4. DASHBOARD TESTS
+
+### Test 4.1: Dashboard Load (No Reports)
+**Steps:**
+1. Complete profile
+2. Navigate to `/citizen-dashboard`
+3. Check reports section
+
+**Expected Results:**
+- ✅ Shows "No reports yet" message
+- ✅ Shows "Submit Your First Report" button
+- ✅ Stats show: Total=0, Pending=0, Approved=0, Rejected=0
+- ✅ No console errors
+
+---
+
+### Test 4.2: Dashboard Load (With Reports)
+**Steps:**
+1. Submit a crime report
+2. Navigate to `/citizen-dashboard`
+
+**Expected Results:**
+- ✅ Reports are displayed in table
+- ✅ Stats are calculated correctly
+- ✅ Filter buttons work (all/pending/approved/rejected)
+
+---
+
+### Test 4.3: Token Refresh on Dashboard
+**Steps:**
+1. Login and complete profile
+2. Wait for token to expire (or manually delete token)
+3. Refresh dashboard
+
+**Expected Results:**
+- ✅ Token is automatically refreshed
+- ✅ Dashboard loads without errors
+- ✅ User is NOT logged out
+
+---
+
+## 5. GOOGLE OAUTH TESTS
+
+### Test 5.1: Google Login Flow
+**Steps:**
+1. Click "Sign in with Google"
+2. Complete Google OAuth flow
+3. Check redirect and profile creation
+
+**Expected Results:**
+- ✅ Redirected to Google OAuth page
+- ✅ After auth, redirected to `/complete-profile`
+- ✅ User profile created in database
+- ✅ Can complete profile normally
+
+---
+
+## 6. LOGOUT TESTS
+
+### Test 6.1: Manual Logout
+**Steps:**
+1. Login and complete profile
+2. Click "Logout" button
+
+**Expected Results:**
+- ✅ Cleared from localStorage (`citizen`, `citizen_token`, `citizen_session`)
+- ✅ Redirected to `/login-citizen`
+- ✅ Cannot access protected routes after logout
+
+---
+
+### Test 6.2: Session Expire Logout
+**Steps:**
+1. Login
+2. Manually expire session (clear Supabase session)
+3. Try to access dashboard
+
+**Expected Results:**
+- ✅ Should detect expired session
+- ✅ Should attempt token refresh
+- ✅ If refresh fails, logout and redirect to login
+
+---
+
+## 7. ERROR HANDLING TESTS
+
+### Test 7.1: Network Error
+**Steps:**
+1. Stop backend server
+2. Try to login or complete profile
+
+**Expected Results:**
+- ✅ Shows user-friendly error message
+- ✅ No app crash
+- ✅ No raw JSON parse errors
+
+---
+
+### Test 7.2: Invalid Token in Request
+**Steps:**
+1. Manually set invalid token in localStorage
+2. Try to access dashboard
+
+**Expected Results:**
+- ✅ Shows 401 error
+- ✅ Attempts token refresh
+- ✅ If refresh fails, logs out
+
+---
+
+### Test 7.3: Malformed localStorage
+**Steps:**
+1. Manually set `localStorage.setItem("citizen", "undefined")`
+2. Try to access protected route
+
+**Expected Results:**
+- ✅ Should handle gracefully (try-catch)
+- ✅ Should redirect to login
+- ✅ No "Unexpected token" JSON parse errors
+
+---
+
+## 8. EDGE CASES
+
+### Test 8.1: Multiple Browser Tabs
+**Steps:**
+1. Login in one tab
+2. Open another tab and navigate to dashboard
+
+**Expected Results:**
+- ✅ Should be logged in (from localStorage)
+- ✅ Token refresh in one tab reflects in other
+
+---
+
+### Test 8.2: Profile Completion with Existing Data
+**Steps:**
+1. Complete profile with data
+2. Logout and login again
+3. Try to access `/complete-profile`
+
+**Expected Results:**
+- ✅ Should redirect to dashboard (profile already complete)
+
+---
+
+### Test 8.3: Rapid Login/Logout
+**Steps:**
+1. Login
+2. Immediately logout
+3. Login again
+4. Repeat 5 times
+
+**Expected Results:**
+- ✅ No localStorage corruption
+- ✅ No "undefined" strings in storage
+- ✅ Works consistently
+
+---
+
+## 9. SECURITY TESTS
+
+### Test 9.1: Cannot Access Protected Routes Without Auth
+**Steps:**
+1. Clear localStorage
+2. Try to access: `/citizen-dashboard`, `/complete-profile`, `/api/citizens/my-reports`
+
+**Expected Results:**
+- ✅ All redirect to `/login-citizen`
+- ✅ API endpoints return 401
+
+---
+
+### Test 9.2: Token Validation
+**Steps:**
+1. Login and copy token from localStorage
+2. Use token in Postman/curl: `GET /api/citizens/my-reports` with `Authorization: Bearer <token>`
+
+**Expected Results:**
+- ✅ Request succeeds with valid token
+- ✅ Request fails with invalid/expired token
+
+---
+
+## 10. API RESPONSE FORMAT TESTS
+
+### Test 10.1: Check Success Response Format
+**Steps:**
+1. Login and check console logs
+2. Verify response structure
+
+**Expected Format:**
+```json
+{
+  "success": true,
+  "user": { ... },
+  "session": {
+    "accessToken": "...",
+    "refreshToken": "...",
+    "expiresIn": 3600
+  },
+  "message": "Login successful"
+}
+```
+
+---
+
+### Test 10.2: Check Error Response Format
+**Steps:**
+1. Try to login with wrong password
+2. Check console logs
+
+**Expected Format:**
+```json
+{
+  "success": false,
+  "error": "Invalid credentials",
+  "code": "UNAUTHORIZED"
+}
+```
+
+---
+
+## BUG CHECKLIST
+
+Run through these tests and note any bugs found:
+
+- [ ] Registration succeeds but profile completion fails
+- [ ] Login succeeds but dashboard shows "Unauthorized"
+- [ ] Token refresh not working (keeps logging out)
+- [ ] Console shows "Cannot read properties of undefined"
+- [ ] JSON parse errors in console
+- [ ] Duplicate /api/ in API URLs
+- [ ] Wrong property names (accessToken vs access_token)
+- [ ] localStorage contains "undefined" strings
+- [ ] Profile completion shows "User not found" after login
+- [ ] Dashboard shows error instead of "No reports yet"
+
+---
+
+## EXECUTION CHECKLIST
+
+For each test:
+- [ ] Test passes ✓
+- [ ] Test fails ✗
+- [ ] Bug found: _______________
+
+---
+
+## Notes
+- Update this file as bugs are found
+- Use this document for regression testing
+- Test after each code change to user auth flow

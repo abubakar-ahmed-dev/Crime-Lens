@@ -80,6 +80,17 @@ export const registerCitizen = asyncHandler(async (req, res) => {
     isProfileComplete: false,
   });
 
+  // Build session object with user data for email verification status
+  const sessionWithUser = authData.session ? {
+    ...authData.session,
+    user: {
+      id: authData.user.id,
+      email: authData.user.email,
+      email_confirmed_at: authData.user.email_confirmed_at,
+      app_metadata: authData.user.app_metadata,
+    },
+  } : null;
+
   return success(res, {
     data: {
       user: {
@@ -87,12 +98,10 @@ export const registerCitizen = asyncHandler(async (req, res) => {
         email: submitter.email,
         fullName: submitter.fullName,
         isProfileComplete: submitter.isProfileComplete,
+        emailVerified: !!authData.user?.email_confirmed_at,
+        provider: authData.user?.app_metadata?.provider || "email",
       },
-      session: authData.session ? {
-        accessToken: authData.session.access_token,
-        refreshToken: authData.session.refresh_token,
-        expiresIn: authData.session.expires_in,
-      } : null,
+      session: sessionWithUser,
     },
     message: 'Registration successful. Please complete your profile.',
     statusCode: 201,
@@ -132,6 +141,17 @@ export const loginCitizen = asyncHandler(async (req, res) => {
     return errors.notFound(res, 'User profile not found');
   }
 
+  // Include Supabase user data in session for email verification status
+  const sessionWithUser = {
+    ...authData.session,
+    user: {
+      id: authData.user.id,
+      email: authData.user.email,
+      email_confirmed_at: authData.user.email_confirmed_at,
+      app_metadata: authData.user.app_metadata,
+    },
+  };
+
   return success(res, {
     data: {
       user: {
@@ -142,12 +162,10 @@ export const loginCitizen = asyncHandler(async (req, res) => {
         cnic: submitter.submitterCnic,
         address: submitter.address,
         isProfileComplete: submitter.isProfileComplete,
+        emailVerified: !!authData.user.email_confirmed_at,
+        provider: authData.user.app_metadata?.provider || "email",
       },
-      session: {
-        accessToken: authData.session.access_token,
-        refreshToken: authData.session.refresh_token,
-        expiresIn: authData.session.expires_in,
-      },
+      session: sessionWithUser,
     },
     message: 'Login successful',
   });
@@ -299,7 +317,16 @@ export const updateProfile = asyncHandler(async (req, res) => {
     }
     updates.submitterCnic = cnic;
   }
-  if (contact) updates.contact = contact;
+  if (contact) {
+    // Check if contact number is already taken by another user
+    const existingContact = await CrimeReportsSubmitter.findOne({
+      where: { contact },
+    });
+    if (existingContact && existingContact.email !== userEmail) {
+      return errors.conflict(res, 'Contact number already registered');
+    }
+    updates.contact = contact;
+  }
   if (address) updates.address = address;
 
   // Check if profile is complete
@@ -311,18 +338,49 @@ export const updateProfile = asyncHandler(async (req, res) => {
     updates.isProfileComplete = true;
   }
 
-  await submitter.update(updates);
+  // Use raw SQL to update the record (handles primary key update correctly)
+  if (Object.keys(updates).length === 0) {
+    return errors.badRequest(res, 'No fields to update');
+  }
+
+  // Build dynamic UPDATE query
+  const setClause = [];
+  const replacements = { email: userEmail };
+  let paramIndex = 1;
+
+  for (const [key, value] of Object.entries(updates)) {
+    setClause.push(`"${key}" = $${paramIndex}`);
+    replacements[key] = value;
+    paramIndex++;
+  }
+
+  // IMPORTANT: WHERE clause must use the CURRENT (old) CNIC to find the record
+  // The SET clause will update it to the new CNIC if provided
+  const currentCnic = submitter.submitterCnic;
+
+  await sequelize.query(
+    `UPDATE "CrimeReportsSubmitter" SET ${setClause.join(', ')} WHERE "submitterCnic" = $${paramIndex}`,
+    {
+      replacements: { ...replacements, submitterCnic: currentCnic },
+      type: sequelize.QueryTypes.UPDATE,
+    }
+  );
+
+  // Fetch the updated record to return fresh data
+  const updatedSubmitter = await CrimeReportsSubmitter.findOne({
+    where: { email: userEmail },
+  });
 
   return success(res, {
     data: {
       user: {
-        id: submitter.submitterCnic,
-        email: submitter.email,
-        fullName: submitter.fullName,
-        contact: submitter.contact,
-        cnic: submitter.submitterCnic,
-        address: submitter.address,
-        isProfileComplete: submitter.isProfileComplete,
+        id: updatedSubmitter.submitterCnic,
+        email: updatedSubmitter.email,
+        fullName: updatedSubmitter.fullName,
+        contact: updatedSubmitter.contact,
+        cnic: updatedSubmitter.submitterCnic,
+        address: updatedSubmitter.address,
+        isProfileComplete: updatedSubmitter.isProfileComplete,
       },
     },
     message: 'Profile updated successfully',

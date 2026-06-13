@@ -68,11 +68,22 @@ export const authorizeCitizen = async (req, res, next) => {
       return res.status(401).json({ error: "Invalid or expired token" });
     }
 
+    // Check if email is verified (only applies to email/password signups, not OAuth)
+    // The email_confirmed_at field is null when email is not verified
+    if (!data.user.email_confirmed_at && !data.user.app_metadata?.provider) {
+      return res.status(403).json({
+        error: "Please verify your email first. Check your inbox for the verification link.",
+        code: "EMAIL_NOT_VERIFIED"
+      });
+    }
+
     // Attach user info to req.user for the controller to use
     req.user = {
       id: data.user.id,
       email: data.user.email,
+      emailVerified: !!data.user.email_confirmed_at,
       authType: "supabase",
+      provider: data.user.app_metadata?.provider || "email",
     };
 
     next();

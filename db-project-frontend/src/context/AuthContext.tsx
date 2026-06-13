@@ -31,6 +31,8 @@ type CitizenUserType = {
   email: string;
   fullName: string;
   isProfileComplete: boolean;
+  emailVerified: boolean;
+  provider?: string;
   cnic?: string;
   contact?: string;
   address?: string;
@@ -54,6 +56,7 @@ type AuthContextType = {
   citizenGoogleLogin: () => Promise<{ success: boolean; message?: string }>;
   citizenLogout: () => Promise<void>;
   refreshCitizenSession: () => Promise<void>;
+  resendVerificationEmail: () => Promise<{ success: boolean; message?: string }>;
   updateCitizenProfile: (data: { cnic?: string; contact?: string; address?: string }) => Promise<{ success: boolean; message?: string }>;
 };
 
@@ -198,12 +201,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, message: "No session returned from server" };
       }
 
-      setCitizen(data.user);
-      setCitizenSession(data.session);
-      setCitizenToken(data.session.accessToken);
-      localStorage.setItem("citizen", JSON.stringify(data.user));
-      localStorage.setItem("citizen_session", JSON.stringify(data.session));
-      localStorage.setItem("citizen_token", data.session.accessToken);
+      // Add email verification status from Supabase session
+      const sessionData = data.session;
+      const citizenWithVerification = {
+        ...data.user,
+        emailVerified: !!(sessionData.user?.email_confirmed_at),
+        provider: sessionData.user?.app_metadata?.provider || "email",
+      };
+
+      setCitizen(citizenWithVerification);
+      setCitizenSession(sessionData);
+      setCitizenToken(sessionData.access_token);
+      localStorage.setItem("citizen", JSON.stringify(citizenWithVerification));
+      localStorage.setItem("citizen_session", JSON.stringify(sessionData));
+      localStorage.setItem("citizen_token", sessionData.access_token);
 
       return { success: true };
     } catch (err: any) {
@@ -229,17 +240,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, message: data.error || "Registration failed" };
       }
 
-      setCitizen(data.user);
+      // For email signup, emailVerified is false until user clicks verification link
+      // Google OAuth users have verified emails by default
+      const citizenWithVerification = {
+        ...data.user,
+        emailVerified: !!(data.session?.user?.email_confirmed_at),
+        provider: data.session?.user?.app_metadata?.provider || "email",
+      };
+
+      setCitizen(citizenWithVerification);
 
       // Only set session/token if it exists (email confirmation might be disabled)
       if (data.session) {
         setCitizenSession(data.session);
-        setCitizenToken(data.session.accessToken);
+        setCitizenToken(data.session.access_token);
         localStorage.setItem("citizen_session", JSON.stringify(data.session));
-        localStorage.setItem("citizen_token", data.session.accessToken);
+        localStorage.setItem("citizen_token", data.session.access_token);
       }
 
-      localStorage.setItem("citizen", JSON.stringify(data.user));
+      localStorage.setItem("citizen", JSON.stringify(citizenWithVerification));
 
       return { success: true };
     } catch (err: any) {
@@ -313,6 +332,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   /**
+   * Resend verification email
+   */
+  const resendVerificationEmail = async () => {
+    try {
+      const { data, error } = await supabase.auth.resend({
+        type: 'signup',
+        email: citizen?.email || '',
+      });
+
+      if (error) {
+        return { success: false, message: error.message || "Failed to resend verification email" };
+      }
+
+      return { success: true, message: "Verification email sent! Please check your inbox." };
+    } catch (err: any) {
+      console.error("Resend verification error:", err);
+      return { success: false, message: "Failed to resend verification email. Please try again." };
+    }
+  };
+
+  /**
    * Update citizen profile
    */
   const updateCitizenProfile = async (profileData: { cnic?: string; contact?: string; address?: string }) => {
@@ -355,6 +395,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (!response.ok) {
         console.error("Profile update failed:", response.status, data);
+        // Handle email not verified error specifically
+        if (data.code === "EMAIL_NOT_VERIFIED" || data.error?.includes("verify your email")) {
+          return { success: false, message: "Please verify your email first. Check your inbox for the verification link." };
+        }
         return { success: false, message: data.error || data.message || "Profile update failed" };
       }
 
@@ -388,6 +432,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         citizenGoogleLogin,
         citizenLogout,
         refreshCitizenSession,
+        resendVerificationEmail,
         updateCitizenProfile,
       }}
     >

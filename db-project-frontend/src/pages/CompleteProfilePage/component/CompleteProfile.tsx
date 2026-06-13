@@ -4,7 +4,7 @@ import { useAuth } from "../../../context/AuthContext";
 
 export default function CompleteProfile() {
   const navigate = useNavigate();
-  const { citizen, updateCitizenProfile, citizenLogout, isCitizenAuthenticated } = useAuth();
+  const { citizen, updateCitizenProfile, citizenLogout, isCitizenAuthenticated, resendVerificationEmail } = useAuth();
 
   const [formData, setFormData] = useState({
     cnic: "",
@@ -13,7 +13,9 @@ export default function CompleteProfile() {
   });
 
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
   const [step, setStep] = useState(1);
 
   // Redirect if not authenticated or profile is already complete
@@ -112,9 +114,56 @@ export default function CompleteProfile() {
     navigate("/login-citizen");
   };
 
+  const handleResendEmail = async () => {
+    setResendingEmail(true);
+    setError("");
+    setSuccessMessage("");
+
+    const result = await resendVerificationEmail();
+
+    setResendingEmail(false);
+
+    if (result.success) {
+      setSuccessMessage(result.message || "Verification email sent!");
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccessMessage(""), 5000);
+    } else {
+      setError(result.message || "Failed to resend verification email");
+    }
+  };
+
+  // Check if email is not verified (only for email signup, not Google/OAuth)
+  const isEmailNotVerified = citizen?.provider === "email" && !citizen?.emailVerified;
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100 px-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.1)] p-8">
+        {/* Email Verification Banner - Only for email signup */}
+        {isEmailNotVerified && (
+          <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3 flex-1">
+                <p className="text-sm text-yellow-700">
+                  <strong>Email verification required!</strong> Please check your inbox and click the verification link to complete your registration.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleResendEmail}
+                  disabled={resendingEmail}
+                  className="mt-2 text-xs font-medium text-yellow-800 hover:text-yellow-900 underline disabled:no-underline disabled:opacity-50"
+                >
+                  {resendingEmail ? "Sending..." : "Resend verification email"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-block px-4 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium mb-3">
@@ -130,6 +179,13 @@ export default function CompleteProfile() {
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-600 text-sm">{error}</p>
+          </div>
+        )}
+
+        {/* Success Message */}
+        {successMessage && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-green-600 text-sm">{successMessage}</p>
           </div>
         )}
 
