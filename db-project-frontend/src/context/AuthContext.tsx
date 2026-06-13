@@ -40,7 +40,7 @@ type AuthContextType = {
   // Admin/Police auth state
   user: UserType | null;
   token: string | null;
-  login: (username: string, password: string, verify_role: string) => Promise<{ success: boolean; message?: string }>;
+  login: (username: string, password: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
   isAuthenticated: boolean;
 
@@ -135,9 +135,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   /**
    * Admin/Police login (JWT-based)
    */
-  const login = async (username: string, password: string, verify_role: string) => {
+  const login = async (username: string, password: string) => {
     try {
-      const data = await loginUser(username, password, verify_role);
+      const data = await loginUser(username, password);
       if (!data || !data.success) {
         return { success: false, message: data?.message || "Login failed" };
       }
@@ -188,6 +188,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, message: data.error || "Login failed" };
       }
 
+      if (!data.user) {
+        console.error("No user data in response:", data);
+        return { success: false, message: "Invalid response from server" };
+      }
+
+      if (!data.session) {
+        console.error("No session data in response:", data);
+        return { success: false, message: "No session returned from server" };
+      }
+
       setCitizen(data.user);
       setCitizenSession(data.session);
       setCitizenToken(data.session.accessToken);
@@ -197,7 +207,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { success: true };
     } catch (err: any) {
-      return { success: false, message: "Login failed. Please try again." };
+      console.error("Login error:", err);
+      return { success: false, message: err?.message || "Login failed. Please try again." };
     }
   };
 
@@ -241,7 +252,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const citizenGoogleLogin = async () => {
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -287,6 +298,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase.auth.refreshSession();
       if (error) throw error;
 
+      if (!data.session) {
+        throw new Error("No session returned from refresh");
+      }
+
       setCitizenSession(data.session);
       setCitizenToken(data.session.access_token);
       localStorage.setItem("citizen_session", JSON.stringify(data.session));
@@ -323,9 +338,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      console.log("Profile update - token exists:", !!token);
-      console.log("Profile update - token length:", token?.length);
-
       if (!token) {
         return { success: false, message: "Not authenticated. Please login again." };
       }
@@ -346,9 +358,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, message: data.error || data.message || "Profile update failed" };
       }
 
-      // Update local citizen state
-      setCitizen(data.profile);
-      localStorage.setItem("citizen", JSON.stringify(data.profile));
+      // Update local citizen state with the returned user data
+      setCitizen(data.user);
+      localStorage.setItem("citizen", JSON.stringify(data.user));
 
       return { success: true };
     } catch (err: any) {

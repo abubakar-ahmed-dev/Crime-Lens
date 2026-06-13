@@ -5,6 +5,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import db from "./models/index.js";
+import { validateEnv } from "./config/envValidation.js";
 
 import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -16,6 +17,9 @@ import crimeRoutes from "./routes/crimeRoutes.js";
 import citizenAuthRoutes from "./routes/citizenAuthRoutes.js";
 
 dotenv.config();
+
+// Validate environment variables before starting the server
+validateEnv();
 
 const app = express();
 

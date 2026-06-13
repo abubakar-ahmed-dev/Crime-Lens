@@ -31,11 +31,6 @@ export default (sequelize) => {
       },
       comment: "Email address from Supabase Auth",
     },
-    password: {
-      type: DataTypes.TEXT,
-      allowNull: true,
-      comment: "Password hash (backup/sync, not primary auth)",
-    },
 
     // Personal information
     fullName: {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../../context/AuthContext";
+import { supabase, useAuth } from "../../../context/AuthContext";
 
 export default function CitizenDashboard() {
   const navigate = useNavigate();
@@ -22,8 +22,16 @@ export default function CitizenDashboard() {
       return;
     }
 
-    // Parse citizen data from state or storage
-    const citizenData = citizen || (citizenFromStorage ? JSON.parse(citizenFromStorage) : null);
+    // Parse citizen data from state or storage (safely handle "undefined" string)
+    let citizenData = citizen;
+    if (!citizenData && citizenFromStorage && citizenFromStorage !== "undefined") {
+      try {
+        citizenData = JSON.parse(citizenFromStorage);
+      } catch (e) {
+        console.error("Failed to parse citizen data from storage:", e);
+        citizenData = null;
+      }
+    }
 
     // Redirect to profile completion if not complete
     if (citizenData && !citizenData.isProfileComplete) {
@@ -39,20 +47,63 @@ export default function CitizenDashboard() {
     setError("");
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/citizens/my-reports`, {
+      // Get token from state or localStorage
+      let token = citizenToken || localStorage.getItem("citizen_token");
+
+      if (!token) {
+        throw new Error("Not authenticated. Please login again.");
+      }
+
+      // Try to fetch reports
+      let response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/citizens/my-reports`, {
         headers: {
-          "Authorization": `Bearer ${citizenToken}`,
+          "Authorization": `Bearer ${token}`,
         },
       });
+
+      // If token expired, try to refresh and retry
+      if (response.status === 401) {
+        console.log("Token expired, attempting refresh...");
+
+        try {
+          const { data: { session } } = await supabase.auth.refreshSession();
+
+          if (!session) {
+            throw new Error("Failed to refresh session");
+          }
+
+          // Update token and retry
+          token = session.access_token;
+          localStorage.setItem("citizen_token", token);
+          setCitizenToken(token);
+          localStorage.setItem("citizen_session", JSON.stringify(session));
+          setCitizenSession(session);
+
+          response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/citizens/my-reports`, {
+            headers: {
+              "Authorization": `Bearer ${token}`,
+            },
+          });
+        } catch (refreshError) {
+          console.error("Token refresh failed:", refreshError);
+          // If refresh fails, logout user
+          await citizenLogout();
+          navigate("/login-citizen");
+          return;
+        }
+      }
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to fetch reports");
+        throw new Error(data.error || data.message || `Failed to fetch reports (${response.status})`);
       }
 
-      setReports(data.reports || []);
+      // Handle new standardized response format (data is wrapped in 'data' property)
+      const reportsData = data.data || data;
+      setReports(reportsData.reports || []);
     } catch (err: any) {
+      console.error("Fetch reports error:", err);
       setError(err.message || "Failed to load reports");
     } finally {
       setLoading(false);
