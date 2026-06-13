@@ -40,7 +40,6 @@ const LoginAdminPolice = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password, verify_role }),
       });
-      console.log("hello");
 
       const data = await response.json();
 
