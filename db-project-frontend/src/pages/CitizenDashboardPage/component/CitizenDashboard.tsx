@@ -224,28 +224,28 @@ export default function CitizenDashboard() {
         </div>
 
         {/* My Reports Section */}
-        <div className="bg-white rounded-xl shadow-sm border">
-          <div className="p-6 border-b">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <h2 className="text-lg font-semibold text-gray-800">My Reports</h2>
-              <div className="flex gap-2">
+        <div className="bg-[#fefefe] p-4 rounded-2xl shadow-[0_0_5px_rgba(0,0,0,0.15)]">
+          <div className="flex flex-col gap-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <h3 className="font-outfit font-semibold text-xl text-black">My Reports</h3>
+              <div className="flex gap-2 flex-wrap">
                 {(["all", "pending", "approved", "rejected"] as const).map((status) => (
                   <button
                     key={status}
                     onClick={() => setFilter(status)}
-                    className={`px-3 py-1 rounded-lg text-sm font-medium capitalize ${filter === status
-                      ? "bg-[#237E54] text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
+                      filter === status
+                        ? "bg-[#237E54] text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
                   >
                     {status}
                   </button>
                 ))}
               </div>
             </div>
-          </div>
 
-          <div className="p-6">
+            <div>
             {loading ? (
               <div className="text-center py-8">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#237E54]"></div>
@@ -312,6 +312,7 @@ export default function CitizenDashboard() {
                 </table>
               </div>
             )}
+            </div>
           </div>
         </div>
         {/* Action Buttons */}
@@ -331,6 +332,62 @@ export default function CitizenDashboard() {
             />
           </div>
         </div>
+
+        {/* Update Profile Form */}
+        {showProfileForm && (
+          <div className="bg-[#fefefe] p-4 rounded-2xl shadow-[0_0_5px_rgba(0,0,0,0.15)]">
+            <div className="flex flex-col gap-y-4">
+              <h3 className="font-outfit font-semibold text-xl text-black">Update Profile</h3>
+
+              <div className="flex flex-col gap-y-3">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Full Name</label>
+                  <input
+                    type="text"
+                    value={profileData.fullName}
+                    onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
+                    className="w-full mt-1 border-2 border-[#d9d9d9] rounded-lg px-4 py-2 font-outfit text-sm focus:outline-none focus:border-[#237E54]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Contact Number</label>
+                  <input
+                    type="text"
+                    value={profileData.contact}
+                    onChange={(e) => setProfileData({...profileData, contact: e.target.value})}
+                    className="w-full mt-1 border-2 border-[#d9d9d9] rounded-lg px-4 py-2 font-outfit text-sm focus:outline-none focus:border-[#237E54]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Address</label>
+                  <textarea
+                    value={profileData.address}
+                    onChange={(e) => setProfileData({...profileData, address: e.target.value})}
+                    className="w-full mt-1 border-2 border-[#d9d9d9] rounded-lg px-4 py-2 font-outfit text-sm focus:outline-none focus:border-[#237E54] resize-none"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <GreenButton
+                    label="Save Changes"
+                    width={150}
+                    height={45}
+                    onClick={handleProfileUpdate}
+                  />
+                  <WhiteButton
+                    label="Cancel"
+                    width={100}
+                    height={45}
+                    onClick={() => setShowProfileForm(false)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </section>
