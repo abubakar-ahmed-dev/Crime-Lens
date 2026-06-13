@@ -53,6 +53,10 @@ const Login = () => {
               label="Login as a Police Agent"
               onClick={() => NavigateLoginAdmin("Police Agent")}
             />
+            <WhiteButton
+              label="Login as a Citizen"
+              onClick={() => navigate("/login-citizen")}
+            />
             <hr className="border-t-2 border-[#d9d9d9] mx-4" />
             <GreenButton label="Back to Home" onClick={NavigateHome} />
           </div>
