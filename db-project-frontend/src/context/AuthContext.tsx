@@ -56,7 +56,7 @@ type AuthContextType = {
   citizenGoogleLogin: () => Promise<{ success: boolean; message?: string }>;
   citizenLogout: () => Promise<void>;
   refreshCitizenSession: () => Promise<void>;
-  resendVerificationEmail: () => Promise<{ success: boolean; message?: string }>;
+  resendVerificationEmail: (email?: string) => Promise<{ success: boolean; message?: string }>;
   updateCitizenProfile: (data: { cnic?: string; contact?: string; address?: string }) => Promise<{ success: boolean; message?: string }>;
 };
 
@@ -333,12 +333,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   /**
    * Resend verification email
+   * @param email - Optional email parameter (used when user is not logged in)
    */
-  const resendVerificationEmail = async () => {
+  const resendVerificationEmail = async (email?: string) => {
     try {
+      const targetEmail = email || citizen?.email || '';
+
+      if (!targetEmail) {
+        return { success: false, message: "No email address provided" };
+      }
+
       const { data, error } = await supabase.auth.resend({
         type: 'signup',
-        email: citizen?.email || '',
+        email: targetEmail,
       });
 
       if (error) {

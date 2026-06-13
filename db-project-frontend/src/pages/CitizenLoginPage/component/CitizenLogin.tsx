@@ -4,7 +4,7 @@ import { useAuth } from "../../../context/AuthContext";
 
 export default function CitizenLogin() {
   const navigate = useNavigate();
-  const { citizenLogin, citizenGoogleLogin, isCitizenAuthenticated, citizen } = useAuth();
+  const { citizenLogin, citizenGoogleLogin, isCitizenAuthenticated, citizen, resendVerificationEmail } = useAuth();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -12,7 +12,9 @@ export default function CitizenLogin() {
   });
 
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -60,6 +62,28 @@ export default function CitizenLogin() {
     // Supabase will handle redirect
   };
 
+  const handleResendVerification = async () => {
+    if (!formData.email) {
+      setError("Please enter your email address first");
+      return;
+    }
+
+    setResendingEmail(true);
+    setError("");
+
+    const result = await resendVerificationEmail(formData.email);
+
+    setResendingEmail(false);
+
+    if (result.success) {
+      setSuccessMessage(result.message || "Verification email sent! Please check your inbox.");
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccessMessage(""), 5000);
+    } else {
+      setError(result.message || "Failed to resend verification email");
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100 px-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.1)] p-8">
@@ -73,6 +97,24 @@ export default function CitizenLogin() {
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-600 text-sm">{error}</p>
+            {/* Show resend link if error is about email verification */}
+            {(error.includes("verify your email") || error.includes("Email not confirmed")) && (
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                disabled={resendingEmail}
+                className="mt-2 text-sm text-red-700 hover:text-red-800 underline disabled:no-underline disabled:opacity-50"
+              >
+                {resendingEmail ? "Sending..." : "Resend verification email"}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Success Message */}
+        {successMessage && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-green-600 text-sm">{successMessage}</p>
           </div>
         )}
 

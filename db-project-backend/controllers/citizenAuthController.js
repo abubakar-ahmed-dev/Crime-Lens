@@ -126,6 +126,14 @@ export const loginCitizen = asyncHandler(async (req, res) => {
   });
 
   if (authError) {
+    // Handle email not confirmed error specifically
+    if (authError.message.includes("Email not confirmed")) {
+      return res.status(403).json({
+        success: false,
+        error: "Please verify your email first. Check your inbox for the verification link.",
+        code: "EMAIL_NOT_VERIFIED"
+      });
+    }
     if (authError.message.includes("Invalid")) {
       return errors.unauthorized(res, 'Invalid credentials');
     }
