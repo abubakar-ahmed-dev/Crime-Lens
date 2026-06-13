@@ -37,6 +37,7 @@ const Sidebar = ({
     { label: "Verify Report", icon: ICONS.VerifyReportIcon, activeIcon: ICONS.VerifyReportIcon_Active, route: "/verification?type=police" },
     { label: "Crime Records", icon: ICONS.CrimeRecordsIcon, activeIcon: ICONS.CrimeRecordsIcon_Active, route: "/all-records?type=police" },
     { label: "Report Crime", icon: ICONS.ReportCrimeIcon, activeIcon: ICONS.ReportCrimeIcon_Active, route: "/report-crime" },
+    { label: "Profile", icon: ICONS.DashboardIcon, activeIcon: ICONS.DashboardIcon_Active, route: "/citizen-dashboard" },
     { label: "Upload Data", icon: ICONS.UploadDataIcon, activeIcon: ICONS.UploadDataIcon_Active, route: "/upload-crimes" },
     { label: "Give Feedback", icon: ICONS.GiveFeedbackIcon, activeIcon: ICONS.GiveFeedbackIcon_Active, route: "/feedback" },
   ];
@@ -53,7 +54,7 @@ const Sidebar = ({
     );
   } else if (version === "user") {
     filteredMenus = allMenus.filter((m) =>
-      ["Dashboard", "Report Crime"].includes(m.label)
+      ["Dashboard", "Report Crime", "Profile"].includes(m.label)
     );
   }
 
