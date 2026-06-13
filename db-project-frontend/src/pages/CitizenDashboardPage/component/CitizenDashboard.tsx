@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
+import StatsCard from "../../../components/StatsCards";
+import GreenButton from "../../../components/GreenButton";
+import WhiteButton from "../../../components/WhiteButton";
+import RedButton from "../../../components/RedButton";
+import ArrowButton from "../../../components/ArrowButton";
+import StatsCardLiveIcon from "../../../components/StatsCardLiveIcon";
 
 export default function CitizenDashboard() {
   const navigate = useNavigate();
@@ -10,6 +16,12 @@ export default function CitizenDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [showProfileForm, setShowProfileForm] = useState(false);
+  const [profileData, setProfileData] = useState({
+    fullName: citizen?.fullName || "",
+    contact: citizen?.contact || "",
+    address: citizen?.address || "",
+  });
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -111,6 +123,12 @@ export default function CitizenDashboard() {
     navigate("/login-citizen");
   };
 
+  const handleProfileUpdate = () => {
+    // TODO: Implement backend API call
+    console.log("Profile update:", profileData);
+    setShowProfileForm(false);
+  };
+
   const filteredReports = reports.filter((report) => {
     if (filter === "all") return true;
     return report.status === filter;
@@ -133,33 +151,26 @@ export default function CitizenDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top Navigation */}
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center">
-              <h1 className="text-xl font-bold text-[#237E54]">CrimeLens</h1>
-              <span className="ml-3 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+    <section className="flex flex-row min-h-screen w-full">
+      <div className="flex flex-col gap-y-4 p-4 w-full overflow-y-auto">
+        {/* Header Section */}
+        <div className="bg-[#fefefe] p-4 rounded-2xl shadow-[0_0_5px_rgba(0,0,0,0.15)] flex flex-col gap-y-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 w-full">
+            <div className="flex flex-col gap-y-1">
+              <div className="font-outfit font-semibold text-2xl sm:text-4xl text-black">
                 Citizen Dashboard
-              </span>
+              </div>
+              <div className="font-outfit text-sm sm:text-md text-[#A0A0A0]">
+                Monitor your crime reports, track status, and manage your profile.
+              </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">
-                Welcome, {citizen?.fullName}
-              </span>
-              <button
-                onClick={handleLogout}
-                className="px-3 py-1 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
-              >
-                Logout
-              </button>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Welcome, {citizen?.fullName}</span>
+              <RedButton label="Logout" width={100} height={40} onClick={handleLogout} />
             </div>
           </div>
         </div>
-      </nav>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-xl p-6 shadow-sm border">
@@ -254,11 +265,10 @@ export default function CitizenDashboard() {
                   <button
                     key={status}
                     onClick={() => setFilter(status)}
-                    className={`px-3 py-1 rounded-lg text-sm font-medium capitalize ${
-                      filter === status
+                    className={`px-3 py-1 rounded-lg text-sm font-medium capitalize ${filter === status
                         ? "bg-[#237E54] text-white"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
+                      }`}
                   >
                     {status}
                   </button>
@@ -337,6 +347,6 @@ export default function CitizenDashboard() {
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
