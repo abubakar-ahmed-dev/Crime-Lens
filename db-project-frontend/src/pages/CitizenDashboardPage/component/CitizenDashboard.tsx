@@ -17,6 +17,9 @@ export default function CitizenDashboard() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [showProfileForm, setShowProfileForm] = useState(false);
+  const [profileUpdateLoading, setProfileUpdateLoading] = useState(false);
+  const [profileUpdateError, setProfileUpdateError] = useState("");
+  const [profileUpdateSuccess, setProfileUpdateSuccess] = useState("");
   const [profileData, setProfileData] = useState({
     fullName: citizen?.fullName || "",
     contact: citizen?.contact || "",
@@ -53,6 +56,17 @@ export default function CitizenDashboard() {
 
     fetchMyReports();
   }, [citizen, isCitizenAuthenticated, navigate]);
+
+  // Update profileData when citizen data changes (e.g., after profile update)
+  useEffect(() => {
+    if (citizen) {
+      setProfileData({
+        fullName: citizen.fullName || "",
+        contact: citizen.contact || "",
+        address: citizen.address || "",
+      });
+    }
+  }, [citizen]);
 
   const fetchMyReports = async () => {
     setLoading(true);
@@ -123,10 +137,94 @@ export default function CitizenDashboard() {
     navigate("/login-citizen");
   };
 
-  const handleProfileUpdate = () => {
-    // TODO: Implement backend API call
-    console.log("Profile update:", profileData);
-    setShowProfileForm(false);
+  const handleProfileUpdate = async () => {
+    setProfileUpdateLoading(true);
+    setProfileUpdateError("");
+    setProfileUpdateSuccess("");
+
+    try {
+      // Get token from state or localStorage
+      let token = citizenToken || localStorage.getItem("citizen_token");
+
+      if (!token) {
+        throw new Error("Not authenticated. Please login again.");
+      }
+
+      // Try to update profile
+      let response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/citizens/update-profile`, {
+        method: "PUT",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fullName: profileData.fullName,
+          contact: profileData.contact,
+          address: profileData.address,
+        }),
+      });
+
+      // If token expired, try to refresh and retry
+      if (response.status === 401) {
+        console.log("Token expired, attempting refresh...");
+
+        try {
+          await refreshCitizenSession();
+
+          // Get new token after refresh
+          token = localStorage.getItem("citizen_token");
+
+          if (!token) {
+            throw new Error("Failed to get refreshed token");
+          }
+
+          response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/citizens/update-profile`, {
+            method: "PUT",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              fullName: profileData.fullName,
+              contact: profileData.contact,
+              address: profileData.address,
+            }),
+          });
+        } catch (refreshError) {
+          console.error("Token refresh failed:", refreshError);
+          await citizenLogout();
+          navigate("/login-citizen");
+          return;
+        }
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || `Failed to update profile (${response.status})`);
+      }
+
+      // Update citizen state with new data
+      if (data.data?.user) {
+        const updatedUser = {
+          ...citizen,
+          fullName: data.data.user.fullName,
+          contact: data.data.user.contact,
+          address: data.data.user.address,
+        };
+
+        // Update localStorage
+        localStorage.setItem("citizen", JSON.stringify(updatedUser));
+
+        // Show success message
+        setProfileUpdateSuccess("Profile updated successfully!");
+      }
+    } catch (err: any) {
+      console.error("Profile update error:", err);
+      setProfileUpdateError(err.message || "Failed to update profile");
+    } finally {
+      setProfileUpdateLoading(false);
+    }
   };
 
   const filteredReports = reports.filter((report) => {
@@ -339,14 +437,33 @@ export default function CitizenDashboard() {
             <div className="flex flex-col gap-y-4">
               <h3 className="font-outfit font-semibold text-xl text-black">Update Profile</h3>
 
+              {/* Error Message */}
+              {profileUpdateError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+                  {profileUpdateError}
+                </div>
+              )}
+
+              {/* Success Message */}
+              {profileUpdateSuccess && (
+                <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-lg text-sm">
+                  {profileUpdateSuccess}
+                </div>
+              )}
+
               <div className="flex flex-col gap-y-3">
                 <div>
                   <label className="text-sm font-medium text-gray-700">Full Name</label>
                   <input
                     type="text"
                     value={profileData.fullName}
-                    onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
-                    className="w-full mt-1 border-2 border-[#d9d9d9] rounded-lg px-4 py-2 font-outfit text-sm focus:outline-none focus:border-[#237E54]"
+                    onChange={(e) => {
+                      setProfileData({...profileData, fullName: e.target.value});
+                      setProfileUpdateSuccess("");
+                      setProfileUpdateError("");
+                    }}
+                    disabled={profileUpdateLoading}
+                    className="w-full mt-1 border-2 border-[#d9d9d9] rounded-lg px-4 py-2 font-outfit text-sm focus:outline-none focus:border-[#237E54] disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -355,8 +472,13 @@ export default function CitizenDashboard() {
                   <input
                     type="text"
                     value={profileData.contact}
-                    onChange={(e) => setProfileData({...profileData, contact: e.target.value})}
-                    className="w-full mt-1 border-2 border-[#d9d9d9] rounded-lg px-4 py-2 font-outfit text-sm focus:outline-none focus:border-[#237E54]"
+                    onChange={(e) => {
+                      setProfileData({...profileData, contact: e.target.value});
+                      setProfileUpdateSuccess("");
+                      setProfileUpdateError("");
+                    }}
+                    disabled={profileUpdateLoading}
+                    className="w-full mt-1 border-2 border-[#d9d9d9] rounded-lg px-4 py-2 font-outfit text-sm focus:outline-none focus:border-[#237E54] disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -364,24 +486,35 @@ export default function CitizenDashboard() {
                   <label className="text-sm font-medium text-gray-700">Address</label>
                   <textarea
                     value={profileData.address}
-                    onChange={(e) => setProfileData({...profileData, address: e.target.value})}
-                    className="w-full mt-1 border-2 border-[#d9d9d9] rounded-lg px-4 py-2 font-outfit text-sm focus:outline-none focus:border-[#237E54] resize-none"
+                    onChange={(e) => {
+                      setProfileData({...profileData, address: e.target.value});
+                      setProfileUpdateSuccess("");
+                      setProfileUpdateError("");
+                    }}
+                    disabled={profileUpdateLoading}
+                    className="w-full mt-1 border-2 border-[#d9d9d9] rounded-lg px-4 py-2 font-outfit text-sm focus:outline-none focus:border-[#237E54] resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                     rows={3}
                   />
                 </div>
 
                 <div className="flex gap-2">
                   <GreenButton
-                    label="Save Changes"
+                    label={profileUpdateLoading ? "Saving..." : "Save Changes"}
                     width={150}
                     height={45}
                     onClick={handleProfileUpdate}
+                    disabled={profileUpdateLoading}
                   />
                   <WhiteButton
                     label="Cancel"
                     width={100}
                     height={45}
-                    onClick={() => setShowProfileForm(false)}
+                    onClick={() => {
+                      setShowProfileForm(false);
+                      setProfileUpdateError("");
+                      setProfileUpdateSuccess("");
+                    }}
+                    disabled={profileUpdateLoading}
                   />
                 </div>
               </div>

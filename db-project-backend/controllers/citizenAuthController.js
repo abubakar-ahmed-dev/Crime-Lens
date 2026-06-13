@@ -287,9 +287,9 @@ export const getProfile = asyncHandler(async (req, res) => {
 
 /**
  * PUT /api/citizens/profile
- * Update user's profile (protected route)
+ * Complete user's profile (protected route)
  */
-export const updateProfile = asyncHandler(async (req, res) => {
+export const completeProfile = asyncHandler(async (req, res) => {
   const userEmail = req.user?.email;
 
   if (!userEmail) {
@@ -396,6 +396,101 @@ export const updateProfile = asyncHandler(async (req, res) => {
 });
 
 /**
+ * PUT /api/citizens/update-profile
+ * Update user's profile information (fullName, contact, address)
+ * This is separate from completeProfile - used for updating existing profile data
+ */
+export const updateProfile = asyncHandler(async (req, res) => {
+  const userEmail = req.user?.email;
+
+  if (!userEmail) {
+    return errors.unauthorized(res);
+  }
+
+  const { fullName, contact, address } = req.body;
+
+  // Find user by email
+  const submitter = await CrimeReportsSubmitter.findOne({
+    where: { email: userEmail },
+  });
+
+  if (!submitter) {
+    return errors.notFound(res, 'User profile not found');
+  }
+
+  // Build updates object - only include fields that are provided
+  const updates = {};
+
+  if (fullName !== undefined && fullName !== null && fullName !== "") {
+    updates.fullName = fullName;
+  }
+
+  if (contact !== undefined && contact !== null && contact !== "") {
+    // Check if contact number is already taken by another user
+    const existingContact = await CrimeReportsSubmitter.findOne({
+      where: { contact },
+    });
+
+    // If contact exists and belongs to a different user, return error
+    if (existingContact && existingContact.email !== userEmail) {
+      return errors.conflict(res, 'This contact number is already registered with another account');
+    }
+
+    updates.contact = contact;
+  }
+
+  if (address !== undefined && address !== null && address !== "") {
+    updates.address = address;
+  }
+
+  // Check if there's anything to update
+  if (Object.keys(updates).length === 0) {
+    return errors.badRequest(res, 'No fields to update');
+  }
+
+  // Use raw SQL to update safely (handles any potential edge cases)
+  const setClause = [];
+  const replacements = {};
+  let paramIndex = 1;
+
+  // Build SET clause with named parameters
+  for (const [key, value] of Object.entries(updates)) {
+    setClause.push(`"${key}" = :${key}`);
+    replacements[key] = value;
+  }
+
+  const currentCnic = submitter.submitterCnic;
+
+  await sequelize.query(
+    `UPDATE "CrimeReportsSubmitter" SET ${setClause.join(', ')} WHERE "submitterCnic" = :submitterCnic`,
+    {
+      replacements: { ...replacements, submitterCnic: currentCnic },
+      type: sequelize.QueryTypes.UPDATE,
+    }
+  );
+
+  // Fetch the updated record
+  const updatedSubmitter = await CrimeReportsSubmitter.findOne({
+    where: { email: userEmail },
+  });
+
+  return success(res, {
+    data: {
+      user: {
+        id: updatedSubmitter.submitterCnic,
+        email: updatedSubmitter.email,
+        fullName: updatedSubmitter.fullName,
+        contact: updatedSubmitter.contact,
+        cnic: updatedSubmitter.submitterCnic,
+        address: updatedSubmitter.address,
+        isProfileComplete: updatedSubmitter.isProfileComplete,
+      },
+    },
+    message: 'Profile updated successfully',
+  });
+});
+
+/**
  * GET /api/citizens/my-reports
  * Get all reports submitted by the current user (protected route)
  */
@@ -460,6 +555,7 @@ export default {
   loginCitizen,
   googleAuthCitizen,
   getProfile,
+  completeProfile,
   updateProfile,
   getMyReports,
 };

@@ -10,6 +10,7 @@ import {
   loginCitizen,
   googleAuthCitizen,
   getProfile,
+  completeProfile,
   updateProfile,
   getMyReports,
 } from "../controllers/citizenAuthController.js";
@@ -40,8 +41,11 @@ router.post("/google-auth", googleAuthCitizen);
 // Get current user profile
 router.get("/profile", authorizeCitizen, getProfile);
 
-// Update user profile
-router.put("/profile", authorizeCitizen, updateProfile);
+// Complete user profile
+router.put("/profile", authorizeCitizen, completeProfile);
+
+// Update user profile (fullName, contact, address)
+router.put("/update-profile", authorizeCitizen, updateProfile);
 
 // Get user's submitted reports
 router.get("/my-reports", authorizeCitizen, getMyReports);
