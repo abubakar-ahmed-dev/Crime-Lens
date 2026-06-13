@@ -223,24 +223,6 @@ export default function CitizenDashboard() {
           />
         </div>
 
-        {/* Action Buttons */}
-        <div className="bg-[#fefefe] p-4 rounded-2xl shadow-[0_0_5px_rgba(0,0,0,0.15)]">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <GreenButton
-              label="Report Crime"
-              width={200}
-              height={50}
-              onClick={() => navigate("/report-crime")}
-            />
-            <WhiteButton
-              label="Update Profile"
-              width={200}
-              height={50}
-              onClick={() => setShowProfileForm(!showProfileForm)}
-            />
-          </div>
-        </div>
-
         {/* My Reports Section */}
         <div className="bg-white rounded-xl shadow-sm border">
           <div className="p-6 border-b">
@@ -252,8 +234,8 @@ export default function CitizenDashboard() {
                     key={status}
                     onClick={() => setFilter(status)}
                     className={`px-3 py-1 rounded-lg text-sm font-medium capitalize ${filter === status
-                        ? "bg-[#237E54] text-white"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      ? "bg-[#237E54] text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                       }`}
                   >
                     {status}
@@ -332,6 +314,24 @@ export default function CitizenDashboard() {
             )}
           </div>
         </div>
+        {/* Action Buttons */}
+        <div className="bg-[#fefefe] p-4 rounded-2xl shadow-[0_0_5px_rgba(0,0,0,0.15)]">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <GreenButton
+              label="Report Crime"
+              width={200}
+              height={50}
+              onClick={() => navigate("/report-crime")}
+            />
+            <WhiteButton
+              label="Update Profile"
+              width={200}
+              height={50}
+              onClick={() => setShowProfileForm(!showProfileForm)}
+            />
+          </div>
+        </div>
+
       </div>
     </section>
   );
