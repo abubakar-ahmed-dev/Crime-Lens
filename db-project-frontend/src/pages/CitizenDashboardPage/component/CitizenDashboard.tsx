@@ -223,28 +223,21 @@ export default function CitizenDashboard() {
           />
         </div>
 
-        {/* Quick Actions */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border mb-8">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button
+        {/* Action Buttons */}
+        <div className="bg-[#fefefe] p-4 rounded-2xl shadow-[0_0_5px_rgba(0,0,0,0.15)]">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <GreenButton
+              label="Report Crime"
+              width={200}
+              height={50}
               onClick={() => navigate("/report-crime")}
-              className="flex items-center justify-center p-4 bg-[#237E54] text-white rounded-lg hover:bg-[#1a6644] transition-colors"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Report New Crime
-            </button>
-            <button
-              onClick={() => navigate("/profile")}
-              className="flex items-center justify-center p-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              View Profile
-            </button>
+            />
+            <WhiteButton
+              label="Update Profile"
+              width={200}
+              height={50}
+              onClick={() => setShowProfileForm(!showProfileForm)}
+            />
           </div>
         </div>
 
