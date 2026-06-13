@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase, useAuth } from "../../../context/AuthContext";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function CitizenDashboard() {
   const navigate = useNavigate();
-  const { citizen, citizenToken, citizenLogout, isCitizenAuthenticated } = useAuth();
+  const { citizen, citizenToken, citizenLogout, isCitizenAuthenticated, refreshCitizenSession } = useAuth();
 
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,18 +66,14 @@ export default function CitizenDashboard() {
         console.log("Token expired, attempting refresh...");
 
         try {
-          const { data: { session } } = await supabase.auth.refreshSession();
+          await refreshCitizenSession();
 
-          if (!session) {
-            throw new Error("Failed to refresh session");
+          // Get new token after refresh
+          token = localStorage.getItem("citizen_token");
+
+          if (!token) {
+            throw new Error("Failed to get refreshed token");
           }
-
-          // Update token and retry
-          token = session.access_token;
-          localStorage.setItem("citizen_token", token);
-          setCitizenToken(token);
-          localStorage.setItem("citizen_session", JSON.stringify(session));
-          setCitizenSession(session);
 
           response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/citizens/my-reports`, {
             headers: {
