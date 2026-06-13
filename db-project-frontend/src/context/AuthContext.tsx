@@ -4,6 +4,13 @@ import { createClient } from "@supabase/supabase-js";
 import { loginUser, setAuthToken } from "../services/api";
 import { API_BASE_URL } from "../config/constants";
 
+// Type definition for custom citizen update event
+declare global {
+  interface WindowEventMap {
+    'citizen-updated': CustomEvent<any>;
+  }
+}
+
 // Supabase configuration
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://jgxizgpxxdawcgdxrlfe.supabase.co";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpneGl6Z3B4eGRhd2NnZHhybGZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTgzNDE1MzgsImV4cCI6MjAzMzkxNzUzOH0.WNqPkCD2FB9mIUaMVKZLqN9q7wxFkHQKBA_YfTWPlUg";
@@ -134,6 +141,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subscription.unsubscribe();
     };
   }, [token]);
+
+  // Listen for citizen profile updates from other components
+  useEffect(() => {
+    const handleCitizenUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<CitizenUserType>;
+      const updatedCitizen = customEvent.detail;
+      if (updatedCitizen) {
+        setCitizen(updatedCitizen);
+      }
+    };
+
+    // Add event listener
+    window.addEventListener('citizen-updated', handleCitizenUpdate);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('citizen-updated', handleCitizenUpdate);
+    };
+  }, []);
 
   /**
    * Admin/Police login (JWT-based)

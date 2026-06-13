@@ -200,24 +200,38 @@ export default function CitizenDashboard() {
 
       const data = await response.json();
 
+      console.log("Update profile response:", data);
+
       if (!response.ok) {
         throw new Error(data.error || data.message || `Failed to update profile (${response.status})`);
       }
 
-      // Update citizen state with new data
-      if (data.data?.user) {
-        const updatedUser = {
-          ...citizen,
-          fullName: data.data.user.fullName,
-          contact: data.data.user.contact,
-          address: data.data.user.address,
-        };
+      // The update-profile endpoint returns the user data at root level (not nested in data)
+      // due to how the success() function works
+      const updatedUser = data.user;
 
-        // Update localStorage
+      if (updatedUser) {
+        console.log("Updating profile data with:", updatedUser);
+
+        // Update form data immediately
+        setProfileData({
+          fullName: updatedUser.fullName || "",
+          contact: updatedUser.contact || "",
+          address: updatedUser.address || "",
+        });
+
+        // Update localStorage with the same structure
         localStorage.setItem("citizen", JSON.stringify(updatedUser));
+
+        // Dispatch custom event to notify AuthContext of the change
+        window.dispatchEvent(new CustomEvent('citizen-updated', { detail: updatedUser }));
 
         // Show success message
         setProfileUpdateSuccess("Profile updated successfully!");
+        console.log("Success message set");
+      } else {
+        console.error("No user data in response, full response:", data);
+        setProfileUpdateError("Failed to get updated user data from server");
       }
     } catch (err: any) {
       console.error("Profile update error:", err);
@@ -322,7 +336,7 @@ export default function CitizenDashboard() {
         </div>
 
         {/* My Reports Section */}
-        <div className="bg-[#fefefe] p-4 rounded-2xl shadow-[0_0_5px_rgba(0,0,0,0.15)]">
+        <div className="bg-[#fefefe] p-4 rounded-2xl shadow-[0_0_5px_rgba(0,0,0,0.15)] mt-6">
           <div className="flex flex-col gap-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <h3 className="font-outfit font-semibold text-xl text-black">My Reports</h3>
@@ -414,7 +428,7 @@ export default function CitizenDashboard() {
           </div>
         </div>
         {/* Action Buttons */}
-        <div className="bg-[#fefefe] p-4 rounded-2xl shadow-[0_0_5px_rgba(0,0,0,0.15)]">
+        <div className="bg-[#fefefe] p-4 rounded-2xl shadow-[0_0_5px_rgba(0,0,0,0.15)]  mt-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <GreenButton
               label="Report Crime"
