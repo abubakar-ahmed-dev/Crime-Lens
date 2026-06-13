@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 
 export default function Register() {
@@ -16,7 +16,6 @@ export default function Register() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -41,11 +40,6 @@ export default function Register() {
 
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
-      return;
-    }
-
-    if (!agreedToTerms) {
-      setError("Please agree to the Terms and Conditions");
       return;
     }
 
@@ -173,27 +167,6 @@ export default function Register() {
             />
           </div>
 
-          {/* Terms and Conditions */}
-          <div className="flex items-start">
-            <input
-              type="checkbox"
-              id="terms"
-              checked={agreedToTerms}
-              onChange={(e) => setAgreedToTerms(e.target.checked)}
-              className="mt-1 w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-            />
-            <label htmlFor="terms" className="ml-2 text-sm text-gray-600">
-              I agree to the{" "}
-              <Link to="/terms" className="text-green-600 hover:underline">
-                Terms and Conditions
-              </Link>{" "}
-              and{" "}
-              <Link to="/privacy" className="text-green-600 hover:underline">
-                Privacy Policy
-              </Link>
-            </label>
-          </div>
-
           {/* Submit Button */}
           <button
             type="submit"
@@ -242,9 +215,9 @@ export default function Register() {
         <div className="mt-6 text-center">
           <p className="text-gray-600">
             Already have an account?{" "}
-            <Link to="/login-citizen" className="text-[#237E54] font-semibold hover:underline">
+            <button onClick={() => navigate("/login-citizen")} className="text-[#237E54] font-semibold hover:underline">
               Sign In
-            </Link>
+            </button>
           </p>
         </div>
 
