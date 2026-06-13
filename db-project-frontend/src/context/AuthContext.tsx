@@ -190,10 +190,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setCitizen(data.user);
       setCitizenSession(data.session);
-      setCitizenToken(data.session.access_token);
+      setCitizenToken(data.session.accessToken);
       localStorage.setItem("citizen", JSON.stringify(data.user));
       localStorage.setItem("citizen_session", JSON.stringify(data.session));
-      localStorage.setItem("citizen_token", data.session.access_token);
+      localStorage.setItem("citizen_token", data.session.accessToken);
 
       return { success: true };
     } catch (err: any) {
@@ -302,11 +302,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const updateCitizenProfile = async (profileData: { cnic?: string; contact?: string; address?: string }) => {
     try {
+      // Try to get a fresh token from Supabase first
+      let token = citizenToken || localStorage.getItem("citizen_token");
+
+      // If we have a Supabase session, try to get a fresh token
+      if (citizenSession?.access_token) {
+        token = citizenSession.access_token;
+      } else {
+        // Try to refresh from Supabase
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            token = session.access_token;
+            // Update state with fresh token
+            setCitizenToken(session.access_token);
+            localStorage.setItem("citizen_token", session.access_token);
+          }
+        } catch (e) {
+          console.error("Failed to get fresh session:", e);
+        }
+      }
+
+      console.log("Profile update - token exists:", !!token);
+      console.log("Profile update - token length:", token?.length);
+
+      if (!token) {
+        return { success: false, message: "Not authenticated. Please login again." };
+      }
+
       const response = await fetch(`${API_BASE_URL}/citizens/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${citizenToken}`,
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify(profileData),
       });
@@ -314,7 +342,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const data = await response.json();
 
       if (!response.ok) {
-        return { success: false, message: data.error || "Profile update failed" };
+        console.error("Profile update failed:", response.status, data);
+        return { success: false, message: data.error || data.message || "Profile update failed" };
       }
 
       // Update local citizen state

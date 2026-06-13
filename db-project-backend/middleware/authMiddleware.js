@@ -1,5 +1,6 @@
 // middleware/authMiddleware.js
 import jwt from "jsonwebtoken";
+import { supabase } from "../config/supabase.js";
 
 /**
  * Verify JWT Token (for Admin/Police users)
@@ -50,31 +51,34 @@ export const authorizeRoles = (...allowedRoles) => {
 /**
  * Authorize Citizen
  * Checks if the request is from an authenticated citizen (Supabase token)
- * This is separate from Admin/Police JWT auth
+ * Verifies the Supabase JWT and attaches user info to req.user
  */
 export const authorizeCitizen = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({ success: false, message: "No authorization token provided" });
+      return res.status(401).json({ error: "No authorization token provided" });
     }
 
-    // For citizen auth, we need to verify with Supabase
-    // This would typically be done in the controller with Supabase client
-    // For now, we'll just check that a token is present
-    // The actual verification happens in the citizen auth controller
+    // Verify the token with Supabase
+    const { data, error } = await supabase.auth.getUser(token);
 
-    // You can add Supabase verification here if needed:
-    // const { data, error } = await supabase.auth.getUser(token);
-    // if (error) throw error;
+    if (error || !data.user) {
+      return res.status(401).json({ error: "Invalid or expired token" });
+    }
+
+    // Attach user info to req.user for the controller to use
+    req.user = {
+      id: data.user.id,
+      email: data.user.email,
+      authType: "supabase",
+    };
 
     next();
   } catch (error) {
-    return res.status(403).json({
-      success: false,
-      message: "Invalid citizen token",
-    });
+    console.error("Citizen auth error:", error);
+    return res.status(401).json({ error: "Unauthorized" });
   }
 };
 

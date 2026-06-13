@@ -27,8 +27,16 @@ export default function CompleteProfile() {
       return;
     }
 
-    // Parse citizen data from state or storage
-    const citizenData = citizen || (citizenFromStorage ? JSON.parse(citizenFromStorage) : null);
+    // Parse citizen data from state or storage (safely handle "undefined" string)
+    let citizenData = citizen;
+    if (!citizenData && citizenFromStorage && citizenFromStorage !== "undefined") {
+      try {
+        citizenData = JSON.parse(citizenFromStorage);
+      } catch (e) {
+        console.error("Failed to parse citizen data from storage:", e);
+        citizenData = null;
+      }
+    }
 
     if (citizenData?.isProfileComplete) {
       navigate("/citizen-dashboard");

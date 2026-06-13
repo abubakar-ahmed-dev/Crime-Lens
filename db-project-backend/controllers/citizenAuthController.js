@@ -307,15 +307,16 @@ export const googleAuthCitizen = async (req, res) => {
  */
 export const getProfile = async (req, res) => {
   try {
-    // User ID should be attached to req by auth middleware
-    const userId = req.user?.id;
+    // User email should be attached to req by auth middleware
+    const userEmail = req.user?.email;
 
-    if (!userId) {
+    if (!userEmail) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    // Find user by email (link between Supabase and database)
     const submitter = await CrimeReportsSubmitter.findOne({
-      where: { submitterCnic: userId },
+      where: { email: userEmail },
     });
 
     if (!submitter) {
@@ -345,9 +346,9 @@ export const getProfile = async (req, res) => {
  */
 export const updateProfile = async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userEmail = req.user?.email;
 
-    if (!userId) {
+    if (!userEmail) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
@@ -359,8 +360,9 @@ export const updateProfile = async (req, res) => {
       return res.status(400).json({ error: "Invalid CNIC format. Use: XXXXX-XXXXXXX-X" });
     }
 
+    // Find user by email (link between Supabase and database)
     const submitter = await CrimeReportsSubmitter.findOne({
-      where: { submitterCnic: userId },
+      where: { email: userEmail },
     });
 
     if (!submitter) {
@@ -374,7 +376,7 @@ export const updateProfile = async (req, res) => {
       const existing = await CrimeReportsSubmitter.findOne({
         where: { submitterCnic: cnic },
       });
-      if (existing && existing.submitterCnic !== userId) {
+      if (existing && existing.email !== userEmail) {
         return res.status(409).json({ error: "CNIC already registered" });
       }
       updates.submitterCnic = cnic;

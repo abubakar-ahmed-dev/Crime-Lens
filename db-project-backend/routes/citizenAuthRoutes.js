@@ -13,6 +13,7 @@ import {
   updateProfile,
   getMyReports,
 } from "../controllers/citizenAuthController.js";
+import { authorizeCitizen } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -32,18 +33,17 @@ router.post("/google-auth", googleAuthCitizen);
 /**
  * Protected Routes (Authentication required)
  *
- * Note: These routes require middleware to verify the JWT token
- * from Supabase and attach user info to req.user
- * TODO: Implement Supabase JWT verification middleware
+ * These routes use the authorizeCitizen middleware to verify the Supabase JWT token
+ * and attach user info to req.user
  */
 
 // Get current user profile
-router.get("/profile", getProfile);
+router.get("/profile", authorizeCitizen, getProfile);
 
 // Update user profile
-router.put("/profile", updateProfile);
+router.put("/profile", authorizeCitizen, updateProfile);
 
 // Get user's submitted reports
-router.get("/my-reports", getMyReports);
+router.get("/my-reports", authorizeCitizen, getMyReports);
 
 export default router;
