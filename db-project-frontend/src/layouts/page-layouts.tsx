@@ -37,6 +37,8 @@ const PageLayout = () => {
     "/",
     "/login",
     "/login-admin",
+    "/login-citizen",
+    "/register",
     "/map",
     "/request-agent",
   ];
