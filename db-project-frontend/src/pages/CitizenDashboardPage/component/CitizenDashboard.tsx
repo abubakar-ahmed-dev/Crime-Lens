@@ -172,62 +172,55 @@ export default function CitizenDashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl p-6 shadow-sm border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Reports</p>
-                <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatsCard
+            title="Total Reports"
+            value={stats.total}
+            subText="All submitted reports"
+            bgColor="bg-[#ffffff]"
+            gradientBg="linear-gradient(to bottom, #145332, #1C6943, #237E54)"
+            width="w-[100%]"
+            height="h-[170px]"
+            mainTextColor="text-[#ffffff]"
+            smallTextColor="text-[#D9D9D9]"
+            LiveButton={1}
+          />
 
-          <div className="bg-white rounded-xl p-6 shadow-sm border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-          </div>
+          <StatsCard
+            title="Pending"
+            value={stats.pending}
+            subText="Awaiting verification"
+            bgColor="bg-[#ffffff]"
+            width="w-[100%]"
+            height="h-[170px]"
+            mainTextColor="text-black"
+            smallTextColor="text-[#FFA500]"
+            LiveButton={1}
+          />
 
-          <div className="bg-white rounded-xl p-6 shadow-sm border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Approved</p>
-                <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-            </div>
-          </div>
+          <StatsCard
+            title="Approved"
+            value={stats.approved}
+            subText="Verified reports"
+            bgColor="bg-[#ffffff]"
+            width="w-[100%]"
+            height="h-[170px]"
+            mainTextColor="text-black"
+            smallTextColor="text-[#237E54]"
+            LiveButton={1}
+          />
 
-          <div className="bg-white rounded-xl p-6 shadow-sm border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Rejected</p>
-                <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
-              </div>
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-            </div>
-          </div>
+          <StatsCard
+            title="Rejected"
+            value={stats.rejected}
+            subText="Declined reports"
+            bgColor="bg-[#ffffff]"
+            width="w-[100%]"
+            height="h-[170px]"
+            mainTextColor="text-black"
+            smallTextColor="text-[#FF4C4C]"
+            LiveButton={1}
+          />
         </div>
 
         {/* Quick Actions */}
