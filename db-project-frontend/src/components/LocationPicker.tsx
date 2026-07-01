@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import L from "leaflet";
-import { MapContainer, Marker, TileLayer, useMapEvents } from "react-leaflet";
+import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import GreenButton from "./GreenButton";
 import markerIcon2x from "../assets/leaflet/marker-icon-2x.png";
@@ -66,6 +66,20 @@ const MapClickSetter = ({
       });
     },
   });
+
+  return null;
+};
+
+const MapCleanup = () => {
+  const map = useMap();
+
+  useEffect(() => {
+    return () => {
+      map.stop();
+      map.closePopup();
+      map.off();
+    };
+  }, [map]);
 
   return null;
 };
@@ -213,6 +227,9 @@ export default function LocationPicker({
               center={mapCenter}
               zoom={13}
               scrollWheelZoom
+              zoomAnimation={false}
+              fadeAnimation={false}
+              markerZoomAnimation={false}
               style={{ width: "100%", height: "100%" }}
             >
               <TileLayer
@@ -220,6 +237,7 @@ export default function LocationPicker({
                 attribution="&copy; OpenStreetMap contributors"
               />
               <MapClickSetter onPick={setMapSelection} />
+              <MapCleanup />
               <Marker position={selectedPosition} icon={pickerIcon} />
             </MapContainer>
           </div>
