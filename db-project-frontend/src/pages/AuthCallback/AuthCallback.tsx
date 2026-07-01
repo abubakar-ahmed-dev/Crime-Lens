@@ -30,10 +30,55 @@ export default function AuthCallback() {
       try {
         // Parse the hash fragment to get tokens
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = hashParams.get("access_token");
+        const queryParams = new URLSearchParams(window.location.search);
+        const code = queryParams.get("code");
+        let accessToken = hashParams.get("access_token");
         const refreshToken = hashParams.get("refresh_token");
         const type = hashParams.get("type"); // 'signup' for email verification, or missing for OAuth
-        const mode = new URLSearchParams(window.location.search).get("mode") === "signup" ? "signup" : "login";
+        const hasMode = queryParams.has("mode");
+        const mode = queryParams.get("mode") === "signup" ? "signup" : "login";
+        let sessionData: any = null;
+        let sessionUser: any = null;
+
+        if (!accessToken && !code) {
+          setError("No access token found in callback");
+          sessionStorage.removeItem(processingKey);
+          setTimeout(() => navigate("/login-citizen"), 2000);
+          return;
+        }
+
+        if (code) {
+          const { data, error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
+
+          if (sessionError || !data.session) {
+            console.error("Session error:", sessionError);
+            setError("Failed to establish session");
+            sessionStorage.removeItem(processingKey);
+            setTimeout(() => navigate("/login-citizen"), 2000);
+            return;
+          }
+
+          sessionData = data.session;
+          sessionUser = data.user;
+          accessToken = data.session.access_token;
+        } else {
+          // Set the session using the tokens from URL
+          const { data, error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken as string,
+            refresh_token: refreshToken || "",
+          });
+
+          if (sessionError || !data.session) {
+            console.error("Session error:", sessionError);
+            setError("Failed to establish session");
+            sessionStorage.removeItem(processingKey);
+            setTimeout(() => navigate("/login-citizen"), 2000);
+            return;
+          }
+
+          sessionData = data.session;
+          sessionUser = data.user;
+        }
 
         if (!accessToken) {
           setError("No access token found in callback");
@@ -42,47 +87,39 @@ export default function AuthCallback() {
           return;
         }
 
-        // Set the session using the tokens from URL
-        const { data, error: sessionError } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken || "",
-        });
-
-        if (sessionError) {
-          console.error("Session error:", sessionError);
-          setError("Failed to establish session");
-          sessionStorage.removeItem(processingKey);
-          setTimeout(() => navigate("/login-citizen"), 2000);
-          return;
-        }
-
         // Check if this is an email verification callback
         // Supabase sends type='signup' or similar for email verification
-        const isEmailVerification = type === "signup" || type === "email";
+        const isEmailVerification = type === "signup" || type === "email" || (!!code && !hasMode);
 
         if (isEmailVerification) {
           // This is an email verification callback
           // The email should now be confirmed
-          if (data.user?.email_confirmed_at) {
+          if (sessionUser?.email_confirmed_at || sessionUser?.confirmed_at) {
             setIsEmailVerified(true);
             setLoading(false);
 
-            // Store session
-            localStorage.setItem("citizen_session", JSON.stringify(data.session));
+            const response = await fetch(`${API_BASE_URL}/citizens/profile`, {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+            });
+            const profileData = await response.json();
+
+            if (!response.ok || !profileData.user) {
+              throw new Error(profileData.error || "Failed to load citizen profile");
+            }
+
+            const verifiedCitizen = {
+              ...profileData.user,
+              emailVerified: true,
+              provider: "email",
+            };
+
+            localStorage.setItem("citizen", JSON.stringify(verifiedCitizen));
+            localStorage.setItem("citizen_session", JSON.stringify(sessionData));
             localStorage.setItem("citizen_token", accessToken);
             localStorage.setItem("userRole", "user");
-
-            // Update the citizen user data with emailVerified = true
-            const citizen = localStorage.getItem("citizen");
-            if (citizen) {
-              try {
-                const citizenData = JSON.parse(citizen);
-                citizenData.emailVerified = true;
-                localStorage.setItem("citizen", JSON.stringify(citizenData));
-              } catch (e) {
-                console.error("Failed to update citizen data:", e);
-              }
-            }
 
             // Clear the hash from URL
             window.history.replaceState({}, document.title, window.location.pathname);
@@ -91,8 +128,7 @@ export default function AuthCallback() {
 
             // Redirect after showing success message
             setTimeout(() => {
-              const citizenData = citizen ? JSON.parse(citizen) : null;
-              if (citizenData?.isProfileComplete) {
+              if (verifiedCitizen.isProfileComplete) {
                 navigate("/citizen-dashboard");
               } else {
                 navigate("/complete-profile");
@@ -111,7 +147,7 @@ export default function AuthCallback() {
         window.history.replaceState({}, document.title, window.location.pathname);
 
         // Create/fetch backend profile for OAuth users
-        if (data.user) {
+        if (sessionUser) {
           try {
             const response = await fetch(`${API_BASE_URL}/citizens/google-auth`, {
               method: "POST",
@@ -128,7 +164,7 @@ export default function AuthCallback() {
 
               // Store in localStorage first
               localStorage.setItem("citizen", JSON.stringify(profileData.user));
-              localStorage.setItem("citizen_session", JSON.stringify(data.session));
+              localStorage.setItem("citizen_session", JSON.stringify(sessionData));
               localStorage.setItem("citizen_token", accessToken);
               localStorage.setItem("userRole", "user");
 

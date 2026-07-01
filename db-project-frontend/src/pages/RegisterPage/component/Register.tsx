@@ -63,11 +63,11 @@ export default function Register() {
     setLoading(false);
 
     if (result.success) {
-      setSuccessMessage("Registration successful! Please check your email to verify your account before completing your profile.");
-      // Redirect to profile completion page after a short delay
-      setTimeout(() => {
+      if (result.requiresEmailVerification) {
+        setSuccessMessage("Registration successful! Please check your email to verify your account.");
+      } else {
         navigate("/complete-profile");
-      }, 3000);
+      }
     } else {
       setError(result.message || "Registration failed");
     }

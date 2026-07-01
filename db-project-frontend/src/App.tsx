@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
 import { CitizenProtectedRoutes, PublicRoutes, ProtectedRoutes } from "./routes/index";
 import PageLayout from "./layouts/page-layouts";
 
@@ -43,6 +44,22 @@ const CitizenProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const AuthCallbackRedirect = () => {
+  useEffect(() => {
+    const isCallbackRoute = window.location.pathname === "/auth/callback";
+    const hasAuthHash = window.location.hash.includes("access_token");
+    const hasAuthCode = new URLSearchParams(window.location.search).has("code");
+
+    if (!isCallbackRoute && (hasAuthHash || hasAuthCode)) {
+      window.location.replace(
+        `${window.location.origin}/auth/callback${window.location.search}${window.location.hash}`
+      );
+    }
+  }, []);
+
+  return null;
+};
+
 function App() {
   const publicRoutes = PublicRoutes();
   const protectedRoutes = ProtectedRoutes();
@@ -50,6 +67,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <AuthCallbackRedirect />
       <Routes>
         {/* PUBLIC ROUTES (No Layout) */}
         <Route element={<PageLayout />}>

@@ -63,7 +63,7 @@ type AuthContextType = {
   citizenSession: any;
   isCitizenAuthenticated: boolean;
   citizenLogin: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
-  citizenRegister: (email: string, password: string, fullName: string) => Promise<{ success: boolean; message?: string }>;
+  citizenRegister: (email: string, password: string, fullName: string) => Promise<{ success: boolean; message?: string; requiresEmailVerification?: boolean }>;
   citizenGoogleLogin: (mode?: "login" | "signup") => Promise<{ success: boolean; message?: string }>;
   citizenLogout: () => Promise<void>;
   refreshCitizenSession: () => Promise<void>;
@@ -267,7 +267,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await fetch(`${API_BASE_URL}/citizens/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, fullName }),
+        body: JSON.stringify({
+          email,
+          password,
+          fullName,
+          redirectTo: `${window.location.origin}/auth/callback`,
+        }),
       });
 
       const data = await response.json();
@@ -284,20 +289,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         provider: data.session?.user?.app_metadata?.provider || "email",
       };
 
-      setCitizen(citizenWithVerification);
-
       // Only set session/token if it exists (email confirmation might be disabled)
       if (data.session) {
+        setCitizen(citizenWithVerification);
         setCitizenSession(data.session);
         setCitizenToken(data.session.access_token);
+        localStorage.setItem("citizen", JSON.stringify(citizenWithVerification));
         localStorage.setItem("citizen_session", JSON.stringify(data.session));
         localStorage.setItem("citizen_token", data.session.access_token);
+        localStorage.setItem("userRole", "user");
       }
 
-      localStorage.setItem("citizen", JSON.stringify(citizenWithVerification));
-      localStorage.setItem("userRole", "user");
-
-      return { success: true };
+      return { success: true, requiresEmailVerification: !data.session };
     } catch (err: any) {
       return { success: false, message: "Registration failed. Please try again." };
     }

@@ -15,7 +15,7 @@ const { sequelize, CrimeReportsSubmitter } = db;
  * Register a new citizen user
  */
 export const registerCitizen = asyncHandler(async (req, res) => {
-  const { email, password, fullName } = req.body;
+  const { email, password, fullName, redirectTo } = req.body;
 
   // Validate required fields
   if (!email || !password || !fullName) {
@@ -47,6 +47,7 @@ export const registerCitizen = asyncHandler(async (req, res) => {
     email,
     password,
     options: {
+      emailRedirectTo: redirectTo,
       data: {
         full_name: fullName,
       },

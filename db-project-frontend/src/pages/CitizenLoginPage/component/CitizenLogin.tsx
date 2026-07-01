@@ -25,7 +25,7 @@ export default function CitizenLogin() {
   useEffect(() => {
     if (isCitizenAuthenticated && citizen) {
       if (citizen.isProfileComplete) {
-        navigate("/dashboard");
+        navigate("/citizen-dashboard");
       } else {
         navigate("/complete-profile");
       }
