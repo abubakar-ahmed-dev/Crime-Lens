@@ -423,7 +423,6 @@ export const reportCrime = async (req, res) => {
     }
 
     const submitterId = submitter.id;
-    const submitterCnic = submitter.submitterCnic;
 
     t = await sequelize.transaction();
 
@@ -461,15 +460,13 @@ export const reportCrime = async (req, res) => {
     // ---------------------------
     const newCrimeSubmissionRows = await sequelize.query(
       `
-      INSERT INTO "CrimeSubmission" ("submitterId", "submitterCnic", "userId", "submittedAt", "CrimeId")
-      VALUES (:submitterId, :cnic, :userId, :submittedAt, :crimeId)
+      INSERT INTO "CrimeSubmission" ("submitterId", "submittedAt", "CrimeId")
+      VALUES (:submitterId, :submittedAt, :crimeId)
       RETURNING *
       `,
       {
         replacements: {
           submitterId,
-          cnic: submitterCnic,
-          userId: submitterId,
           submittedAt: new Date(),
           crimeId: newCrime.id,
         },

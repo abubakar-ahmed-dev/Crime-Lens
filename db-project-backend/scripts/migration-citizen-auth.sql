@@ -54,14 +54,6 @@ SET "fullName" = COALESCE("fullName", "submitterName"),
 WHERE "fullName" IS NULL;
 
 -- ============================================
--- Alter CrimeSubmission Table
--- ============================================
-
--- Add userId column for authenticated citizen submissions
-ALTER TABLE "CrimeSubmission"
-ADD COLUMN IF NOT EXISTS "userId" TEXT;
-
--- ============================================
 -- Create Indexes for Citizen Authentication
 -- ============================================
 
@@ -77,10 +69,6 @@ ON "CrimeReportsSubmitter"("email");
 CREATE INDEX IF NOT EXISTS "CrimeReportsSubmitter_isProfileComplete_idx"
 ON "CrimeReportsSubmitter"("isProfileComplete");
 
--- User ID index on CrimeSubmission
-CREATE INDEX IF NOT EXISTS "CrimeSubmission_userId_idx"
-ON "CrimeSubmission"("userId");
-
 -- ============================================
 -- Verification Queries
 -- ============================================
@@ -92,14 +80,8 @@ WHERE table_name = 'CrimeReportsSubmitter'
 AND column_name IN ('supabaseUserId', 'email', 'fullName', 'contact', 'address', 'isProfileComplete', 'createdAt', 'updatedAt')
 ORDER BY ordinal_position;
 
--- Check CrimeSubmission columns
-SELECT column_name, data_type, is_nullable
-FROM information_schema.columns
-WHERE table_name = 'CrimeSubmission'
-AND column_name = 'userId';
-
 -- Check indexes
 SELECT indexname, tablename
 FROM pg_indexes
 WHERE tablename IN ('CrimeReportsSubmitter', 'CrimeSubmission')
-AND indexname LIKE '%userId%' OR indexname LIKE '%email%' OR indexname LIKE '%supabaseUserId%';
+AND indexname LIKE '%email%' OR indexname LIKE '%supabaseUserId%';

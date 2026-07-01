@@ -102,9 +102,7 @@ CREATE TABLE IF NOT EXISTS "Crime" (
 -- CrimeSubmission table
 CREATE TABLE IF NOT EXISTS "CrimeSubmission" (
     "id" BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    "submitterCnic" TEXT,
     "submitterId" UUID NOT NULL,
-    "userId" TEXT,
     "submittedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "CrimeId" BIGINT NOT NULL,
     CONSTRAINT "CrimeSubmission_submitterId_fkey" FOREIGN KEY ("submitterId") REFERENCES "CrimeReportsSubmitter"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -169,7 +167,6 @@ CREATE INDEX IF NOT EXISTS "CrimeReportsSubmitter_supabaseUserId_idx" ON "CrimeR
 CREATE INDEX IF NOT EXISTS "CrimeReportsSubmitter_email_idx" ON "CrimeReportsSubmitter"("email");
 CREATE INDEX IF NOT EXISTS "CrimeReportsSubmitter_isProfileComplete_idx" ON "CrimeReportsSubmitter"("isProfileComplete");
 CREATE INDEX IF NOT EXISTS "CrimeSubmission_submitterId_idx" ON "CrimeSubmission"("submitterId");
-CREATE INDEX IF NOT EXISTS "CrimeSubmission_userId_idx" ON "CrimeSubmission"("userId");
 
 -- PostGIS indexes for geospatial queries
 CREATE INDEX IF NOT EXISTS "idx_crime_location" ON "Crime" USING GIST(location);

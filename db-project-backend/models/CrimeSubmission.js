@@ -14,24 +14,10 @@ export default (sequelize) => {
       primaryKey: true,
     },
 
-    // Legacy: CNIC-based submission (deprecated, kept for backward compatibility)
-    submitterCnic: {
-      type: DataTypes.TEXT,
-      allowNull: true,
-      comment: "CNIC snapshot for display/backward compatibility",
-    },
-
     submitterId: {
       type: DataTypes.UUID,
       allowNull: false,
       comment: "Stable reference to CrimeReportsSubmitter.id",
-    },
-
-    // Legacy field retained during migration. Use submitterId for ownership.
-    userId: {
-      type: DataTypes.TEXT,
-      allowNull: true,
-      comment: "Legacy user identifier retained for backward compatibility",
     },
 
     submittedAt: {
