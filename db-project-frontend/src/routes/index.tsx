@@ -19,6 +19,7 @@ import AuthCallbackPage from "../pages/AuthCallback/AuthCallback";
 type TRoute = {
   path: string;
   element: React.ReactNode;
+  allowedRoles?: Array<"admin" | "police" | "user">;
 };
 
 export const PublicRoutes = () => {
@@ -90,14 +91,17 @@ export const ProtectedRoutes = () => {
       {
         path: "/all-records",
         element: <AllRecordsPage/>,
+        allowedRoles: ["admin", "police"],
       },
       {
           path: "/verification",
-          element: <VerificationPage/>
+          element: <VerificationPage/>,
+          allowedRoles: ["admin", "police"],
       },
       {
         path: "/upload-crimes",
-        element: <UploadPage/>
+        element: <UploadPage/>,
+        allowedRoles: ["admin"],
       }
   
     ];

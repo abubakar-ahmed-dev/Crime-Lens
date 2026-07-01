@@ -5,6 +5,7 @@ import AllRecordsSearch from "./AllRecordsSearch";
 import DetailsPopup from "./DetailsPopup"
 import { downloadCSV } from "./downloadCSV";
 import { API_BASE_URL } from "../../../config/constants";
+import { getJwtAuthHeaders } from "../../../utils/authHeaders";
 
 interface AllRecordsProps {
   version: "admin" | "police" | "user" | null;
@@ -61,7 +62,9 @@ export default function AllRecords({ version }: AllRecordsProps) {
         let res, data;
 
         if (version === "police") {
-          res = await fetch(`${API_BASE_URL}/crimes/all`);
+          res = await fetch(`${API_BASE_URL}/crimes/all`, {
+            headers: getJwtAuthHeaders(),
+          });
           if (!res.ok) throw new Error("Network response was not ok");
           data = await res.json();
           if (!mounted) return;
@@ -73,7 +76,9 @@ export default function AllRecords({ version }: AllRecordsProps) {
             console.error("Error fetching crimes:", data.message);
           }
         } else if (version === "admin") {
-          res = await fetch(`${API_BASE_URL}/agent/all`);
+          res = await fetch(`${API_BASE_URL}/agent/all`, {
+            headers: getJwtAuthHeaders(),
+          });
           if (!res.ok) throw new Error("Network response was not ok");
           data = await res.json();
           if (!mounted) return;
@@ -156,7 +161,10 @@ export default function AllRecords({ version }: AllRecordsProps) {
             version === "admin"
               ? `${API_BASE_URL}/agent/delete/${id}`
               : `${API_BASE_URL}/crimes/delete/${id}`;
-          return fetch(url, { method: "DELETE" });
+          return fetch(url, {
+            method: "DELETE",
+            headers: getJwtAuthHeaders(),
+          });
         })
       );
 
@@ -193,7 +201,9 @@ export default function AllRecords({ version }: AllRecordsProps) {
       setIsUpdateModalOpen(true);
     } else {
       try {
-        const res = await fetch(`${API_BASE_URL}/crimes/get-crime/${recordId}`);
+        const res = await fetch(`${API_BASE_URL}/crimes/get-crime/${recordId}`, {
+          headers: getJwtAuthHeaders(),
+        });
         const data = await res.json();
         if (!data.success) {
           alert("Failed to load crime details.");
@@ -227,7 +237,7 @@ export default function AllRecords({ version }: AllRecordsProps) {
           `${API_BASE_URL}/agent/update/${selectedAgent.agentId}`,
           {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: getJwtAuthHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify(updatedData),
           }
         );
@@ -246,7 +256,7 @@ export default function AllRecords({ version }: AllRecordsProps) {
       } else if (version === "police" && fullCrime) {
         const res = await fetch(`${API_BASE_URL}/crimes/update/${fullCrime.id}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: getJwtAuthHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(updatedData),
         });
         const data = await res.json();

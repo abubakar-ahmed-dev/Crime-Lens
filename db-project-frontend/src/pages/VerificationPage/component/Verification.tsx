@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import VerificationCard from "./VerificationCard";
 import { API_BASE_URL } from "../../../config/constants";
+import { getJwtAuthHeaders } from "../../../utils/authHeaders";
 
 interface AllRecordsProps {
   version: "admin" | "police" | "user" | null;
@@ -30,7 +31,9 @@ export default function AllRecords({ version }: AllRecordsProps) {
         endpoint = `${API_BASE_URL}/user/pending`;
       }
 
-      const response = await fetch(endpoint);
+      const response = await fetch(endpoint, {
+        headers: getJwtAuthHeaders(),
+      });
       const data = await response.json();
 
       if (data.success) {

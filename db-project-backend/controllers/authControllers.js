@@ -43,12 +43,6 @@ export const login = async (req, res) => {
           return res
         .status(404)
         .json({ success: false, message: "User not found" });
-        
-        // ---------------------------
-        // Compare password using bcrypt
-        // ---------------------------
-        console.log("Input password:", password);
-        console.log("Stored hash:", user.passwordHash);
 
         let passwordMatches = false;
 
@@ -56,11 +50,9 @@ export const login = async (req, res) => {
         if (user.passwordHash && user.passwordHash.startsWith('$2')) {
           // It's a bcrypt hash - use bcrypt.compare
           passwordMatches = await bcrypt.compare(password, user.passwordHash);
-          console.log("Using bcrypt comparison, result:", passwordMatches);
         } else {
           // It's plain text - compare directly and then hash it
           passwordMatches = (password === user.passwordHash);
-          console.log("Plain text comparison, result:", passwordMatches);
 
           // If matches, hash the password and update the database
           if (passwordMatches) {
@@ -72,7 +64,6 @@ export const login = async (req, res) => {
                 type: QueryTypes.UPDATE,
               }
             );
-            console.log("Password hashed and updated in database");
           }
         }
 

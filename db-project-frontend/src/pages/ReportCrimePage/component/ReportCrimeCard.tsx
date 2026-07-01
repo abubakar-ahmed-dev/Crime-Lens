@@ -67,12 +67,6 @@ export default function ReportCrimeCard() {
     setLoading(true);
 
     try {
-      // Prepare submission data with user ID
-      const submissionData = {
-        ...formData,
-        userId: citizen.id, // User ID from authenticated citizen
-      };
-
       const response = await fetch(
         `${API_BASE_URL}/user/report-crime`,
         {
@@ -81,7 +75,7 @@ export default function ReportCrimeCard() {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${citizenToken}`,
           },
-          body: JSON.stringify(submissionData),
+          body: JSON.stringify(formData),
         }
       );
 
@@ -237,13 +231,13 @@ export default function ReportCrimeCard() {
                 )}`}
               >
                 <option value="">Select a zone...</option>
-                <option value="1">Clifton & Defence</option>
+                <option value="1">North Nazimabad</option>
                 <option value="2">Saddar & Civil Lines</option>
                 <option value="3">Lyari</option>
                 <option value="4">Garden & Old City</option>
                 <option value="5">Gulshan-e-Iqbal</option>
                 <option value="6">Gulistan-e-Johar</option>
-                <option value="7">North Nazimabad</option>
+                <option value="7">Clifton & Defence</option>
                 <option value="8">North Karachi</option>
                 <option value="10">Korangi</option>
                 <option value="11">Malir</option>

@@ -50,7 +50,7 @@ const Sidebar = ({
     );
   } else if (version === "police") {
     filteredMenus = allMenus.filter((m) =>
-      ["Dashboard", "Verify Report", "Crime Records", "Upload Data"].includes(m.label)
+      ["Dashboard", "Verify Report", "Crime Records"].includes(m.label)
     );
   } else if (version === "user") {
     filteredMenus = allMenus.filter((m) =>

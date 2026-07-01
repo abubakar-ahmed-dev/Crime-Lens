@@ -10,9 +10,7 @@ const HomePage = () => {
   const { role } = useSelector((state: any) => state.currentRole);
 
   useEffect(() => {
-    console.log(role)
     dispatch(setRole("user"));
-    console.log(role);
   }, [role]);
   
   return <Home />;

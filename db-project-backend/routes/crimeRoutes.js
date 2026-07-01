@@ -1,8 +1,10 @@
 // routes/crimeRoutes.js
 import express from "express";
-import { getCrimeById, getAllCrimeTypes, getAllCrimes, getCrimesForMap, updateCrime, deleteCrime, } from "../controllers/CrimeControllers2.js";
+import { getCrimeById, getAllCrimeTypes, getAllCrimes, getCrimesForMap, updateCrime, deleteCrime, } from "../controllers/CrimeControllers.js";
+import { verifyToken, authorizeRoles } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
+const policeOnly = [verifyToken, authorizeRoles("police")];
 
 router.get(
   "/",
@@ -11,6 +13,7 @@ router.get(
 
 router.get(
   "/all",
+  policeOnly,
   getAllCrimes
 );
 
@@ -20,14 +23,15 @@ router.get(
 );
 
 // GET full details of a single crime
-router.get("/get-crime/:id", getCrimeById);
+router.get("/get-crime/:id", policeOnly, getCrimeById);
 
 
-router.put("/update/:id", updateCrime);
+router.put("/update/:id", policeOnly, updateCrime);
 
 
 router.delete(
   "/delete/:id",
+  policeOnly,
   deleteCrime
 );
 
