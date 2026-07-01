@@ -8,6 +8,50 @@ interface AllRecordsProps {
   version: "admin" | "police" | "user" | null;
 }
 
+const isValidStoredCoordinate = (
+  value: unknown,
+  field: "latitude" | "longitude"
+) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return false;
+
+  return field === "latitude"
+    ? numericValue >= 23 && numericValue <= 26
+    : numericValue >= 65 && numericValue <= 68;
+};
+
+const getCrimeCoordinate = (
+  crime: any,
+  field: "latitude" | "longitude"
+) => {
+  const explicitValue = crime[field];
+  if (
+    explicitValue !== null &&
+    explicitValue !== undefined &&
+    explicitValue !== "" &&
+    isValidStoredCoordinate(explicitValue, field)
+  ) {
+    return explicitValue.toString();
+  }
+
+  let location = crime.location;
+  if (typeof location === "string") {
+    try {
+      location = JSON.parse(location);
+    } catch {
+      location = null;
+    }
+  }
+  const coordinateIndex = field === "latitude" ? 1 : 0;
+  const coordinateValue = location?.coordinates?.[coordinateIndex];
+
+  return coordinateValue !== null &&
+    coordinateValue !== undefined &&
+    isValidStoredCoordinate(coordinateValue, field)
+    ? coordinateValue.toString()
+    : "";
+};
+
 export default function AllRecords({ version }: AllRecordsProps) {
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,8 +196,8 @@ export default function AllRecords({ version }: AllRecordsProps) {
 
                     address={record.address || ""}
                     description={record.description || ""}
-                    latitude={record.latitude ?? ""}
-                    longitude={record.longitude ?? ""}
+                    latitude={getCrimeCoordinate(record, "latitude")}
+                    longitude={getCrimeCoordinate(record, "longitude")}
 
                     zone={record.Zone?.id || record.zoneId}   
 

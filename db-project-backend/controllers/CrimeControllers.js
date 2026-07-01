@@ -155,7 +155,43 @@ export const getAllCrimeTypes = async (req, res) => {
 export const getPendingSubmissions = async (req, res) => {
   try {
     const pendingCrimes = await sequelize.query(
-      `SELECT * FROM "view_PendingSubmissions";`,
+      `
+      SELECT c.id,
+             c.title,
+             c.description,
+             c.address,
+             c."crimeTypeId",
+             json_build_object('id', ct.id, 'name', ct.name) AS "CrimeType",
+             c."zoneId",
+             json_build_object('id', z.id) AS "Zone",
+             c.status,
+             c."reportedAt",
+             c."incidentDate",
+             ST_AsGeoJSON(c.location)::json AS location,
+             CASE WHEN c.location IS NOT NULL THEN ST_Y(c.location) END AS latitude,
+             CASE WHEN c.location IS NOT NULL THEN ST_X(c.location) END AS longitude,
+             cs_latest.id AS "submissionId",
+             crs."submitterCnic",
+             cs_latest."submittedAt",
+             crs."fullName",
+             crs.contact
+      FROM "Crime" c
+      LEFT JOIN "CrimeType" ct ON ct.id = c."crimeTypeId"
+      LEFT JOIN "Zone" z ON z.id = c."zoneId"
+      LEFT JOIN LATERAL (
+        SELECT cs.id,
+               cs."submitterId",
+               cs."submittedAt",
+               cs."CrimeId"
+        FROM "CrimeSubmission" cs
+        WHERE cs."CrimeId" = c.id
+        ORDER BY cs."submittedAt" DESC
+        LIMIT 1
+      ) cs_latest ON true
+      LEFT JOIN "CrimeReportsSubmitter" crs ON crs.id = cs_latest."submitterId"
+      WHERE c.status = 'pending'
+      ORDER BY c."reportedAt" DESC;
+      `,
       { type: QueryTypes.SELECT }
     );
 
@@ -528,7 +564,38 @@ export const reportCrime = async (req, res) => {
 export const getAllCrimes = async (req, res) => {
   try {
     const crimes = await sequelize.query(
-      `SELECT * FROM "view_all_crimes";`,
+      `
+      SELECT c.id AS id,
+             z.name AS "zoneName",
+             pb.id AS "registeredBranchId",
+             crs."submitterCnic" AS "submitterCnic",
+             ct.name AS "crimeTypeName",
+             c."incidentDate" AS "incidentDate",
+             c.status AS status,
+             ST_AsGeoJSON(c.location)::json AS location,
+             CASE WHEN c.location IS NOT NULL THEN ST_Y(c.location) END AS latitude,
+             CASE WHEN c.location IS NOT NULL THEN ST_X(c.location) END AS longitude
+      FROM "Crime" c
+      LEFT JOIN "Zone" z ON z.id = c."zoneId"
+      LEFT JOIN LATERAL (
+        SELECT pb_inner.id
+        FROM "PoliceBranch" pb_inner
+        WHERE pb_inner."zoneId" = c."zoneId"
+        ORDER BY pb_inner.id ASC
+        LIMIT 1
+      ) pb ON true
+      LEFT JOIN "CrimeType" ct ON ct.id = c."crimeTypeId"
+      LEFT JOIN LATERAL (
+        SELECT cs."submitterId"
+        FROM "CrimeSubmission" cs
+        WHERE cs."CrimeId" = c.id
+        ORDER BY cs."submittedAt" DESC
+        LIMIT 1
+      ) cs_latest ON true
+      LEFT JOIN "CrimeReportsSubmitter" crs ON crs.id = cs_latest."submitterId"
+      WHERE c.status = 'approved'
+      ORDER BY c."incidentDate" DESC, c.id DESC;
+      `,
       { type: QueryTypes.SELECT }
     );
 
@@ -599,8 +666,8 @@ export const getCrimeById = async (req, res) => {
              address,
              "zoneId",
              ST_AsGeoJSON(location)::json AS location,
-             CASE WHEN location IS NOT NULL THEN ST_Y(location::geometry) END AS latitude,
-             CASE WHEN location IS NOT NULL THEN ST_X(location::geometry) END AS longitude
+             CASE WHEN location IS NOT NULL THEN ST_Y(location) END AS latitude,
+             CASE WHEN location IS NOT NULL THEN ST_X(location) END AS longitude
       FROM "Crime"
       WHERE id = :id AND status = 'approved'
       LIMIT 1;

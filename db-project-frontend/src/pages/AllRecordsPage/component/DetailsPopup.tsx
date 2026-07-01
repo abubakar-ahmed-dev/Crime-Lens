@@ -41,6 +41,17 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
     onSubmit(formData);
   };
 
+  const locationValue = {
+    latitude: String(formData.latitude ?? ""),
+    longitude: String(formData.longitude ?? ""),
+  };
+  const defaultMapCenter = isValidLocation(locationValue)
+    ? locationValue
+    : {
+      latitude: "24.899983520748542",
+      longitude: "67.05814361572267",
+    };
+
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white p-4 sm:p-6 rounded-xl w-full max-w-[450px] shadow-xl overflow-y-auto max-h-[90vh] sm:max-h-[550px]">
@@ -84,18 +95,12 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
 
             <label className="block mb-2 font-medium">Location</label>
             <LocationPicker
-              value={{
-                latitude: String(formData.latitude ?? ""),
-                longitude: String(formData.longitude ?? ""),
-              }}
+              value={locationValue}
               onChange={(location) => {
                 setFormData((prev: any) => ({ ...prev, ...location }));
                 setLocationError("");
               }}
-              defaultMapCenter={{
-                latitude: String(formData.latitude || "24.899983520748542"),
-                longitude: String(formData.longitude || "67.05814361572267"),
-              }}
+              defaultMapCenter={defaultMapCenter}
             />
             {locationError && (
               <p className="text-red-600 text-xs mt-2 mb-3">{locationError}</p>
