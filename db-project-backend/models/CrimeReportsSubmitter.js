@@ -8,11 +8,17 @@ import DataTypes from "sequelize";
  */
 export default (sequelize) => {
   const CrimeReportsSubmitter = sequelize.define("CrimeReportsSubmitter", {
-    // Primary identifier (CNIC - National ID card number)
+    id: {
+      type: DataTypes.UUID,
+      primaryKey: true,
+      defaultValue: DataTypes.UUIDV4,
+    },
+
+    // Citizen CNIC is profile data, not the database identity.
     submitterCnic: {
       type: DataTypes.TEXT,
-      primaryKey: true,
-      allowNull: false,
+      unique: true,
+      allowNull: true,
     },
 
     // Supabase Auth integration
@@ -76,8 +82,8 @@ export default (sequelize) => {
 
   CrimeReportsSubmitter.associate = (models) => {
     CrimeReportsSubmitter.hasMany(models.CrimeSubmission, {
-      foreignKey: "submitterCnic",
-      onDelete: "SET NULL",
+      foreignKey: "submitterId",
+      onDelete: "RESTRICT",
       onUpdate: "CASCADE",
       as: "submissions",
     });

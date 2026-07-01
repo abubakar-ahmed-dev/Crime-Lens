@@ -6,6 +6,7 @@
 
 -- Enable PostGIS extension (if not already enabled)
 CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ============================================
 -- Create ENUM Types
@@ -56,10 +57,11 @@ CREATE TABLE IF NOT EXISTS "User" (
 
 -- CrimeReportsSubmitter table (Citizen Profile)
 CREATE TABLE IF NOT EXISTS "CrimeReportsSubmitter" (
-    "submitterCnic" TEXT PRIMARY KEY,
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     "supabaseUserId" TEXT UNIQUE,
     "email" TEXT NOT NULL UNIQUE,
     "password" TEXT,
+    "submitterCnic" TEXT UNIQUE,
     "fullName" TEXT NOT NULL,
     "contact" TEXT,
     "address" TEXT,
@@ -100,12 +102,10 @@ CREATE TABLE IF NOT EXISTS "Crime" (
 -- CrimeSubmission table
 CREATE TABLE IF NOT EXISTS "CrimeSubmission" (
     "id" BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    "submitterCnic" TEXT,
-    "userId" TEXT,
+    "submitterId" UUID NOT NULL,
     "submittedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "CrimeId" BIGINT NOT NULL,
-    CONSTRAINT "CrimeSubmission_submitterCnic_fkey" FOREIGN KEY ("submitterCnic") REFERENCES "CrimeReportsSubmitter"("submitterCnic") ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT "CrimeSubmission_userId_fkey" FOREIGN KEY ("userId") REFERENCES "CrimeReportsSubmitter"("submitterCnic") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "CrimeSubmission_submitterId_fkey" FOREIGN KEY ("submitterId") REFERENCES "CrimeReportsSubmitter"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "CrimeSubmission_CrimeId_fkey" FOREIGN KEY ("CrimeId") REFERENCES "Crime"("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
@@ -162,11 +162,11 @@ CREATE INDEX IF NOT EXISTS "Crime_zoneId_reportedAt_idx" ON "Crime"("zoneId", "r
 CREATE INDEX IF NOT EXISTS "activitylog_tablename_recordid_idx" ON "activitylog"("tablename", "recordid");
 
 -- Citizen-specific indexes
-CREATE INDEX IF NOT EXISTS "CrimeReportsSubmitter_userId_idx" ON "CrimeReportsSubmitter"("submitterCnic");
+CREATE INDEX IF NOT EXISTS "CrimeReportsSubmitter_userId_idx" ON "CrimeReportsSubmitter"("id");
 CREATE INDEX IF NOT EXISTS "CrimeReportsSubmitter_supabaseUserId_idx" ON "CrimeReportsSubmitter"("supabaseUserId");
 CREATE INDEX IF NOT EXISTS "CrimeReportsSubmitter_email_idx" ON "CrimeReportsSubmitter"("email");
 CREATE INDEX IF NOT EXISTS "CrimeReportsSubmitter_isProfileComplete_idx" ON "CrimeReportsSubmitter"("isProfileComplete");
-CREATE INDEX IF NOT EXISTS "CrimeSubmission_userId_idx" ON "CrimeSubmission"("userId");
+CREATE INDEX IF NOT EXISTS "CrimeSubmission_submitterId_idx" ON "CrimeSubmission"("submitterId");
 
 -- PostGIS indexes for geospatial queries
 CREATE INDEX IF NOT EXISTS "idx_crime_location" ON "Crime" USING GIST(location);

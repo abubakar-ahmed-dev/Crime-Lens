@@ -68,12 +68,8 @@ export const registerCitizen = asyncHandler(async (req, res) => {
     return errors.badRequest(res, authError.message || 'Registration failed');
   }
 
-  // Create profile in CrimeReportsSubmitter table
-  // Use a temporary CNIC placeholder (user will complete profile later)
-  const tempCnic = `temp_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-
   const submitter = await CrimeReportsSubmitter.create({
-    submitterCnic: tempCnic,
+    submitterCnic: null,
     supabaseUserId: authData.user?.id || null,
     email,
     fullName,
@@ -94,9 +90,10 @@ export const registerCitizen = asyncHandler(async (req, res) => {
   return success(res, {
     data: {
       user: {
-        id: submitter.submitterCnic,
+        id: submitter.id,
         email: submitter.email,
         fullName: submitter.fullName,
+        cnic: submitter.submitterCnic,
         isProfileComplete: submitter.isProfileComplete,
         emailVerified: !!authData.user?.email_confirmed_at,
         provider: authData.user?.app_metadata?.provider || "email",
@@ -163,7 +160,7 @@ export const loginCitizen = asyncHandler(async (req, res) => {
   return success(res, {
     data: {
       user: {
-        id: submitter.submitterCnic,
+        id: submitter.id,
         email: submitter.email,
         fullName: submitter.fullName,
         contact: submitter.contact,
@@ -224,10 +221,8 @@ export const googleAuthCitizen = asyncHandler(async (req, res) => {
 
   // Create profile if it doesn't exist
   if (!submitter) {
-    const tempCnic = `temp_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-
     submitter = await CrimeReportsSubmitter.create({
-      submitterCnic: tempCnic,
+      submitterCnic: null,
       supabaseUserId,
       email,
       fullName,
@@ -238,7 +233,7 @@ export const googleAuthCitizen = asyncHandler(async (req, res) => {
   return success(res, {
     message: 'Google authentication successful',
     user: {
-      id: submitter.submitterCnic,
+      id: submitter.id,
       email: submitter.email,
       fullName: submitter.fullName,
       contact: submitter.contact,
@@ -273,7 +268,7 @@ export const getProfile = asyncHandler(async (req, res) => {
   return success(res, {
     data: {
       user: {
-        id: submitter.submitterCnic,
+        id: submitter.id,
         email: submitter.email,
         fullName: submitter.fullName,
         contact: submitter.contact,
@@ -338,7 +333,7 @@ export const completeProfile = asyncHandler(async (req, res) => {
   if (address) updates.address = address;
 
   // Check if profile is complete
-  const hasCnic = cnic || submitter.submitterCnic && !submitter.submitterCnic.startsWith("temp_");
+  const hasCnic = cnic || submitter.submitterCnic;
   const hasContact = contact || submitter.contact;
   const hasAddress = address || submitter.address;
 
@@ -346,33 +341,11 @@ export const completeProfile = asyncHandler(async (req, res) => {
     updates.isProfileComplete = true;
   }
 
-  // Use raw SQL to update the record (handles primary key update correctly)
   if (Object.keys(updates).length === 0) {
     return errors.badRequest(res, 'No fields to update');
   }
 
-  // Build dynamic UPDATE query
-  const setClause = [];
-  const replacements = { email: userEmail };
-  let paramIndex = 1;
-
-  for (const [key, value] of Object.entries(updates)) {
-    setClause.push(`"${key}" = $${paramIndex}`);
-    replacements[key] = value;
-    paramIndex++;
-  }
-
-  // IMPORTANT: WHERE clause must use the CURRENT (old) CNIC to find the record
-  // The SET clause will update it to the new CNIC if provided
-  const currentCnic = submitter.submitterCnic;
-
-  await sequelize.query(
-    `UPDATE "CrimeReportsSubmitter" SET ${setClause.join(', ')} WHERE "submitterCnic" = $${paramIndex}`,
-    {
-      replacements: { ...replacements, submitterCnic: currentCnic },
-      type: sequelize.QueryTypes.UPDATE,
-    }
-  );
+  await submitter.update(updates);
 
   // Fetch the updated record to return fresh data
   const updatedSubmitter = await CrimeReportsSubmitter.findOne({
@@ -382,7 +355,7 @@ export const completeProfile = asyncHandler(async (req, res) => {
   return success(res, {
     data: {
       user: {
-        id: updatedSubmitter.submitterCnic,
+        id: updatedSubmitter.id,
         email: updatedSubmitter.email,
         fullName: updatedSubmitter.fullName,
         contact: updatedSubmitter.contact,
@@ -448,26 +421,7 @@ export const updateProfile = asyncHandler(async (req, res) => {
     return errors.badRequest(res, 'No fields to update');
   }
 
-  // Use raw SQL to update safely (handles any potential edge cases)
-  const setClause = [];
-  const replacements = {};
-  let paramIndex = 1;
-
-  // Build SET clause with named parameters
-  for (const [key, value] of Object.entries(updates)) {
-    setClause.push(`"${key}" = :${key}`);
-    replacements[key] = value;
-  }
-
-  const currentCnic = submitter.submitterCnic;
-
-  await sequelize.query(
-    `UPDATE "CrimeReportsSubmitter" SET ${setClause.join(', ')} WHERE "submitterCnic" = :submitterCnic`,
-    {
-      replacements: { ...replacements, submitterCnic: currentCnic },
-      type: sequelize.QueryTypes.UPDATE,
-    }
-  );
+  await submitter.update(updates);
 
   // Fetch the updated record
   const updatedSubmitter = await CrimeReportsSubmitter.findOne({
@@ -477,7 +431,7 @@ export const updateProfile = asyncHandler(async (req, res) => {
   return success(res, {
     data: {
       user: {
-        id: updatedSubmitter.submitterCnic,
+        id: updatedSubmitter.id,
         email: updatedSubmitter.email,
         fullName: updatedSubmitter.fullName,
         contact: updatedSubmitter.contact,
@@ -510,12 +464,11 @@ export const getMyReports = asyncHandler(async (req, res) => {
     return errors.notFound(res, 'User profile not found');
   }
 
-  // Use submitterCnic as userId in CrimeSubmission table
-  const userId = submitter.submitterCnic;
+  const submitterId = submitter.id;
 
   // Raw SQL query to get user's reports with crime details
   // Returns empty array if no reports found (not an error)
-  const [results] = await sequelize.query(`
+  const reports = await sequelize.query(`
     SELECT
       c."id",
       c."title",
@@ -532,15 +485,12 @@ export const getMyReports = asyncHandler(async (req, res) => {
     JOIN "Crime" c ON cs."CrimeId" = c."id"
     LEFT JOIN "CrimeType" ct ON c."crimeTypeId" = ct."id"
     LEFT JOIN "Zone" z ON c."zoneId" = z."id"
-    WHERE cs."userId" = :userId
+    WHERE cs."submitterId" = :submitterId
     ORDER BY cs."submittedAt" DESC
   `, {
-    replacements: { userId },
+    replacements: { submitterId },
     type: sequelize.QueryTypes.SELECT,
   });
-
-  // Handle empty results - return empty array, not an error
-  const reports = results || [];
 
   return success(res, {
     data: {
