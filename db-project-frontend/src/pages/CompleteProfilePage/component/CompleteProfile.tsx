@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
+import LogowithText from "../../../assets/LogowithText.svg";
+import MainBackground from "../../../assets/MainBackground.png";
+import InstructionIcon from "../../../assets/InstructionIcon.svg";
+import BackButton from "../../../components/BackButton";
+import GreenButton from "../../../components/GreenButton";
 
 export default function CompleteProfile() {
   const navigate = useNavigate();
@@ -16,7 +21,6 @@ export default function CompleteProfile() {
   const [successMessage, setSuccessMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [resendingEmail, setResendingEmail] = useState(false);
-  const [step, setStep] = useState(1);
 
   // Redirect if not authenticated or profile is already complete
   useEffect(() => {
@@ -51,11 +55,6 @@ export default function CompleteProfile() {
     if (citizenData?.address) setFormData((prev) => ({ ...prev, address: citizenData.address || "" }));
   }, [citizen, isCitizenAuthenticated, navigate]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    setError("");
-  };
-
   const formatCNIC = (value: string) => {
     // Remove all non-digit characters
     const digits = value.replace(/\D/g, "");
@@ -68,6 +67,30 @@ export default function CompleteProfile() {
   const handleCnicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatCNIC(e.target.value);
     setFormData({ ...formData, cnic: formatted });
+    setError("");
+  };
+
+  const formatContact = (value: string) => {
+    let digits = value.replace(/\D/g, "");
+
+    if (digits.startsWith("92")) {
+      digits = digits.slice(2);
+    }
+
+    if (digits.startsWith("0")) {
+      digits = digits.slice(1);
+    }
+
+    digits = digits.slice(0, 10);
+
+    if (!digits) return "";
+    if (digits.length <= 3) return `+92-${digits}`;
+    return `+92-${digits.slice(0, 3)}-${digits.slice(3)}`;
+  };
+
+  const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatContact(e.target.value);
+    setFormData({ ...formData, contact: formatted });
     setError("");
   };
 
@@ -89,9 +112,9 @@ export default function CompleteProfile() {
     }
 
     // Contact validation
-    const phoneRegex = /^(\+92|0)?[3-9]\d{2}-?\d{7}$/;
-    if (!phoneRegex.test(formData.contact.replace(/[- ]/g, ""))) {
-      setError("Invalid contact number format");
+    const phoneRegex = /^\+92-[3-9]\d{2}-\d{7}$/;
+    if (!phoneRegex.test(formData.contact)) {
+      setError("Invalid contact number format. Use: +92-3XX-XXXXXXX");
       return;
     }
 
@@ -136,139 +159,115 @@ export default function CompleteProfile() {
   const isEmailNotVerified = citizen?.provider === "email" && !citizen?.emailVerified;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100 px-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.1)] p-8">
-        {/* Email Verification Banner - Only for email signup */}
-        {isEmailNotVerified && (
-          <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3 flex-1">
-                <p className="text-sm text-yellow-700">
-                  <strong>Email verification required!</strong> Please check your inbox and click the verification link to complete your registration.
-                </p>
+    <div className="-m-4">
+      <section
+        className="flex items-center justify-center min-h-screen bg-cover bg-center p-4"
+        style={{ backgroundImage: `url(${MainBackground})` }}
+      >
+        <div className="bg-white rounded-3xl shadow-xl flex flex-col px-4 sm:px-8 py-6 sm:py-8 w-full max-w-md space-y-4 md:space-y-6 mx-8 sm:mx-0">
+          <div className="flex items-center text-[#145332] cursor-pointer text-sm">
+            <div className="flex items-start" onClick={handleLogout}>
+              <BackButton textSize="text-sm" iconSize={16} />
+            </div>
+          </div>
+
+          <div className="flex items-center flex-col md:space-y-6">
+            <div className="flex justify-center">
+              <img src={LogowithText} alt="CrimeLens" className="w-44 md:w-52" />
+            </div>
+
+            <h2 className="text-center font-outfit font-medium text-[#145332] text-md">
+              Complete Citizen Profile
+            </h2>
+          </div>
+
+          {isEmailNotVerified && (
+            <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3">
+              <p className="text-yellow-700 text-sm font-outfit">
+                Please verify your email before completing your profile.
                 <button
                   type="button"
                   onClick={handleResendEmail}
                   disabled={resendingEmail}
-                  className="mt-2 text-xs font-medium text-yellow-800 hover:text-yellow-900 underline disabled:no-underline disabled:opacity-50"
+                  className="ml-2 underline font-medium disabled:no-underline disabled:opacity-50"
                 >
                   {resendingEmail ? "Sending..." : "Resend verification email"}
                 </button>
-              </div>
+              </p>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-block px-4 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium mb-3">
-            Step {step} of 1: Complete Your Profile
-          </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Profile Completion</h1>
-          <p className="text-gray-600">
-            Welcome, {citizen?.fullName}! Please complete your profile to continue.
-          </p>
-        </div>
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-red-600 text-sm font-outfit">{error}</p>
+            </div>
+          )}
 
-        {/* Error Message */}
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-600 text-sm">{error}</p>
-          </div>
-        )}
+          {successMessage && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <p className="text-green-600 text-sm font-outfit">{successMessage}</p>
+            </div>
+          )}
 
-        {/* Success Message */}
-        {successMessage && (
-          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-green-600 text-sm">{successMessage}</p>
-          </div>
-        )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* CNIC */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              CNIC Number <span className="text-red-500">*</span>
-            </label>
+          <div className="flex items-center gap-3 border-2 border-[#00A6FB] bg-[#F1F9FF] rounded-lg p-3">
+            <img
+              src={InstructionIcon}
+              alt="Info"
+              className="w-7 h-7 shrink-0 self-center"
+            />
+            <p className="text-sm text-[#00A6FB] font-outfit font-medium leading-snug">
+              Complete your profile to continue with citizen crime reporting.
+            </p>
+          </div>
+          <form onSubmit={handleSubmit} className="flex flex-col w-full space-y-4">
+
+
             <input
               type="text"
               name="cnic"
               value={formData.cnic}
               onChange={handleCnicChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
-              placeholder="#####-#######-#"
+              className="border-2 border-[#d9d9d9] text-[#ababab] rounded-lg px-4 py-2 font-outfit text-sm focus:outline-none focus:border-[#237E54]"
+              placeholder="CNIC Number"
               maxLength={15}
               required
             />
-            <p className="mt-1 text-xs text-gray-500">Format: 12345-1234567-1</p>
-          </div>
 
-          {/* Contact */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Contact Number <span className="text-red-500">*</span>
-            </label>
             <input
               type="text"
               name="contact"
               value={formData.contact}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
-              placeholder="+92-3XX-XXXXXXX or 03XX-XXXXXXX"
+              onChange={handleContactChange}
+              className="border-2 border-[#d9d9d9] text-[#ababab] rounded-lg px-4 py-2 font-outfit text-sm focus:outline-none focus:border-[#237E54]"
+              placeholder="Contact Number"
+              maxLength={15}
               required
             />
-          </div>
 
-          {/* Address */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Address <span className="text-red-500">*</span>
-            </label>
             <textarea
               name="address"
               value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none resize-none"
-              placeholder="Enter your residential address"
+              onChange={(e) => {
+                setFormData({ ...formData, address: e.target.value });
+                setError("");
+              }}
+              className="border-2 border-[#d9d9d9] text-[#ababab] rounded-lg px-4 py-2 font-outfit text-sm focus:outline-none focus:border-[#237E54] resize-none mb-7"
+              placeholder="Residential Address"
               rows={3}
               required
             />
-          </div>
 
-          {/* Info Message */}
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-blue-600 text-sm">
-              <strong>Note:</strong> This information is required for crime reporting and verification purposes.
-              Your data will be kept secure and confidential.
-            </p>
-          </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-[#237E54] text-white py-3 rounded-lg font-semibold hover:bg-[#1a6644] transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            {loading ? "Saving Profile..." : "Complete Profile"}
-          </button>
-        </form>
-
-        {/* Logout Link */}
-        <div className="mt-4 text-center">
-          <button
-            onClick={handleLogout}
-            className="text-gray-500 text-sm hover:text-gray-700"
-          >
-            Logout and finish later
-          </button>
+            <GreenButton
+              type="submit"
+              label={loading ? "Saving Profile..." : "Complete Profile"}
+              fullWidth
+              disabled={loading}
+            />
+          </form>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

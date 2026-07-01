@@ -41,6 +41,7 @@ const PageLayout = () => {
     "/register",
     "/map",
     "/request-agent",
+    "/complete-profile",
   ];
 
   // Routes that should take full width (no padding)
