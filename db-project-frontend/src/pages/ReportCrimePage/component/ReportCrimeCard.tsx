@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../../config/constants";
-import { useAuth } from "../../../context/AuthContext";
+import { supabase, useAuth } from "../../../context/AuthContext";
 import LocationPicker, { isValidLocation } from "../../../components/LocationPicker";
 
 export default function ReportCrimeCard() {
   const navigate = useNavigate();
-  const { citizen, citizenToken, isCitizenAuthenticated } = useAuth();
+  const { citizen, citizenToken, isCitizenAuthenticated, refreshCitizenSession } = useAuth();
 
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -74,17 +74,54 @@ export default function ReportCrimeCard() {
     setLoading(true);
 
     try {
-      const response = await fetch(
+      let accessToken = citizenToken || localStorage.getItem("citizen_token");
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session?.access_token) {
+        accessToken = session.access_token;
+        localStorage.setItem("citizen_token", session.access_token);
+      }
+
+      if (!accessToken) {
+        setError("Your session has expired. Please login again.");
+        navigate("/login-citizen");
+        return;
+      }
+
+      let response = await fetch(
         `${API_BASE_URL}/user/report-crime`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${citizenToken}`,
+            "Authorization": `Bearer ${accessToken}`,
           },
           body: JSON.stringify(formData),
         }
       );
+
+      if (response.status === 401) {
+        await refreshCitizenSession();
+        accessToken = localStorage.getItem("citizen_token");
+
+        if (!accessToken) {
+          setError("Your session has expired. Please login again.");
+          navigate("/login-citizen");
+          return;
+        }
+
+        response = await fetch(
+          `${API_BASE_URL}/user/report-crime`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify(formData),
+          }
+        );
+      }
 
       const data = await response.json();
 
