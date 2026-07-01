@@ -25,11 +25,11 @@ This file lists repository fixes identified from the current code, configuration
 
 ## Authentication
 
-- [ ] Fix or remove `loginUser` in `src/services/api.js`; it calls `/auth/login` without the required `verify_role`.
-- [ ] Standardize admin/police auth state storage. Current code stores token, user, and role through multiple paths.
-- [ ] Ensure logout clears all relevant admin/police auth state, including `token`, `user`, and `userRole`.
-- [ ] Review citizen auth route protection on the frontend. Some citizen routes are listed as public in `src/routes/index.tsx`.
-- [ ] Remove hard-coded Supabase URL and anon key fallbacks from frontend code if environment-only configuration is required.
+- [x] Fix or remove `loginUser` in `src/services/api.js`; it calls `/auth/login` without the required `verify_role`.
+- [x] Standardize admin/police auth state storage. Current code stores token, user, and role through multiple paths.
+- [x] Ensure logout clears all relevant admin/police auth state, including `token`, `user`, and `userRole`.
+- [x] Review citizen auth route protection on the frontend. Some citizen routes are listed as public in `src/routes/index.tsx`.
+- [x] Remove hard-coded Supabase URL and anon key fallbacks from frontend code if environment-only configuration is required.
 
 ## Backend Bugs
 

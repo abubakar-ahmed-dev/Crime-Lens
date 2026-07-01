@@ -4,6 +4,9 @@ import GreenButton from "./GreenButton";
 import { ICONS } from "../assets/icons";
 import MeetCreatorsCard from "./MeetCreatorsCards";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { useAuth } from "../context/AuthContext";
+import { clearRole } from "../store/features/current_role";
 
 interface SidebarProps {
   version?: "admin" | "police" | "user";
@@ -29,6 +32,8 @@ const Sidebar = ({
   const [activeItem, setActiveItem] = useState<string>("");
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useDispatch();
+  const { logout } = useAuth();
 
   const allMenus: MenuItem[] = [
     { label: "Dashboard", icon: ICONS.DashboardIcon, activeIcon: ICONS.DashboardIcon_Active, route: "/dashboard" },
@@ -131,7 +136,10 @@ const Sidebar = ({
             label={buttonText}
             width={220}
             onClick={() => {
-              localStorage.removeItem("token");
+              if (version === "admin" || version === "police") {
+                logout();
+                dispatch(clearRole());
+              }
               navigate("/");
             }}
           />

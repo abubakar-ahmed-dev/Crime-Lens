@@ -47,11 +47,11 @@ const Login = () => {
             <hr className="border-t-2 border-[#d9d9d9] mx-4" />
             <WhiteButton
               label="Login as an Administrator"
-              onClick={() => NavigateLoginAdmin("Administrator")}
+              onClick={() => NavigateLoginAdmin("admin")}
             />
             <WhiteButton
               label="Login as a Police Agent"
-              onClick={() => NavigateLoginAdmin("Police Agent")}
+              onClick={() => NavigateLoginAdmin("police")}
             />
             <WhiteButton
               label="Login as a Citizen"

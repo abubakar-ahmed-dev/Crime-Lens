@@ -75,15 +75,15 @@ export const login = async (req, res) => {
         const roleName = user.roleName; // identical to user.Role?.name
         
         const mapVerifyRole = (verifyRole) => {
-          if (verifyRole === "Administrator") return "admin";
-          if (verifyRole === "Police Agent") return "police";
-          return "user";
+          if (verifyRole === "Administrator" || verifyRole === "admin") return "admin";
+          if (verifyRole === "Police Agent" || verifyRole === "police") return "police";
+          return null;
         };
         
         const expectedRole = mapVerifyRole(verify_role);
         
         // Role mismatch
-        if (roleName !== expectedRole) {
+        if (!expectedRole || roleName !== expectedRole) {
           return res.status(401).json({
             success: false,
             message: "Invalid username or password",

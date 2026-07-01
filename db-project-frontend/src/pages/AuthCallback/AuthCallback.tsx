@@ -68,6 +68,7 @@ export default function AuthCallback() {
             // Store session
             localStorage.setItem("citizen_session", JSON.stringify(data.session));
             localStorage.setItem("citizen_token", accessToken);
+            localStorage.setItem("userRole", "user");
 
             // Update the citizen user data with emailVerified = true
             const citizen = localStorage.getItem("citizen");
@@ -112,6 +113,7 @@ export default function AuthCallback() {
           const citizenStr = localStorage.getItem("citizen");
           if (citizenStr) {
             const user = JSON.parse(citizenStr);
+            localStorage.setItem("userRole", "user");
             if (user.isProfileComplete) {
               navigate("/citizen-dashboard");
             } else {
@@ -145,6 +147,7 @@ export default function AuthCallback() {
               localStorage.setItem("citizen", JSON.stringify(profileData.user));
               localStorage.setItem("citizen_session", JSON.stringify(data.session));
               localStorage.setItem("citizen_token", accessToken);
+              localStorage.setItem("userRole", "user");
 
               // Wait a moment for localStorage to be set and state to update
               await new Promise(resolve => setTimeout(resolve, 100));

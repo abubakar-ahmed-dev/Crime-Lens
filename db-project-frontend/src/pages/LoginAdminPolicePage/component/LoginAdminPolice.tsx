@@ -8,7 +8,7 @@ import PasswordHideIcon from "../../../assets/PasswodHideIcon.svg";
 import BackButton from "../../../components/BackButton";
 import { useDispatch } from "react-redux";
 import { setRole } from "../../../store/features/current_role";
-import { API_BASE_URL } from "../../../config/constants";
+import { useAuth } from "../../../context/AuthContext";
 
 const LoginAdminPolice = () => {
   const [username, setUsername] = useState("");
@@ -19,7 +19,14 @@ const LoginAdminPolice = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const location = useLocation();
-  const verify_role = location.state?.role;
+  const selectedRole = location.state?.role;
+  const verify_role =
+    selectedRole === "Administrator"
+      ? "admin"
+      : selectedRole === "Police Agent"
+        ? "police"
+        : selectedRole;
+  const { login } = useAuth();
 
   const NavigateLogin = () => {
     navigate("/login");
@@ -29,31 +36,23 @@ const LoginAdminPolice = () => {
     navigate("/dashboard");
   };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
-    console.log("frontend");
+
+    if (verify_role !== "admin" && verify_role !== "police") {
+      setError("Please select admin or police login first.");
+      return;
+    }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password, verify_role }),
-      });
+      const result = await login(username, password, verify_role);
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        // Store token if needed
-        localStorage.setItem("token", data.token);
-
-        // 🔥🔥 SET ROLE IN REDUX GLOBAL STATE
-        dispatch(setRole(data.user.role));
-
-        // Navigate to dashboard
+      if (result.success && result.user) {
+        dispatch(setRole(result.user.role as "admin" | "police"));
         NavigateDashboard();
       } else {
-        setError(data.message || "Login failed");
+        setError(result.message || "Login failed");
       }
     } catch (err) {
       console.error("Login error:", err);
@@ -84,7 +83,7 @@ const LoginAdminPolice = () => {
             </div>
 
             <h2 className="text-center font-outfit font-medium text-[#145332] text-md">
-              Login as an {location.state.role}
+              Login as an {verify_role || "admin/police user"}
             </h2>
           </div>
 
