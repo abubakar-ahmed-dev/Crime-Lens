@@ -3,6 +3,7 @@ import { useState } from "react";
 import WhiteButton from "../../../components/WhiteButton";
 import ConfirmationPopup from "./ConfirmationPopup";
 import { API_BASE_URL } from "../../../config/constants";
+import { getJwtAuthHeaders } from "../../../utils/authHeaders";
 
 type VerificationCardProps =
   | {
@@ -97,9 +98,9 @@ export default function VerificationCard(props: VerificationCardProps) {
 
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: {
+        headers: getJwtAuthHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify(body),
       });
 
@@ -139,9 +140,9 @@ export default function VerificationCard(props: VerificationCardProps) {
 
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: {
+        headers: getJwtAuthHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({ reason }),
       });
 

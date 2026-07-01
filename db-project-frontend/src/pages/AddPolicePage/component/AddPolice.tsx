@@ -66,7 +66,6 @@ const LoginCreate = () => {
     setLoading(true);
 
     try {
-      console.log("Submitting agent request...", formData);
 
       const response = await fetch(`${API_BASE_URL}/agent/request`, {
         method: "POST",
@@ -81,7 +80,6 @@ const LoginCreate = () => {
       });
 
       const data = await response.json();
-      console.log("Backend Response:", data);
 
       if (response.ok && data.success) {
         setSuccessMsg(

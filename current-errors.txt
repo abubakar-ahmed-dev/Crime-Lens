@@ -1,0 +1,6 @@
+I tried signing up. it went good, but when it redirects, it should redirect me to complete profile page, but it shows authentication error, and redirect me to login citizen page. The console printed this error:
+
+Backend fetch error: TypeError: Cannot read properties of undefined (reading 'isProfileComplete')
+    at handleCallback (AuthCallback.tsx:135:52)
+
+The isProfileComplete is column in CrimeReportsSubmitter. it is set to false when a new user is created. In above process, a new entry is created both in auth.users table, and crime reports submitters table

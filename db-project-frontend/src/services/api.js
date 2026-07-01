@@ -16,8 +16,8 @@ export const setAuthToken = (token) => {
   else delete api.defaults.headers.common["Authorization"];
 };
 
-export const loginUser = async (username, password) => {
-  const res = await api.post("/auth/login", { username, password });
+export const loginUser = async (username, password, verify_role) => {
+  const res = await api.post("/auth/login", { username, password, verify_role });
   return res.data; // { success, token, user, ... }
 };
 

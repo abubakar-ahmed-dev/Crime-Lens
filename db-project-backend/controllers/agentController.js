@@ -3,6 +3,7 @@
 import { QueryTypes, Op, fn, col, literal } from "sequelize";
 import sequelize from "../config/db.js";
 import db from "../models/index.js";
+import bcrypt from "bcryptjs";
 const { Crime, User, Criminal , CrimeSubmission, PoliceAgentRequestsTemp, CrimeReportsSubmitter, PoliceAgentRequest, CrimeType, Zone, PoliceBranch } = db;
 
 // ===================================================
@@ -186,6 +187,9 @@ export const verifyAgentRequest = async (req, res) => {
     // ---------------------------
     const now = new Date();
 
+    // Hash the password before storing
+    const hashedPassword = await bcrypt.hash(agentRequest.password, 10);
+
     const newUserResult = await sequelize.query(
       `
       INSERT INTO "User" (username, "passwordHash", "roleId", "createdAt", "updatedAt")
@@ -195,7 +199,7 @@ export const verifyAgentRequest = async (req, res) => {
       {
         replacements: {
           username: agentRequest.username,
-          passwordHash: agentRequest.password, // ⚠ in production, hash password
+          passwordHash: hashedPassword, // Hashed password
           roleId: roleId || 2,
           createdAt: now,
           updatedAt: now,
@@ -601,7 +605,14 @@ export const updateAgent = async (req, res) => {
     // 4️⃣ Update username/password in User
     // ---------------------------
     const updatedUsername = username ?? user.username;
-    const updatedPassword = password ?? user.passwordHash;
+
+    // If password is being updated, hash it; otherwise keep existing hash
+    let updatedPassword;
+    if (password) {
+      updatedPassword = await bcrypt.hash(password, 10);
+    } else {
+      updatedPassword = user.passwordHash;
+    }
 
     await sequelize.query(
       `

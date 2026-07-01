@@ -10,6 +10,8 @@ const router = express.Router();
 
 router.post(
   "/upload-crimes",
+  verifyToken,
+  authorizeRoles("admin"),
   upload.single("file"),
   uploadCrimesCSV
 );

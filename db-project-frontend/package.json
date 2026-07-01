@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.10.1",
+    "@supabase/supabase-js": "^2.108.1",
     "@tailwindcss/vite": "^4.1.15",
     "axios": "^1.13.0",
     "cors": "^2.8.5",

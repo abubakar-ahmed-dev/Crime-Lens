@@ -1,16 +1,21 @@
 -- ============================================
 -- CrimeLens Database Schema for Supabase
--- Version: 2.0 (Updated to match Sequelize models)
+-- Version: 3.0 (Updated for Citizen Authentication)
 -- Run this in Supabase SQL Editor
 -- ============================================
 
 -- Enable PostGIS extension (if not already enabled)
 CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- Create ENUM types first (before they're referenced)
+-- ============================================
+-- Create ENUM Types
+-- ============================================
+
 CREATE TYPE "enum_Crime_status" AS ENUM ('pending', 'approved', 'rejected');
 CREATE TYPE "enum_PoliceAgentRequest_status" AS ENUM ('pending', 'approved', 'rejected');
 CREATE TYPE "enum_UploadLog_status" AS ENUM ('completed', 'failed', 'uploaded');
+CREATE TYPE "enum_ProfileStatus" AS ENUM ('pending', 'complete');
 
 -- ============================================
 -- Create Tables
@@ -37,15 +42,32 @@ CREATE TABLE IF NOT EXISTS "CrimeType" (
     "severity" INTEGER NOT NULL DEFAULT 1
 );
 
--- User table (matches Sequelize model)
+-- User table (Admin/Police users with JWT auth)
 CREATE TABLE IF NOT EXISTS "User" (
     "id" INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     "username" TEXT NOT NULL UNIQUE,
     "passwordHash" TEXT NOT NULL,
     "roleId" INTEGER NOT NULL,
+    "isActive" BOOLEAN DEFAULT TRUE,
+    "lastLogin" TIMESTAMP WITH TIME ZONE,
     "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "User_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "Role"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CrimeReportsSubmitter table (Citizen Profile)
+CREATE TABLE IF NOT EXISTS "CrimeReportsSubmitter" (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "supabaseUserId" TEXT UNIQUE,
+    "email" TEXT NOT NULL UNIQUE,
+    "password" TEXT,
+    "submitterCnic" TEXT UNIQUE,
+    "fullName" TEXT NOT NULL,
+    "contact" TEXT,
+    "address" TEXT,
+    "isProfileComplete" BOOLEAN NOT NULL DEFAULT FALSE,
+    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- PoliceBranch table
@@ -61,15 +83,8 @@ CREATE TABLE IF NOT EXISTS "PoliceBranch" (
     CONSTRAINT "PoliceBranch_branchHeadUserId_fkey" FOREIGN KEY ("branchHeadUserId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
--- CrimeReportsSubmitter table
-CREATE TABLE IF NOT EXISTS "CrimeReportsSubmitter" (
-    "submitterCnic" TEXT PRIMARY KEY,
-    "submitterName" TEXT,
-    "submitterContact" TEXT
-);
-
 -- Crime table
-CREATE TABLE IF NOT EXISTS "Crime" ()
+CREATE TABLE IF NOT EXISTS "Crime" (
     "id" BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     "title" TEXT NOT NULL,
     "description" TEXT,
@@ -84,13 +99,13 @@ CREATE TABLE IF NOT EXISTS "Crime" ()
     CONSTRAINT "Crime_zoneId_fkey" FOREIGN KEY ("zoneId") REFERENCES "Zone"("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
--- CrimeSubmission table (simplified to match Sequelize model)
+-- CrimeSubmission table
 CREATE TABLE IF NOT EXISTS "CrimeSubmission" (
     "id" BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    "submitterCnic" TEXT NOT NULL,
+    "submitterId" UUID NOT NULL,
     "submittedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "CrimeId" BIGINT NOT NULL,
-    CONSTRAINT "CrimeSubmission_submitterCnic_fkey" FOREIGN KEY ("submitterCnic") REFERENCES "CrimeReportsSubmitter"("submitterCnic") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "CrimeSubmission_submitterId_fkey" FOREIGN KEY ("submitterId") REFERENCES "CrimeReportsSubmitter"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "CrimeSubmission_CrimeId_fkey" FOREIGN KEY ("CrimeId") REFERENCES "Crime"("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
@@ -146,6 +161,13 @@ CREATE INDEX IF NOT EXISTS "Crime_status_idx" ON "Crime"("status");
 CREATE INDEX IF NOT EXISTS "Crime_zoneId_reportedAt_idx" ON "Crime"("zoneId", "reportedAt");
 CREATE INDEX IF NOT EXISTS "activitylog_tablename_recordid_idx" ON "activitylog"("tablename", "recordid");
 
+-- Citizen-specific indexes
+CREATE INDEX IF NOT EXISTS "CrimeReportsSubmitter_userId_idx" ON "CrimeReportsSubmitter"("id");
+CREATE INDEX IF NOT EXISTS "CrimeReportsSubmitter_supabaseUserId_idx" ON "CrimeReportsSubmitter"("supabaseUserId");
+CREATE INDEX IF NOT EXISTS "CrimeReportsSubmitter_email_idx" ON "CrimeReportsSubmitter"("email");
+CREATE INDEX IF NOT EXISTS "CrimeReportsSubmitter_isProfileComplete_idx" ON "CrimeReportsSubmitter"("isProfileComplete");
+CREATE INDEX IF NOT EXISTS "CrimeSubmission_submitterId_idx" ON "CrimeSubmission"("submitterId");
+
 -- PostGIS indexes for geospatial queries
 CREATE INDEX IF NOT EXISTS "idx_crime_location" ON "Crime" USING GIST(location);
 CREATE INDEX IF NOT EXISTS "idx_policebranch_location" ON "PoliceBranch" USING GIST(location);
@@ -159,7 +181,7 @@ CREATE INDEX IF NOT EXISTS "idx_zone_boundary" ON "Zone" USING GIST(boundary);
 INSERT INTO "Role" ("name", "description") VALUES
     ('admin', 'System administrator with full access'),
     ('police', 'Police officer with limited access'),
-    ('public', 'Regular citizen user')
+    ('user', 'Regular citizen user')
 ON CONFLICT ("name") DO NOTHING;
 
 -- Insert default crime types
@@ -192,6 +214,7 @@ SELECT
         WHEN 'PoliceAgentRequest' THEN (SELECT COUNT(*) FROM "PoliceAgentRequest")
         WHEN 'UploadLog' THEN (SELECT COUNT(*) FROM "UploadLog")
         WHEN 'activitylog' THEN (SELECT COUNT(*) FROM "activitylog")
+        WHEN 'CrimeReportsSubmitter' THEN (SELECT COUNT(*) FROM "CrimeReportsSubmitter")
         ELSE 0
     END as row_count
 FROM pg_tables
