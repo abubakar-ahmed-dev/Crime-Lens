@@ -4,7 +4,7 @@ import DataTypes from "sequelize";
  * CrimeSubmission Model
  *
  * Links crimes to their submitters (citizens).
- * For authenticated citizens, userId is used instead of submitterCnic.
+ * Authenticated citizen ownership uses submitterId.
  */
 export default (sequelize) => {
   const CrimeSubmission = sequelize.define("CrimeSubmission", {
@@ -18,14 +18,20 @@ export default (sequelize) => {
     submitterCnic: {
       type: DataTypes.TEXT,
       allowNull: true,
-      comment: "Legacy CNIC-based submitter reference (deprecated)",
+      comment: "CNIC snapshot for display/backward compatibility",
     },
 
-    // New: User ID-based submission for authenticated citizens
+    submitterId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      comment: "Stable reference to CrimeReportsSubmitter.id",
+    },
+
+    // Legacy field retained during migration. Use submitterId for ownership.
     userId: {
       type: DataTypes.TEXT,
       allowNull: true,
-      comment: "User ID (same as submitterCnic) for authenticated citizen submissions",
+      comment: "Legacy user identifier retained for backward compatibility",
     },
 
     submittedAt: {
@@ -45,20 +51,11 @@ export default (sequelize) => {
   });
 
   CrimeSubmission.associate = (models) => {
-    // Legacy association via CNIC
     CrimeSubmission.belongsTo(models.CrimeReportsSubmitter, {
-      foreignKey: "submitterCnic",
-      onDelete: "SET NULL",
+      foreignKey: "submitterId",
+      onDelete: "RESTRICT",
       onUpdate: "CASCADE",
-      as: "submitterByCnic",
-    });
-
-    // New association via userId (same table, different semantics)
-    CrimeSubmission.belongsTo(models.CrimeReportsSubmitter, {
-      foreignKey: "userId",
-      onDelete: "SET NULL",
-      onUpdate: "CASCADE",
-      as: "submitterByUser",
+      as: "submitter",
     });
 
     CrimeSubmission.belongsTo(models.Crime, {
