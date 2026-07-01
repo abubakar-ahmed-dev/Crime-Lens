@@ -95,8 +95,10 @@ CREATE TABLE IF NOT EXISTS "Crime" (
     "location" GEOMETRY(point, 4326),
     "address" TEXT,
     "zoneId" INTEGER,
+    "latestUpdatedBy" INTEGER,
     CONSTRAINT "Crime_crimeTypeId_fkey" FOREIGN KEY ("crimeTypeId") REFERENCES "CrimeType"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "Crime_zoneId_fkey" FOREIGN KEY ("zoneId") REFERENCES "Zone"("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "Crime_zoneId_fkey" FOREIGN KEY ("zoneId") REFERENCES "Zone"("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "Crime_latestUpdatedBy_fkey" FOREIGN KEY ("latestUpdatedBy") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CrimeSubmission table

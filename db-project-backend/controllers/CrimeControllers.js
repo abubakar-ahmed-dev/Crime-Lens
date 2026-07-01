@@ -243,15 +243,17 @@ export const approveCrimeReport = async (req, res) => {
           address = :address,
           title = :title,
           description = :description,
-          location = ${locationSQL}
+          location = ${locationSQL},
+          "latestUpdatedBy" = :latestUpdatedBy
       WHERE id = :crimeId
-      RETURNING id, status;
+      RETURNING id, status, "latestUpdatedBy";
       `,
       {
         replacements: {
           address: address || crime.address,
           title: title || crime.title,
           description: description || crime.description,
+          latestUpdatedBy: req.user.id,
           crimeId: crime.id,
         },
         type: QueryTypes.UPDATE,
@@ -634,7 +636,8 @@ export const updateCrime = async (req, res) => {
           description = :description,
           address = :address,
           "zoneId" = :zoneId,
-          location = ${locationSQL}
+          location = ${locationSQL},
+          "latestUpdatedBy" = :latestUpdatedBy
       WHERE id = :id;
       `,
       {
@@ -643,6 +646,7 @@ export const updateCrime = async (req, res) => {
           description,
           address,
           zoneId: zoneId || null,
+          latestUpdatedBy: req.user.id,
           id,
         },
         type: QueryTypes.UPDATE,

@@ -43,6 +43,10 @@ export default (sequelize) => {
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    latestUpdatedBy: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
   }, {
     tableName: "Crime",
     timestamps: false,
@@ -58,6 +62,7 @@ export default (sequelize) => {
   Crime.associate = (models) => {
     Crime.belongsTo(models.CrimeType, { foreignKey: "crimeTypeId", onDelete: "RESTRICT", onUpdate: "CASCADE" });
     Crime.belongsTo(models.Zone, { foreignKey: "zoneId", onDelete: "SET NULL", onUpdate: "CASCADE" });
+    Crime.belongsTo(models.User, { foreignKey: "latestUpdatedBy", as: "latestUpdater", onDelete: "SET NULL", onUpdate: "CASCADE" });
     Crime.hasMany(models.CrimeSubmission, { foreignKey: "CrimeId", onDelete: "SET NULL", onUpdate: "CASCADE" });
   };
 
