@@ -3,7 +3,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import LogowithText from "../../../assets/LogowithText.svg";
 import GreenButton from "../../../components/GreenButton";
-import WhiteButton from "../../../components/WhiteButton";
 import MainBackground from "../../../assets/MainBackground.png";
 import PasswordSeeIcon from "../../../assets/PasswodSeeIcon.svg";
 import PasswordHideIcon from "../../../assets/PasswodHideIcon.svg";

@@ -13,6 +13,8 @@ create or replace view public.view_PendingSubmissions with (security_invoker = o
     c.status,
     c."reportedAt",
     c."incidentDate",
+    CASE WHEN c.location IS NOT NULL THEN ST_Y(c.location::geometry) END AS latitude,
+    CASE WHEN c.location IS NOT NULL THEN ST_X(c.location::geometry) END AS longitude,
     cs_latest.id AS "submissionId",
     crs."submitterCnic",
     cs_latest."submittedAt",

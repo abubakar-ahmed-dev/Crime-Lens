@@ -46,8 +46,8 @@ export default function AllRecords({ version }: AllRecordsProps) {
     description: string;
     address: string;
     zoneId: number;
-    latitude: number;
-    longitude: number;
+    latitude: string;
+    longitude: string;
   }
 
   const [fullCrime, setFullCrime] = useState<FullCrimeDetails | null>(null);
@@ -216,8 +216,8 @@ export default function AllRecords({ version }: AllRecordsProps) {
           description: c.description,
           address: c.address,
           zoneId: c.zoneId,
-          latitude: c.location?.coordinates?.[1] ?? 0,
-          longitude: c.location?.coordinates?.[0] ?? 0,
+          latitude: c.latitude?.toString() ?? c.location?.coordinates?.[1]?.toString() ?? "",
+          longitude: c.longitude?.toString() ?? c.location?.coordinates?.[0]?.toString() ?? "",
         });
         setIsUpdateModalOpen(true);
       } catch (err) {

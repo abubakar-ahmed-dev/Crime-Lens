@@ -5,8 +5,6 @@ import StatsCard from "../../../components/StatsCards";
 import GreenButton from "../../../components/GreenButton";
 import WhiteButton from "../../../components/WhiteButton";
 import RedButton from "../../../components/RedButton";
-import ArrowButton from "../../../components/ArrowButton";
-import StatsCardLiveIcon from "../../../components/StatsCardLiveIcon";
 
 export default function CitizenDashboard() {
   const navigate = useNavigate();

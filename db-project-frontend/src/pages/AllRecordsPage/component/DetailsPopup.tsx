@@ -1,5 +1,6 @@
 import WhiteButton from "../../../components/WhiteButton";
 import { useState, useEffect } from "react";
+import LocationPicker, { isValidLocation } from "../../../components/LocationPicker";
 
 interface UpdateModalProps {
   version: "admin" | "police";
@@ -11,10 +12,12 @@ interface UpdateModalProps {
 
 export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }: UpdateModalProps) {
   const [formData, setFormData] = useState(data);
+  const [locationError, setLocationError] = useState("");
 
   // Sync local state when data changes
   useEffect(() => {
     setFormData(data);
+    setLocationError("");
   }, [data]);
 
   if (!isOpen || !formData) return null;
@@ -24,6 +27,17 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
   };
 
   const handleSave = () => {
+    if (
+      version === "police" &&
+      !isValidLocation({
+        latitude: String(formData.latitude),
+        longitude: String(formData.longitude),
+      })
+    ) {
+      setLocationError("Please provide a valid location before saving.");
+      return;
+    }
+
     onSubmit(formData);
   };
 
@@ -68,21 +82,24 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
               onChange={(e) => handleChange("zoneId", Number(e.target.value))}
             />
 
-            <label className="block mb-1">Latitude</label>
-            <input
-              type="number"
-              className="border rounded px-3 py-2 w-full mb-3"
-              value={formData.latitude}
-              onChange={(e) => handleChange("latitude", Number(e.target.value))}
+            <label className="block mb-2 font-medium">Location</label>
+            <LocationPicker
+              value={{
+                latitude: String(formData.latitude ?? ""),
+                longitude: String(formData.longitude ?? ""),
+              }}
+              onChange={(location) => {
+                setFormData((prev: any) => ({ ...prev, ...location }));
+                setLocationError("");
+              }}
+              defaultMapCenter={{
+                latitude: String(formData.latitude || "24.899983520748542"),
+                longitude: String(formData.longitude || "67.05814361572267"),
+              }}
             />
-
-            <label className="block mb-1">Longitude</label>
-            <input
-              type="number"
-              className="border rounded px-3 py-2 w-full mb-4"
-              value={formData.longitude}
-              onChange={(e) => handleChange("longitude", Number(e.target.value))}
-            />
+            {locationError && (
+              <p className="text-red-600 text-xs mt-2 mb-3">{locationError}</p>
+            )}
           </>
         ) : (
           <>

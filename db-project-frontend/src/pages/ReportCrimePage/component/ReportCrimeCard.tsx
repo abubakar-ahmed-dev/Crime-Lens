@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import GreenButton from "../../../components/GreenButton";
 import { API_BASE_URL } from "../../../config/constants";
 import { useAuth } from "../../../context/AuthContext";
+import LocationPicker, { isValidLocation } from "../../../components/LocationPicker";
 
 export default function ReportCrimeCard() {
   const navigate = useNavigate();
@@ -20,6 +20,8 @@ export default function ReportCrimeCard() {
     date: "",
     address: "",
     description: "",
+    latitude: "",
+    longitude: "",
   });
 
   // Check authentication on mount
@@ -64,6 +66,11 @@ export default function ReportCrimeCard() {
       return;
     }
 
+    if (!isValidLocation({ latitude: formData.latitude, longitude: formData.longitude })) {
+      setError("Please provide a valid location using one of the location options.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -93,6 +100,8 @@ export default function ReportCrimeCard() {
           date: "",
           address: "",
           description: "",
+          latitude: "",
+          longitude: "",
         });
 
         // Redirect to dashboard after 2 seconds
@@ -305,6 +314,21 @@ export default function ReportCrimeCard() {
               {formData.description.length}/300 characters
             </p>
           </div>
+        </div>
+
+        <div>
+          <h3 className="font-semibold text-[#7d7d7d] mb-4">Location:</h3>
+          <LocationPicker
+            value={{
+              latitude: formData.latitude,
+              longitude: formData.longitude,
+            }}
+            onChange={(location) => {
+              setFormData((prev) => ({ ...prev, ...location }));
+              setError("");
+            }}
+            disabled={loading}
+          />
         </div>
 
         {/* User Info Display */}

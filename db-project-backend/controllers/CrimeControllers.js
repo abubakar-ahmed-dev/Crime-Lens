@@ -1,9 +1,27 @@
 // controllers/crimeController.js
-import { Sequelize } from "sequelize";
 import { Op, fn, col, literal, QueryTypes, } from "sequelize";
 import sequelize from "../config/db.js";
 import db from "../models/index.js";
 const { Crime, CrimeSubmission, CrimeReportsSubmitter, CrimeType, Zone } = db;
+
+const parseRequiredCoordinates = (latitude, longitude) => {
+  if (latitude === undefined || latitude === null || latitude === "" || longitude === undefined || longitude === null || longitude === "") {
+    return { valid: false, message: "Latitude and longitude are required" };
+  }
+
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return { valid: false, message: "Latitude and longitude must be valid numbers" };
+  }
+
+  if (lat < 23 || lat > 26 || lng < 65 || lng > 68) {
+    return { valid: false, message: "Latitude must be between 23 and 26 and longitude must be between 65 and 68" };
+  }
+
+  return { valid: true, lat, lng };
+};
 
 // ===================================================
 // 🌍 GET CRIMES FOR MAP (GeoJSON)
@@ -154,6 +172,7 @@ export const getPendingSubmissions = async (req, res) => {
 
 
 export const approveCrimeReport = async (req, res) => {
+  let t;
   try {
     const { submissionId } = req.params;
     const { address, latitude, longitude, title, description } = req.body;
@@ -162,7 +181,7 @@ export const approveCrimeReport = async (req, res) => {
     // 1️⃣ Fetch CrimeSubmission record
     // ---------------------------
 
-    const t = await sequelize.transaction();
+    t = await sequelize.transaction();
 
 
     const submissionRows = await sequelize.query(
@@ -215,6 +234,7 @@ export const approveCrimeReport = async (req, res) => {
     }
 
     if (crime.status !== "pending") {
+      await t.rollback();
       return res.status(400).json({
         success: false,
         message: "Crime report already processed",
@@ -224,16 +244,13 @@ export const approveCrimeReport = async (req, res) => {
     // ---------------------------
     // 3️⃣ Prepare updated data
     // ---------------------------
-    let locationSQL = "location"; // keep existing if no lat/lng
-    if (
-      latitude !== undefined &&
-      longitude !== undefined &&
-      !isNaN(latitude) &&
-      !isNaN(longitude)
-    ) {
-      locationSQL = `ST_SetSRID(ST_Point(${Number(longitude)}, ${Number(
-        latitude
-      )}), 4326)`;
+    const coordinates = parseRequiredCoordinates(latitude, longitude);
+    if (!coordinates.valid) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: coordinates.message,
+      });
     }
 
     const updatedCrimeRows = await sequelize.query(
@@ -243,7 +260,7 @@ export const approveCrimeReport = async (req, res) => {
           address = :address,
           title = :title,
           description = :description,
-          location = ${locationSQL},
+          location = ST_SetSRID(ST_Point(:longitude, :latitude), 4326),
           "latestUpdatedBy" = :latestUpdatedBy
       WHERE id = :crimeId
       RETURNING id, status, "latestUpdatedBy";
@@ -253,6 +270,8 @@ export const approveCrimeReport = async (req, res) => {
           address: address || crime.address,
           title: title || crime.title,
           description: description || crime.description,
+          latitude: coordinates.lat,
+          longitude: coordinates.lng,
           latestUpdatedBy: req.user.id,
           crimeId: crime.id,
         },
@@ -394,6 +413,8 @@ export const reportCrime = async (req, res) => {
       address,
       description,
       title,
+      latitude,
+      longitude,
     } = req.body;
 
     if (!req.user?.email) {
@@ -404,6 +425,11 @@ export const reportCrime = async (req, res) => {
       return res
         .status(400)
         .json({ success: false, message: "Missing required fields" });
+    }
+
+    const coordinates = parseRequiredCoordinates(latitude, longitude);
+    if (!coordinates.valid) {
+      return res.status(400).json({ success: false, message: coordinates.message });
     }
 
     const submitter = await CrimeReportsSubmitter.findOne({
@@ -436,7 +462,7 @@ export const reportCrime = async (req, res) => {
       INSERT INTO "Crime"
         (title, description, "crimeTypeId", "incidentDate", "reportedAt", status, location, address, "zoneId")
       VALUES
-        (:title, :description, :crimeTypeId, :incidentDate, :reportedAt, 'pending', :location, :address, :zoneId)
+        (:title, :description, :crimeTypeId, :incidentDate, :reportedAt, 'pending', ST_SetSRID(ST_Point(:longitude, :latitude), 4326), :address, :zoneId)
       RETURNING *
       `,
       {
@@ -446,7 +472,8 @@ export const reportCrime = async (req, res) => {
           crimeTypeId,
           incidentDate: date,
           reportedAt: new Date(),
-          location: null, // adjust if using GeoJSON Point
+          latitude: coordinates.lat,
+          longitude: coordinates.lng,
           address: address || null,
           zoneId: zone || null,
         },
@@ -563,7 +590,17 @@ export const getCrimeById = async (req, res) => {
 
     const crimeRows = await sequelize.query(
       `
-      SELECT id, title, description, "crimeTypeId", "incidentDate", status, address, "zoneId", location
+      SELECT id,
+             title,
+             description,
+             "crimeTypeId",
+             "incidentDate",
+             status,
+             address,
+             "zoneId",
+             ST_AsGeoJSON(location)::json AS location,
+             CASE WHEN location IS NOT NULL THEN ST_Y(location::geometry) END AS latitude,
+             CASE WHEN location IS NOT NULL THEN ST_X(location::geometry) END AS longitude
       FROM "Crime"
       WHERE id = :id AND status = 'approved'
       LIMIT 1;
@@ -616,14 +653,12 @@ export const updateCrime = async (req, res) => {
     // ---------------------------
     // 2️⃣ Build SQL for location
     // ---------------------------
-    let locationSQL = "location"; // keep existing if lat/lng not provided
-    if (
-      latitude !== undefined &&
-      longitude !== undefined &&
-      !isNaN(latitude) &&
-      !isNaN(longitude)
-    ) {
-      locationSQL = `ST_SetSRID(ST_Point(${Number(longitude)}, ${Number(latitude)}), 4326)`;
+    const coordinates = parseRequiredCoordinates(latitude, longitude);
+    if (!coordinates.valid) {
+      return res.status(400).json({
+        success: false,
+        message: coordinates.message,
+      });
     }
 
     // ---------------------------
@@ -636,7 +671,7 @@ export const updateCrime = async (req, res) => {
           description = :description,
           address = :address,
           "zoneId" = :zoneId,
-          location = ${locationSQL},
+          location = ST_SetSRID(ST_Point(:longitude, :latitude), 4326),
           "latestUpdatedBy" = :latestUpdatedBy
       WHERE id = :id;
       `,
@@ -646,6 +681,8 @@ export const updateCrime = async (req, res) => {
           description,
           address,
           zoneId: zoneId || null,
+          latitude: coordinates.lat,
+          longitude: coordinates.lng,
           latestUpdatedBy: req.user.id,
           id,
         },

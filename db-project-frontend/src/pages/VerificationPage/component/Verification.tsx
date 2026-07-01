@@ -152,6 +152,8 @@ export default function AllRecords({ version }: AllRecordsProps) {
 
                     address={record.address || ""}
                     description={record.description || ""}
+                    latitude={record.latitude ?? ""}
+                    longitude={record.longitude ?? ""}
 
                     zone={record.Zone?.id || record.zoneId}   
 
