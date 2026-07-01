@@ -1,0 +1,75 @@
+Report Crime Error: Error
+    at Query.run (C:\Users\Admin\Desktop\FAST\Duplicates\CrimeLens-main\db-project-backend\node_modules\sequelize\lib\dialects\postgres\query.js:50:25)
+    at C:\Users\Admin\Desktop\FAST\Duplicates\CrimeLens-main\db-project-backend\node_modules\sequelize\lib\sequelize.js:315:28
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async reportCrime (file:///C:/Users/Admin/Desktop/FAST/Duplicates/CrimeLens-main/db-project-backend/controllers/CrimeControllers.js:461:36) {
+  name: 'SequelizeDatabaseError',
+  parent: error: null value in column "submitterCnic" of relation "CrimeSubmission" violates not-null constraint
+      at Parser.parseErrorMessage (C:\Users\Admin\Desktop\FAST\Duplicates\CrimeLens-main\db-project-backend\node_modules\pg-protocol\dist\parser.js:285:98)
+      at Parser.handlePacket (C:\Users\Admin\Desktop\FAST\Duplicates\CrimeLens-main\db-project-backend\node_modules\pg-protocol\dist\parser.js:122:29)
+      at Parser.parse (C:\Users\Admin\Desktop\FAST\Duplicates\CrimeLens-main\db-project-backend\node_modules\pg-protocol\dist\parser.js:35:38)
+      at TLSSocket.<anonymous> (C:\Users\Admin\Desktop\FAST\Duplicates\CrimeLens-main\db-project-backend\node_modules\pg-protocol\dist\index.js:11:42)
+      at TLSSocket.emit (node:events:518:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at TLSWrap.onStreamRead (node:internal/stream_base_commons:189:23) {
+    length: 289,
+    severity: 'ERROR',
+    code: '23502',
+    detail: 'Failing row contains (2, null, 2026-07-01 07:25:49.896+00, 5, temp_1781359732504_u12fol).',
+    hint: undefined,
+    position: undefined,
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: 'public',
+    table: 'CrimeSubmission',
+    column: 'submitterCnic',
+    dataType: undefined,
+    constraint: undefined,
+    file: 'execMain.c',
+    line: '1981',
+    routine: 'ExecConstraints',
+    sql: 'INSERT INTO "CrimeSubmission" ("submitterCnic", "userId", "submittedAt", "CrimeId")\n' +
+      "      VALUES (NULL, 'temp_1781359732504_u12fol', '2026-07-01 12:25:49.896 +05:00', '5')\n" +
+      '      RETURNING *',
+    parameters: undefined
+  },
+  original: error: null value in column "submitterCnic" of relation "CrimeSubmission" violates not-null constraint
+      at Parser.parseErrorMessage (C:\Users\Admin\Desktop\FAST\Duplicates\CrimeLens-main\db-project-backend\node_modules\pg-protocol\dist\parser.js:285:98)
+      at Parser.handlePacket (C:\Users\Admin\Desktop\FAST\Duplicates\CrimeLens-main\db-project-backend\node_modules\pg-protocol\dist\parser.js:122:29)
+      at Parser.parse (C:\Users\Admin\Desktop\FAST\Duplicates\CrimeLens-main\db-project-backend\node_modules\pg-protocol\dist\parser.js:35:38)
+      at TLSSocket.<anonymous> (C:\Users\Admin\Desktop\FAST\Duplicates\CrimeLens-main\db-project-backend\node_modules\pg-protocol\dist\index.js:11:42)
+      at TLSSocket.emit (node:events:518:28)
+      at addChunk (node:internal/streams/readable:561:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+      at Readable.push (node:internal/streams/readable:392:5)
+      at TLSWrap.onStreamRead (node:internal/stream_base_commons:189:23) {
+    length: 289,
+    severity: 'ERROR',
+    code: '23502',
+    detail: 'Failing row contains (2, null, 2026-07-01 07:25:49.896+00, 5, temp_1781359732504_u12fol).',
+    hint: undefined,
+    position: undefined,
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: 'public',
+    table: 'CrimeSubmission',
+    column: 'submitterCnic',
+    dataType: undefined,
+    constraint: undefined,
+    file: 'execMain.c',
+    line: '1981',
+    routine: 'ExecConstraints',
+    sql: 'INSERT INTO "CrimeSubmission" ("submitterCnic", "userId", "submittedAt", "CrimeId")\n' +
+      "      VALUES (NULL, 'temp_1781359732504_u12fol', '2026-07-01 12:25:49.896 +05:00', '5')\n" +
+      '      RETURNING *',
+    parameters: undefined
+  },
+  sql: 'INSERT INTO "CrimeSubmission" ("submitterCnic", "userId", "submittedAt", "CrimeId")\n' +
+    "      VALUES (NULL, 'temp_1781359732504_u12fol', '2026-07-01 12:25:49.896 +05:00', '5')\n" +
+    '      RETURNING *',
+  parameters: {}
+}

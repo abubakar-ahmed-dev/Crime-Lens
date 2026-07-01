@@ -466,7 +466,7 @@ export const reportCrime = async (req, res) => {
       `,
       {
         replacements: {
-          cnic: null,
+          cnic: userId,
           userId,
           submittedAt: new Date(),
           crimeId: newCrime.id,
