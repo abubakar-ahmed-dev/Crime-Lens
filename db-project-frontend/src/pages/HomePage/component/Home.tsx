@@ -3,15 +3,19 @@ import LogowithText from "../../../assets/LogowithText.svg";
 import MainBackground from "../../../assets/MainBackground.png";
 import GreenButton from "../../../components/GreenButton";
 import WhiteButton from "../../../components/WhiteButton";
+import { useDispatch } from "react-redux";
+import { setRole } from "../../../store/features/current_role";
 
 const Home = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const NavigateLogin = () => {
     navigate("/login");
   };
 
   const NavigateDashboard = () => {
+    dispatch(setRole("user"));
     navigate("/dashboard");
   };
 

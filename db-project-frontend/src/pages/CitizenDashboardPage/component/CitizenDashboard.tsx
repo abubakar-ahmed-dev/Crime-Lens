@@ -89,7 +89,6 @@ export default function CitizenDashboard() {
 
       // If token expired, try to refresh and retry
       if (response.status === 401) {
-        console.log("Token expired, attempting refresh...");
 
         try {
           await refreshCitizenSession();
@@ -166,7 +165,6 @@ export default function CitizenDashboard() {
 
       // If token expired, try to refresh and retry
       if (response.status === 401) {
-        console.log("Token expired, attempting refresh...");
 
         try {
           await refreshCitizenSession();
@@ -200,7 +198,6 @@ export default function CitizenDashboard() {
 
       const data = await response.json();
 
-      console.log("Update profile response:", data);
 
       if (!response.ok) {
         throw new Error(data.error || data.message || `Failed to update profile (${response.status})`);
@@ -211,7 +208,6 @@ export default function CitizenDashboard() {
       const updatedUser = data.user;
 
       if (updatedUser) {
-        console.log("Updating profile data with:", updatedUser);
 
         // Update form data immediately
         setProfileData({
@@ -228,7 +224,6 @@ export default function CitizenDashboard() {
 
         // Show success message
         setProfileUpdateSuccess("Profile updated successfully!");
-        console.log("Success message set");
       } else {
         console.error("No user data in response, full response:", data);
         setProfileUpdateError("Failed to get updated user data from server");

@@ -78,7 +78,7 @@ const Sidebar = ({
         flex flex-col bg-[#fefefe] shadow-[0_0_5px_rgba(0,0,0,0.15)]
         ${asDrawer
           ? "h-full w-[min(320px,85vw)] rounded-none"
-          : "lg:fixed lg:top-4 lg:left-4 lg:h-[calc(100vh-2rem)] lg:w-72 rounded-2xl"}
+          : "h-full w-full rounded-2xl"}
         py-4 px-4 overflow-hidden
       `}
     >
