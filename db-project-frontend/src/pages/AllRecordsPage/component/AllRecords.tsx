@@ -29,6 +29,50 @@ export interface CrimeRecord {
   incidentDate: string; // YYYY-MM-DD
 }
 
+const isValidStoredCoordinate = (
+  value: unknown,
+  field: "latitude" | "longitude"
+) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return false;
+
+  return field === "latitude"
+    ? numericValue >= 23 && numericValue <= 26
+    : numericValue >= 65 && numericValue <= 68;
+};
+
+const getCrimeCoordinate = (
+  crime: any,
+  field: "latitude" | "longitude"
+) => {
+  const explicitValue = crime[field];
+  if (
+    explicitValue !== null &&
+    explicitValue !== undefined &&
+    explicitValue !== "" &&
+    isValidStoredCoordinate(explicitValue, field)
+  ) {
+    return explicitValue.toString();
+  }
+
+  let location = crime.location;
+  if (typeof location === "string") {
+    try {
+      location = JSON.parse(location);
+    } catch {
+      location = null;
+    }
+  }
+  const coordinateIndex = field === "latitude" ? 1 : 0;
+  const coordinateValue = location?.coordinates?.[coordinateIndex];
+
+  return coordinateValue !== null &&
+    coordinateValue !== undefined &&
+    isValidStoredCoordinate(coordinateValue, field)
+    ? coordinateValue.toString()
+    : "";
+};
+
 export default function AllRecords({ version }: AllRecordsProps) {
 
   const [records, setRecords] = useState<CrimeRecord[]>([]);
@@ -46,8 +90,8 @@ export default function AllRecords({ version }: AllRecordsProps) {
     description: string;
     address: string;
     zoneId: number;
-    latitude: number;
-    longitude: number;
+    latitude: string;
+    longitude: string;
   }
 
   const [fullCrime, setFullCrime] = useState<FullCrimeDetails | null>(null);
@@ -216,8 +260,8 @@ export default function AllRecords({ version }: AllRecordsProps) {
           description: c.description,
           address: c.address,
           zoneId: c.zoneId,
-          latitude: c.location?.coordinates?.[1] ?? 0,
-          longitude: c.location?.coordinates?.[0] ?? 0,
+          latitude: getCrimeCoordinate(c, "latitude"),
+          longitude: getCrimeCoordinate(c, "longitude"),
         });
         setIsUpdateModalOpen(true);
       } catch (err) {

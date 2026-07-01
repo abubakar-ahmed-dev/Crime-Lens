@@ -4,7 +4,7 @@ type GreenButtonProps = {
   height?: number;
   onClick?: () => void;
   rounded?: string;
-  type?: 'submit' | 'reset';
+  type?: 'button' | 'submit' | 'reset';
   fullWidth?: boolean;
   disabled?: boolean;
 };

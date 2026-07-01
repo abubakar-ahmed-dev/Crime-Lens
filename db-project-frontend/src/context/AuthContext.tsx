@@ -106,6 +106,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
+  const syncCitizenSession = async (sessionData: any) => {
+    if (!sessionData?.access_token) return null;
+
+    if (sessionData.refresh_token) {
+      await supabase.auth.setSession({
+        access_token: sessionData.access_token,
+        refresh_token: sessionData.refresh_token,
+      });
+    }
+
+    setCitizenSession(sessionData);
+    setCitizenToken(sessionData.access_token);
+    localStorage.setItem("citizen_token", sessionData.access_token);
+    localStorage.setItem("citizen_session", JSON.stringify(sessionData));
+    localStorage.setItem("userRole", "user");
+
+    return sessionData.access_token;
+  };
+
+  const restoreStoredSupabaseSession = async () => {
+    try {
+      const storedSession = citizenSession || JSON.parse(localStorage.getItem("citizen_session") || "null");
+      if (!storedSession?.access_token || !storedSession?.refresh_token) return null;
+
+      const { data, error } = await supabase.auth.setSession({
+        access_token: storedSession.access_token,
+        refresh_token: storedSession.refresh_token,
+      });
+
+      if (error || !data.session) return null;
+
+      await syncCitizenSession(data.session);
+      return data.session;
+    } catch (error) {
+      console.error("Failed to restore citizen session:", error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     // Ensure axios has token header on start if present
     if (token) setAuthToken(token);
@@ -114,11 +153,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initSupabaseSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        setCitizenSession(session);
-        setCitizenToken(session.access_token);
-        localStorage.setItem("citizen_token", session.access_token);
-        localStorage.setItem("citizen_session", JSON.stringify(session));
-        localStorage.setItem("userRole", "user");
+        await syncCitizenSession(session);
+      } else {
+        await restoreStoredSupabaseSession();
       }
     };
 
@@ -245,12 +282,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       setCitizen(citizenWithVerification);
-      setCitizenSession(sessionData);
-      setCitizenToken(sessionData.access_token);
       localStorage.setItem("citizen", JSON.stringify(citizenWithVerification));
-      localStorage.setItem("citizen_session", JSON.stringify(sessionData));
-      localStorage.setItem("citizen_token", sessionData.access_token);
-      localStorage.setItem("userRole", "user");
+      await syncCitizenSession(sessionData);
 
       return { success: true };
     } catch (err: any) {
@@ -292,12 +325,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Only set session/token if it exists (email confirmation might be disabled)
       if (data.session) {
         setCitizen(citizenWithVerification);
-        setCitizenSession(data.session);
-        setCitizenToken(data.session.access_token);
         localStorage.setItem("citizen", JSON.stringify(citizenWithVerification));
-        localStorage.setItem("citizen_session", JSON.stringify(data.session));
-        localStorage.setItem("citizen_token", data.session.access_token);
-        localStorage.setItem("userRole", "user");
+        await syncCitizenSession(data.session);
       }
 
       return { success: true, requiresEmailVerification: !data.session };
@@ -355,6 +384,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const refreshCitizenSession = async () => {
     try {
+      const { data: currentSessionData } = await supabase.auth.getSession();
+      let activeSession = currentSessionData.session;
+
+      if (!activeSession) {
+        activeSession = await restoreStoredSupabaseSession();
+      }
+
+      if (!activeSession) {
+        throw new Error("No citizen session available to refresh");
+      }
+
       const { data, error } = await supabase.auth.refreshSession();
       if (error) throw error;
 
@@ -362,10 +402,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error("No session returned from refresh");
       }
 
-      setCitizenSession(data.session);
-      setCitizenToken(data.session.access_token);
-      localStorage.setItem("citizen_session", JSON.stringify(data.session));
-      localStorage.setItem("citizen_token", data.session.access_token);
+      await syncCitizenSession(data.session);
     } catch (err) {
       console.error("Session refresh failed:", err);
       await citizenLogout();

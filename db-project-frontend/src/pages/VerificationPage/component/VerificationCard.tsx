@@ -30,6 +30,8 @@ type VerificationCardProps =
     date: string;
     zone: number;
     address: string;
+    latitude: number | string;
+    longitude: number | string;
     onContact?: () => void;
     onReject?: (reason?: string) => void;
     onApprove?: () => void;

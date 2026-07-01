@@ -1,17 +1,19 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import GreenButton from "../../../components/GreenButton";
 import { API_BASE_URL } from "../../../config/constants";
-import { useAuth } from "../../../context/AuthContext";
+import { supabase, useAuth } from "../../../context/AuthContext";
+import LocationPicker, { isValidLocation } from "../../../components/LocationPicker";
+import GreenButton from "../../../components/GreenButton";
 
 export default function ReportCrimeCard() {
   const navigate = useNavigate();
-  const { citizen, citizenToken, isCitizenAuthenticated } = useAuth();
+  const { citizen, citizenToken, isCitizenAuthenticated, refreshCitizenSession } = useAuth();
 
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
+  const [hideLocationPicker, setHideLocationPicker] = useState(false);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -20,6 +22,8 @@ export default function ReportCrimeCard() {
     date: "",
     address: "",
     description: "",
+    latitude: "",
+    longitude: "",
   });
 
   // Check authentication on mount
@@ -64,26 +68,69 @@ export default function ReportCrimeCard() {
       return;
     }
 
+    if (!isValidLocation({ latitude: formData.latitude, longitude: formData.longitude })) {
+      setError("Please provide a valid location using one of the location options.");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const response = await fetch(
+      let accessToken = citizenToken || localStorage.getItem("citizen_token");
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session?.access_token) {
+        accessToken = session.access_token;
+        localStorage.setItem("citizen_token", session.access_token);
+      }
+
+      if (!accessToken) {
+        setError("Your session has expired. Please login again.");
+        navigate("/login-citizen");
+        return;
+      }
+
+      let response = await fetch(
         `${API_BASE_URL}/user/report-crime`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${citizenToken}`,
+            "Authorization": `Bearer ${accessToken}`,
           },
           body: JSON.stringify(formData),
         }
       );
+
+      if (response.status === 401) {
+        await refreshCitizenSession();
+        accessToken = localStorage.getItem("citizen_token");
+
+        if (!accessToken) {
+          setError("Your session has expired. Please login again.");
+          navigate("/login-citizen");
+          return;
+        }
+
+        response = await fetch(
+          `${API_BASE_URL}/user/report-crime`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify(formData),
+          }
+        );
+      }
 
       const data = await response.json();
 
       if (response.ok && data.success) {
         setSuccessMsg("Crime report submitted successfully!");
         setError("");
+        setHideLocationPicker(true);
 
         // Reset form
         setFormData({
@@ -93,6 +140,8 @@ export default function ReportCrimeCard() {
           date: "",
           address: "",
           description: "",
+          latitude: "",
+          longitude: "",
         });
 
         // Redirect to dashboard after 2 seconds
@@ -307,6 +356,23 @@ export default function ReportCrimeCard() {
           </div>
         </div>
 
+        <div>
+          <h3 className="font-semibold text-[#7d7d7d] mb-4">Location:</h3>
+          {!hideLocationPicker && (
+            <LocationPicker
+              value={{
+                latitude: formData.latitude,
+                longitude: formData.longitude,
+              }}
+              onChange={(location) => {
+                setFormData((prev) => ({ ...prev, ...location }));
+                setError("");
+              }}
+              disabled={loading}
+            />
+          )}
+        </div>
+
         {/* User Info Display */}
         <div className="bg-gray-50 rounded-lg p-3">
           <p className="text-sm text-gray-600">
@@ -316,18 +382,13 @@ export default function ReportCrimeCard() {
 
         {/* SUBMIT BUTTON */}
         <div className="flex justify-center pt-4">
-          <button
+          <GreenButton
             type="submit"
+            label={loading ? "Submitting..." : "Submit Report"}
+            width={250}
+            height={45}
             disabled={loading}
-            className={`px-8 py-3 rounded-lg font-semibold transition-colors ${
-              loading
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-[#237E54] hover:bg-[#1a6644]"
-            } text-white`}
-            style={{ width: "250px", height: "45px" }}
-          >
-            {loading ? "Submitting..." : "Submit Report"}
-          </button>
+          />
         </div>
       </form>
     </div>

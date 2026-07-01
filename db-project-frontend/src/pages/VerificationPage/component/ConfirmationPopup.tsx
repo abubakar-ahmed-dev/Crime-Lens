@@ -1,7 +1,7 @@
-
 // VerificationPage/components/ConfirmationPopup.tsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import WhiteButton from "../../../components/WhiteButton";
+import LocationPicker, { isValidLocation } from "../../../components/LocationPicker";
 
 interface ConfirmationPopupProps {
   version: "admin" | "police";
@@ -25,10 +25,31 @@ interface ConfirmationPopupProps {
   date?: string;
   zone?: number;
   address?: string;
+  latitude?: number | string;
+  longitude?: number | string;
 
   onApprove?: (updatedData: any) => void;
   onReject?: () => void;
 }
+
+const buildInitialFormData = (initialData: Partial<ConfirmationPopupProps>) => ({
+  branchId: initialData.branchId || "",
+  branchContact: initialData.branchContact || "",
+  username: initialData.username || "",
+  password: initialData.password || "",
+  requestDate: initialData.requestDate || "",
+  title: initialData.title || "",
+  fullName: initialData.fullName || "",
+  contact: initialData.contact || "",
+  cnic: initialData.cnic || "",
+  crimeType: initialData.crimeType || "",
+  description: initialData.description || "",
+  date: initialData.date || "",
+  zone: initialData.zone || "",
+  address: initialData.address || "",
+  latitude: initialData.latitude?.toString() || "",
+  longitude: initialData.longitude?.toString() || "",
+});
 
 export default function ConfirmationPopup({
   version,
@@ -38,62 +59,55 @@ export default function ConfirmationPopup({
   onReject,
   ...initialData
 }: ConfirmationPopupProps) {
-  const [formData, setFormData] = useState({
-    branchId: initialData.branchId || "",
-    branchContact: initialData.branchContact || "",
-    username: initialData.username || "",
-    password: initialData.password || "",
-    requestDate: initialData.requestDate || "",
-    title: initialData.title || "",
-    fullName: initialData.fullName || "",
-    contact: initialData.contact || "",
-    cnic: initialData.cnic || "",
-    crimeType: initialData.crimeType || "",
-    description: initialData.description || "",
-    date: initialData.date || "",
-    zone: initialData.zone || "",
-    address: initialData.address || "",
-    latitude: "",
-    longitude: "",
-  });
+  const [formData, setFormData] = useState(buildInitialFormData(initialData));
+  const [locationError, setLocationError] = useState("");
 
-  // 🆕 Error States Added
-  const [latError, setLatError] = useState("");
-  const [longError, setLongError] = useState("");
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(buildInitialFormData(initialData));
+      setLocationError("");
+    }
+  }, [
+    isOpen,
+    initialData.branchId,
+    initialData.branchContact,
+    initialData.username,
+    initialData.password,
+    initialData.requestDate,
+    initialData.title,
+    initialData.fullName,
+    initialData.contact,
+    initialData.cnic,
+    initialData.crimeType,
+    initialData.description,
+    initialData.date,
+    initialData.zone,
+    initialData.address,
+    initialData.latitude,
+    initialData.longitude,
+  ]);
 
   if (!isOpen) return null;
 
-  // 🆕 Updated handleInputChange WITH RANGE VALIDATION
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-
-    // Validate Latitude
-    if (name === "latitude") {
-      const num = Number(value);
-      if (num < 23 || num > 26) {
-        setLatError("Latitude must be between 23 and 26");
-      } else {
-        setLatError("");
-      }
-    }
-
-    // Validate Longitude
-    if (name === "longitude") {
-      const num = Number(value);
-      if (num < 65 || num > 68) {
-        setLongError("Longitude must be between 65 and 68");
-      } else {
-        setLongError("");
-      }
-    }
-
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = () => {
-    if (latError || longError) return; // prevent submit if invalid
+    if (
+      version === "police" &&
+      !isValidLocation({
+        latitude: String(formData.latitude),
+        longitude: String(formData.longitude),
+      })
+    ) {
+      setLocationError("Please provide a valid location before approval.");
+      return;
+    }
+
     onApprove?.(formData);
   };
 
@@ -109,11 +123,9 @@ export default function ConfirmationPopup({
         <div className="flex flex-col gap-4">
           {version === "admin" ? (
             <>
-             <div className="bg-gray-50 p-4 rounded-lg">
-                 <label className="text-sm font-medium text-gray-700">
-                   Branch ID
-                 </label>
-                 <input
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <label className="text-sm font-medium text-gray-700">Branch ID</label>
+                <input
                   type="text"
                   name="branchId"
                   onChange={handleInputChange}
@@ -136,9 +148,7 @@ export default function ConfirmationPopup({
               </div>
 
               <div className="bg-gray-50 p-4 rounded-lg">
-                <label className="text-sm font-medium text-gray-700">
-                  Username
-                </label>
+                <label className="text-sm font-medium text-gray-700">Username</label>
                 <input
                   type="text"
                   value={formData.username}
@@ -149,9 +159,7 @@ export default function ConfirmationPopup({
               </div>
 
               <div className="bg-gray-50 p-4 rounded-lg">
-                <label className="text-sm font-medium text-gray-700">
-                  Password
-                </label>
+                <label className="text-sm font-medium text-gray-700">Password</label>
                 <input
                   type="text"
                   value={formData.password}
@@ -175,12 +183,9 @@ export default function ConfirmationPopup({
               </div>
             </>
           ) : (
-            /* POLICE VERSION - Some Fields Editable */
             <>
               <div className="border-b pb-4">
-                <h3 className="font-semibold text-gray-800 mb-3">
-                  Personal Info
-                </h3>
+                <h3 className="font-semibold text-gray-800 mb-3">Personal Info</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <label className="text-xs font-medium text-gray-700">
@@ -195,9 +200,7 @@ export default function ConfirmationPopup({
                     />
                   </div>
                   <div className="bg-gray-50 p-3 rounded-lg">
-                    <label className="text-xs font-medium text-gray-700">
-                      CNIC
-                    </label>
+                    <label className="text-xs font-medium text-gray-700">CNIC</label>
                     <input
                       type="text"
                       value={formData.cnic}
@@ -234,9 +237,7 @@ export default function ConfirmationPopup({
               </div>
 
               <div className="border-b pb-4">
-                <h3 className="font-semibold text-gray-800 mb-3">
-                  Crime Info
-                </h3>
+                <h3 className="font-semibold text-gray-800 mb-3">Crime Info</h3>
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <label className="text-xs font-medium text-gray-700">
@@ -251,9 +252,7 @@ export default function ConfirmationPopup({
                     />
                   </div>
                   <div className="bg-gray-50 p-3 rounded-lg">
-                    <label className="text-xs font-medium text-gray-700">
-                      Date
-                    </label>
+                    <label className="text-xs font-medium text-gray-700">Date</label>
                     <input
                       type="text"
                       value={formData.date}
@@ -264,13 +263,11 @@ export default function ConfirmationPopup({
                   </div>
                 </div>
                 <div className="bg-gray-50 p-3 rounded-lg mb-3">
-                  <label className="text-xs font-medium text-gray-700">
-                    Title
-                  </label>
+                  <label className="text-xs font-medium text-gray-700">Title</label>
                   <textarea
                     value={formData.title}
                     name="title"
-                  onChange={handleInputChange}
+                    onChange={handleInputChange}
                     className="w-full text-sm bg-gray-100 mt-1 p-2 rounded border h-20 resize-none"
                   />
                 </div>
@@ -281,18 +278,16 @@ export default function ConfirmationPopup({
                   <textarea
                     value={formData.description}
                     name="description"
-                  onChange={handleInputChange}
+                    onChange={handleInputChange}
                     className="w-full text-sm bg-gray-100 mt-1 p-2 rounded border h-20 resize-none"
                   />
                 </div>
                 <div className="bg-gray-50 p-3 rounded-lg mb-3">
-                  <label className="text-xs font-medium text-gray-700">
-                    Address
-                  </label>
+                  <label className="text-xs font-medium text-gray-700">Address</label>
                   <textarea
                     value={formData.address}
                     name="address"
-                  onChange={handleInputChange}
+                    onChange={handleInputChange}
                     className="w-full text-sm bg-gray-100 mt-1 p-2 rounded border h-20 resize-none"
                   />
                 </div>
@@ -300,48 +295,25 @@ export default function ConfirmationPopup({
 
               <div className="border-b pb-4 bg-blue-50 p-3 rounded-lg">
                 <h3 className="font-semibold text-blue-900 mb-3">
-                  ✏️ Officer Additions
+                  Officer Additions
                 </h3>
-
-                <div className="grid grid-cols-2 gap-3">
-                  {/* LATITUDE */}
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 block mb-1">
-                      Latitude <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      step="0.000001"
-                      name="latitude"
-                      value={formData.latitude}
-                      onChange={handleInputChange}
-                      placeholder="23.0001"
-                      className="inputBox mt-1"
-                    />
-                    {latError && (
-                      <p className="text-red-600 text-xs mt-1">{latError}</p>
-                    )}
-                  </div>
-
-                  {/* LONGITUDE */}
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 block mb-1">
-                      Longitude <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      step="0.000001"
-                      name="longitude"
-                      value={formData.longitude}
-                      onChange={handleInputChange}
-                      placeholder="65.0001"
-                      className="inputBox mt-1"
-                    />
-                    {longError && (
-                      <p className="text-red-600 text-xs mt-1">{longError}</p>
-                    )}
-                  </div>
-                </div>
+                <LocationPicker
+                  value={{
+                    latitude: String(formData.latitude),
+                    longitude: String(formData.longitude),
+                  }}
+                  onChange={(location) => {
+                    setFormData((prev) => ({ ...prev, ...location }));
+                    setLocationError("");
+                  }}
+                  defaultMapCenter={{
+                    latitude: String(formData.latitude || "24.899983520748542"),
+                    longitude: String(formData.longitude || "67.05814361572267"),
+                  }}
+                />
+                {locationError && (
+                  <p className="text-red-600 text-xs mt-2">{locationError}</p>
+                )}
               </div>
             </>
           )}
@@ -350,48 +322,38 @@ export default function ConfirmationPopup({
         <div className="flex justify-center mt-6 pb-6 gap-3 sticky bottom-0 bg-white pt-4">
           <WhiteButton label="Cancel" width={150} height={45} onClick={onClose} />
 
-          {/* Disable Approve if errors exist */}
           <button
             onClick={handleSubmit}
-            disabled={!!latError || !!longError}
             className="px-6 py-1 bg-linear-to-r from-[#145332] to-[#237E54] border-2 border-[#237E54] hover:from-[#145332] hover:to-[#145332] disabled:bg-gray-400 text-white text-sm rounded-full font-normal transition-colors"
             style={{ width: 300, height: 45 }}
-          > Approve </button>
+          >
+            Approve
+          </button>
         </div>
 
-      {/* Styling */}
-      <style>{`
-        .inputBox {
-          width: 100%;
-          padding: 10px 14px;
-          border-radius: 8px;
-          border: 1.5px solid #d0d0d0;
-          font-size: 14px;
-          font-family: inherit;
-        }
-        .textareaBox {
-          width: 100%;
-          height: 80px;
-          padding: 10px 14px;
-          border-radius: 8px;
-          border: 1.5px solid #d0d0d0;
-          font-size: 14px;
-          font-family: inherit;
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.25s ease-out;
-        }
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
+        <style>{`
+          .inputBox {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1.5px solid #d0d0d0;
+            font-size: 14px;
+            font-family: inherit;
           }
-          to {
-            opacity: 1;
-            transform: translateY(0);
+          .animate-fadeIn {
+            animation: fadeIn 0.25s ease-out;
           }
-        }
-      `}</style>
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+              transform: translateY(10px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+        `}</style>
       </div>
     </div>
   );
