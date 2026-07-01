@@ -1,10 +1,17 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { PublicRoutes, ProtectedRoutes } from "./routes/index";
+import { CitizenProtectedRoutes, PublicRoutes, ProtectedRoutes } from "./routes/index";
 import PageLayout from "./layouts/page-layouts";
 
 const useAuth = () => {
   const isAuthenticated = localStorage.getItem("token") !== null;
   return { isAuthenticated };
+};
+
+const useCitizenAuth = () => {
+  const isCitizenAuthenticated =
+    localStorage.getItem("citizen") !== null &&
+    localStorage.getItem("citizen_token") !== null;
+  return { isCitizenAuthenticated };
 };
 
 const ProtectedRoute = ({
@@ -26,9 +33,20 @@ const ProtectedRoute = ({
   return <>{children}</>;
 };
 
+const CitizenProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isCitizenAuthenticated } = useCitizenAuth();
+
+  if (!isCitizenAuthenticated) {
+    return <Navigate to="/login-citizen" replace />;
+  }
+
+  return <>{children}</>;
+};
+
 function App() {
   const publicRoutes = PublicRoutes();
   const protectedRoutes = ProtectedRoutes();
+  const citizenProtectedRoutes = CitizenProtectedRoutes();
 
   return (
     <BrowserRouter>
@@ -50,6 +68,21 @@ function App() {
               <ProtectedRoute allowedRoles={route.allowedRoles}>
                 <PageLayout />
               </ProtectedRoute>
+            }
+          >
+            <Route index element={route.element} />
+          </Route>
+        ))}
+
+        {/* CITIZEN PROTECTED ROUTES */}
+        {citizenProtectedRoutes.map((route) => (
+          <Route
+            key={route.path}
+            path={route.path}
+            element={
+              <CitizenProtectedRoute>
+                <PageLayout />
+              </CitizenProtectedRoute>
             }
           >
             <Route index element={route.element} />

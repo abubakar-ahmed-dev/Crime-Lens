@@ -12,8 +12,12 @@ declare global {
 }
 
 // Supabase configuration
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://jgxizgpxxdawcgdxrlfe.supabase.co";
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpneGl6Z3B4eGRhd2NnZHhybGZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTgzNDE1MzgsImV4cCI6MjAzMzkxNzUzOH0.WNqPkCD2FB9mIUaMVKZLqN9q7wxFkHQKBA_YfTWPlUg";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error("Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY");
+}
 
 // Initialize Supabase client for citizen auth
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -49,7 +53,7 @@ type AuthContextType = {
   // Admin/Police auth state
   user: UserType | null;
   token: string | null;
-  login: (username: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  login: (username: string, password: string, verifyRole: string) => Promise<{ success: boolean; message?: string; user?: UserType }>;
   logout: () => void;
   isAuthenticated: boolean;
 
@@ -114,6 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCitizenToken(session.access_token);
         localStorage.setItem("citizen_token", session.access_token);
         localStorage.setItem("citizen_session", JSON.stringify(session));
+        localStorage.setItem("userRole", "user");
       }
     };
 
@@ -126,6 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCitizenToken(session.access_token);
         localStorage.setItem("citizen_token", session.access_token);
         localStorage.setItem("citizen_session", JSON.stringify(session));
+        localStorage.setItem("userRole", "user");
         // Note: Google OAuth profile creation is handled by AuthCallback component
       } else if (event === 'SIGNED_OUT') {
         setCitizenSession(null);
@@ -134,6 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem("citizen_token");
         localStorage.removeItem("citizen_session");
         localStorage.removeItem("citizen");
+        localStorage.removeItem("userRole");
       }
     });
 
@@ -164,9 +171,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   /**
    * Admin/Police login (JWT-based)
    */
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string, verifyRole: string) => {
     try {
-      const data = await loginUser(username, password);
+      const data = await loginUser(username, password, verifyRole);
       if (!data || !data.success) {
         return { success: false, message: data?.message || "Login failed" };
       }
@@ -177,11 +184,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // persist
       localStorage.setItem("token", receivedToken);
       localStorage.setItem("user", JSON.stringify(receivedUser));
+      localStorage.setItem("userRole", receivedUser.role);
       setAuthToken(receivedToken);
       setToken(receivedToken);
       setUser(receivedUser);
 
-      return { success: true };
+      return { success: true, user: receivedUser };
     } catch (err: any) {
       const msg =
         err?.response?.data?.message || err?.response?.data?.error || "Login failed. Try again.";
@@ -195,6 +203,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem("userRole");
     setAuthToken(null);
     setToken(null);
     setUser(null);
@@ -241,6 +250,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem("citizen", JSON.stringify(citizenWithVerification));
       localStorage.setItem("citizen_session", JSON.stringify(sessionData));
       localStorage.setItem("citizen_token", sessionData.access_token);
+      localStorage.setItem("userRole", "user");
 
       return { success: true };
     } catch (err: any) {
@@ -285,6 +295,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       localStorage.setItem("citizen", JSON.stringify(citizenWithVerification));
+      localStorage.setItem("userRole", "user");
 
       return { success: true };
     } catch (err: any) {
@@ -332,6 +343,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem("citizen");
       localStorage.removeItem("citizen_session");
       localStorage.removeItem("citizen_token");
+      localStorage.removeItem("userRole");
     }
   };
 
@@ -369,7 +381,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, message: "No email address provided" };
       }
 
-      const { data, error } = await supabase.auth.resend({
+      const { error } = await supabase.auth.resend({
         type: 'signup',
         email: targetEmail,
       });

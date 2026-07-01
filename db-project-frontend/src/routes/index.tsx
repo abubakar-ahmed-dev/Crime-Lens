@@ -45,14 +45,6 @@ export const PublicRoutes = () => {
       element: <RegisterPage/>
     },
     {
-      path: "/complete-profile",
-      element: <CompleteProfilePage/>
-    },
-    {
-      path: "/citizen-dashboard",
-      element: <CitizenDashboardPage/>
-    },
-    {
         path: "/request-agent",
         element: <AddPolicePage/>
     },
@@ -73,14 +65,32 @@ export const PublicRoutes = () => {
         element: <MeetDevelopersPage/>
     },
     {
-        path: "/report-crime",
-        element: <ReportCrimePage/>
-    },
-    {
         path: "/auth/callback",
         element: <AuthCallbackPage/>
     },
 
+  ];
+
+  return routes;
+};
+
+export const CitizenProtectedRoutes = () => {
+  const routes: TRoute[] = [
+    {
+      path: "/complete-profile",
+      element: <CompleteProfilePage/>,
+      allowedRoles: ["user"],
+    },
+    {
+      path: "/citizen-dashboard",
+      element: <CitizenDashboardPage/>,
+      allowedRoles: ["user"],
+    },
+    {
+      path: "/report-crime",
+      element: <ReportCrimePage/>,
+      allowedRoles: ["user"],
+    },
   ];
 
   return routes;
