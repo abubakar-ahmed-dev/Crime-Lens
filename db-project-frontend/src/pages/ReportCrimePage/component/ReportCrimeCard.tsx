@@ -12,6 +12,7 @@ export default function ReportCrimeCard() {
   const [successMsg, setSuccessMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
+  const [hideLocationPicker, setHideLocationPicker] = useState(false);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -128,6 +129,7 @@ export default function ReportCrimeCard() {
       if (response.ok && data.success) {
         setSuccessMsg("Crime report submitted successfully!");
         setError("");
+        setHideLocationPicker(true);
 
         // Reset form
         setFormData({
@@ -355,17 +357,19 @@ export default function ReportCrimeCard() {
 
         <div>
           <h3 className="font-semibold text-[#7d7d7d] mb-4">Location:</h3>
-          <LocationPicker
-            value={{
-              latitude: formData.latitude,
-              longitude: formData.longitude,
-            }}
-            onChange={(location) => {
-              setFormData((prev) => ({ ...prev, ...location }));
-              setError("");
-            }}
-            disabled={loading}
-          />
+          {!hideLocationPicker && (
+            <LocationPicker
+              value={{
+                latitude: formData.latitude,
+                longitude: formData.longitude,
+              }}
+              onChange={(location) => {
+                setFormData((prev) => ({ ...prev, ...location }));
+                setError("");
+              }}
+              disabled={loading}
+            />
+          )}
         </div>
 
         {/* User Info Display */}
