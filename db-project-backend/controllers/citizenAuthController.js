@@ -5,7 +5,7 @@
  * and report tracking using Supabase Auth.
  */
 
-import { supabase } from "../config/supabase.js";
+import { supabase, supabaseAdmin } from "../config/supabase.js";
 import db from "../models/index.js";
 import { success, errors, validationError, asyncHandler } from "../utils/apiResponse.js";
 const { sequelize, CrimeReportsSubmitter } = db;
@@ -182,10 +182,14 @@ export const loginCitizen = asyncHandler(async (req, res) => {
  * This endpoint is called after Supabase OAuth callback to create/update local user profile
  */
 export const googleAuthCitizen = asyncHandler(async (req, res) => {
-  const { accessToken } = req.body;
+  const { accessToken, mode = "login" } = req.body;
 
   if (!accessToken) {
     return validationError(res, 'accessToken', 'Missing access token');
+  }
+
+  if (!["login", "signup"].includes(mode)) {
+    return validationError(res, 'mode', 'Invalid Google auth mode');
   }
 
   // Get the Supabase user using the access token
@@ -219,7 +223,17 @@ export const googleAuthCitizen = asyncHandler(async (req, res) => {
     }
   }
 
-  // Create profile if it doesn't exist
+  if (!submitter && mode === "login") {
+    if (supabaseAdmin) {
+      await supabaseAdmin.auth.admin.deleteUser(supabaseUserId).catch((error) => {
+        console.error("Failed to remove unregistered Google auth user:", error);
+      });
+    }
+
+    return errors.notFound(res, 'No citizen account exists for this Google email. Please sign up first.');
+  }
+
+  // Create profile only during signup
   if (!submitter) {
     submitter = await CrimeReportsSubmitter.create({
       submitterCnic: null,
@@ -232,14 +246,16 @@ export const googleAuthCitizen = asyncHandler(async (req, res) => {
 
   return success(res, {
     message: 'Google authentication successful',
-    user: {
-      id: submitter.id,
-      email: submitter.email,
-      fullName: submitter.fullName,
-      contact: submitter.contact,
-      cnic: submitter.submitterCnic,
-      address: submitter.address,
-      isProfileComplete: submitter.isProfileComplete,
+    data: {
+      user: {
+        id: submitter.id,
+        email: submitter.email,
+        fullName: submitter.fullName,
+        contact: submitter.contact,
+        cnic: submitter.submitterCnic,
+        address: submitter.address,
+        isProfileComplete: submitter.isProfileComplete,
+      },
     },
   });
 });

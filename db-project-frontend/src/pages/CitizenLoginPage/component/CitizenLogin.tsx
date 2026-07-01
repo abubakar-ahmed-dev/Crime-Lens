@@ -60,7 +60,7 @@ export default function CitizenLogin() {
   };
 
   const handleGoogleLogin = async () => {
-    const result = await citizenGoogleLogin();
+    const result = await citizenGoogleLogin("login");
     if (!result.success) {
       setError(result.message || "Google login failed");
     }

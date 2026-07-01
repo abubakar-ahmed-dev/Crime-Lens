@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../context/AuthContext";
+import { API_BASE_URL } from "../../config/constants";
 
 /**
  * AuthCallback Component
@@ -32,6 +33,7 @@ export default function AuthCallback() {
         const accessToken = hashParams.get("access_token");
         const refreshToken = hashParams.get("refresh_token");
         const type = hashParams.get("type"); // 'signup' for email verification, or missing for OAuth
+        const mode = new URLSearchParams(window.location.search).get("mode") === "signup" ? "signup" : "login";
 
         if (!accessToken) {
           setError("No access token found in callback");
@@ -105,43 +107,24 @@ export default function AuthCallback() {
           }
         }
 
-        // This is an OAuth callback (Google, etc.)
-        // Check if we already have a session (from AuthContext handling it)
-        const { data: { session: existingSession } } = await supabase.auth.getSession();
-        if (existingSession?.user?.email) {
-          // Get citizen data from localStorage or fetch it
-          const citizenStr = localStorage.getItem("citizen");
-          if (citizenStr) {
-            const user = JSON.parse(citizenStr);
-            localStorage.setItem("userRole", "user");
-            if (user.isProfileComplete) {
-              navigate("/citizen-dashboard");
-            } else {
-              navigate("/complete-profile");
-            }
-          } else {
-            navigate("/complete-profile");
-          }
-          sessionStorage.removeItem(processingKey);
-          return;
-        }
-
         // Clear the hash from URL after we've processed the tokens
         window.history.replaceState({}, document.title, window.location.pathname);
 
         // Create/fetch backend profile for OAuth users
         if (data.user) {
           try {
-            const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5001/api";
-
-            const response = await fetch(`${API_BASE}/citizens/google-auth`, {
+            const response = await fetch(`${API_BASE_URL}/citizens/google-auth`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ accessToken }),
+              body: JSON.stringify({ accessToken, mode }),
             });
 
+            const profileData = await response.json();
+
             if (response.ok) {
-              const profileData = await response.json();
+              if (!profileData.user) {
+                throw new Error("Google authentication response did not include a user profile");
+              }
 
               // Store in localStorage first
               localStorage.setItem("citizen", JSON.stringify(profileData.user));
@@ -156,12 +139,18 @@ export default function AuthCallback() {
               const targetRoute = profileData.user.isProfileComplete ? "/citizen-dashboard" : "/complete-profile";
               navigate(targetRoute);
             } else {
-              console.error("Backend error:", await response.text());
-              navigate("/complete-profile");
+              await supabase.auth.signOut();
+              localStorage.removeItem("citizen");
+              localStorage.removeItem("citizen_session");
+              localStorage.removeItem("citizen_token");
+              localStorage.removeItem("userRole");
+              setError(profileData.error || profileData.message || "Google authentication failed");
+              setTimeout(() => navigate(mode === "signup" ? "/register" : "/login-citizen"), 2500);
             }
           } catch (err) {
             console.error("Backend fetch error:", err);
-            navigate("/complete-profile");
+            setError("Google authentication failed. Please try again.");
+            setTimeout(() => navigate(mode === "signup" ? "/register" : "/login-citizen"), 2500);
           }
         } else {
           setError("Failed to get user from session");

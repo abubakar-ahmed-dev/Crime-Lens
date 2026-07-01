@@ -64,7 +64,7 @@ type AuthContextType = {
   isCitizenAuthenticated: boolean;
   citizenLogin: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   citizenRegister: (email: string, password: string, fullName: string) => Promise<{ success: boolean; message?: string }>;
-  citizenGoogleLogin: () => Promise<{ success: boolean; message?: string }>;
+  citizenGoogleLogin: (mode?: "login" | "signup") => Promise<{ success: boolean; message?: string }>;
   citizenLogout: () => Promise<void>;
   refreshCitizenSession: () => Promise<void>;
   resendVerificationEmail: (email?: string) => Promise<{ success: boolean; message?: string }>;
@@ -306,12 +306,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   /**
    * Citizen Google OAuth login
    */
-  const citizenGoogleLogin = async () => {
+  const citizenGoogleLogin = async (mode: "login" | "signup" = "login") => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback?mode=${mode}`,
         },
       });
 

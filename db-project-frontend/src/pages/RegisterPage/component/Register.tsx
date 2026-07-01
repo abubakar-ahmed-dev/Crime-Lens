@@ -74,7 +74,7 @@ export default function Register() {
   };
 
   const handleGoogleLogin = async () => {
-    const result = await citizenGoogleLogin();
+    const result = await citizenGoogleLogin("signup");
     if (!result.success) {
       setError(result.message || "Google login failed");
     }
