@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../../config/constants";
 import { supabase, useAuth } from "../../../context/AuthContext";
 import LocationPicker, { isValidLocation } from "../../../components/LocationPicker";
+import GreenButton from "../../../components/GreenButton";
 
 export default function ReportCrimeCard() {
   const navigate = useNavigate();
@@ -381,18 +382,13 @@ export default function ReportCrimeCard() {
 
         {/* SUBMIT BUTTON */}
         <div className="flex justify-center pt-4">
-          <button
+          <GreenButton
             type="submit"
+            label={loading ? "Submitting..." : "Submit Report"}
+            width={250}
+            height={45}
             disabled={loading}
-            className={`px-8 py-3 rounded-lg font-semibold transition-colors ${
-              loading
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-[#237E54] hover:bg-[#1a6644]"
-            } text-white`}
-            style={{ width: "250px", height: "45px" }}
-          >
-            {loading ? "Submitting..." : "Submit Report"}
-          </button>
+          />
         </div>
       </form>
     </div>

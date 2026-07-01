@@ -234,6 +234,7 @@ export default function LocationPicker({
               label="Set Location"
               width={150}
               height={38}
+              type="button"
               onClick={applyMapSelection}
               disabled={disabled}
             />
