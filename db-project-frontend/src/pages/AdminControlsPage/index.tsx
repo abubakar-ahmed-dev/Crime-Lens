@@ -61,11 +61,6 @@ export default function AdminControlsPage() {
     [branches, selectedBranchId]
   );
 
-  const assignedAgents = useMemo(
-    () => agents.filter((agent) => String(agent.branchId) === selectedBranchId),
-    [agents, selectedBranchId]
-  );
-
   const isSelectedCurrentHead =
     !!selectedBranch?.branchHeadUserId &&
     String(selectedBranch.branchHeadUserId) === selectedAgentId;
@@ -373,7 +368,7 @@ export default function AdminControlsPage() {
             <div className="flex flex-col gap-1 mb-5">
               <h2 className="font-semibold text-xl text-gray-900">Assign Branch Head</h2>
               <p className="text-sm text-[#A0A0A0]">
-                Choose from approved agents already assigned to the selected branch.
+                Choose an approved police agent to lead the selected branch.
               </p>
             </div>
 
@@ -411,22 +406,24 @@ export default function AdminControlsPage() {
                 <select
                   value={selectedAgentId}
                   onChange={(event) => setSelectedAgentId(event.target.value)}
-                  disabled={!selectedBranchId || assignedAgents.length === 0}
+                  disabled={!selectedBranchId || agents.length === 0}
                   className="border border-[#d9d9d9] rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
                 >
                   <option value="">
                     {selectedBranchId ? "Select an agent" : "Select a branch first"}
                   </option>
-                  {assignedAgents.map((agent) => (
+                  {agents.map((agent) => (
                     <option key={agent.userId} value={agent.userId}>
-                      {agent.username}
-                      {agent.isBranchHead ? " (Current Head)" : ""}
+                      {agent.username} - {agent.branchName}
+                      {String(selectedBranch?.branchHeadUserId) === String(agent.userId)
+                        ? " (Current Head)"
+                        : ""}
                     </option>
                   ))}
                 </select>
-                {selectedBranchId && assignedAgents.length === 0 && (
+                {selectedBranchId && agents.length === 0 && (
                   <p className="text-xs text-gray-500 mt-2">
-                    No approved police agents are assigned to this branch yet.
+                    No approved police agents are available yet.
                   </p>
                 )}
               </div>
