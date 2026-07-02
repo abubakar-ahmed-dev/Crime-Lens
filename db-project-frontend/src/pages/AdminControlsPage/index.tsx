@@ -51,7 +51,8 @@ export default function AdminControlsPage() {
   const [selectedAgentId, setSelectedAgentId] = useState("");
   const [loading, setLoading] = useState(true);
   const [savingBranch, setSavingBranch] = useState(false);
-  const [savingHead, setSavingHead] = useState(false);
+  const [assigningHead, setAssigningHead] = useState(false);
+  const [clearingHead, setClearingHead] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -64,6 +65,19 @@ export default function AdminControlsPage() {
     () => agents.filter((agent) => String(agent.branchId) === selectedBranchId),
     [agents, selectedBranchId]
   );
+
+  const isSelectedCurrentHead =
+    !!selectedBranch?.branchHeadUserId &&
+    String(selectedBranch.branchHeadUserId) === selectedAgentId;
+
+  const hasExistingHead = !!selectedBranch?.branchHeadUserId;
+  const assignButtonLabel = assigningHead
+    ? hasExistingHead
+      ? "Replacing..."
+      : "Assigning..."
+    : hasExistingHead
+      ? "Replace Head"
+      : "Assign Head";
 
   const availableZones = useMemo(() => {
     const occupiedZoneIds = new Set(branches.map((branch) => Number(branch.zoneId)));
@@ -173,7 +187,7 @@ export default function AdminControlsPage() {
       return;
     }
 
-    setSavingHead(true);
+    setAssigningHead(true);
 
     try {
       const response = await fetch(
@@ -196,7 +210,7 @@ export default function AdminControlsPage() {
     } catch (err: any) {
       setError(err.message || "Failed to assign branch head");
     } finally {
-      setSavingHead(false);
+      setAssigningHead(false);
     }
   };
 
@@ -209,7 +223,7 @@ export default function AdminControlsPage() {
       return;
     }
 
-    setSavingHead(true);
+    setClearingHead(true);
 
     try {
       const response = await fetch(
@@ -232,7 +246,7 @@ export default function AdminControlsPage() {
     } catch (err: any) {
       setError(err.message || "Failed to clear branch head");
     } finally {
-      setSavingHead(false);
+      setClearingHead(false);
     }
   };
 
@@ -419,17 +433,24 @@ export default function AdminControlsPage() {
 
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <GreenButton
-                  label={savingHead ? "Assigning..." : "Assign Head"}
+                  label={assignButtonLabel}
                   width={160}
                   height={40}
                   onClick={assignHead}
-                  disabled={savingHead || !selectedBranchId || !selectedAgentId}
+                  disabled={
+                    assigningHead ||
+                    clearingHead ||
+                    !selectedBranchId ||
+                    !selectedAgentId ||
+                    isSelectedCurrentHead
+                  }
                 />
                 <WhiteButton
-                  label="Clear Head"
-                  width={140}
+                  label={clearingHead ? "Removing head..." : "Clear Head"}
+                  width={clearingHead ? 175 : 140}
                   height={40}
                   onClick={clearHead}
+                  disabled={assigningHead || clearingHead || !selectedBranchId || !hasExistingHead}
                 />
               </div>
             </div>
