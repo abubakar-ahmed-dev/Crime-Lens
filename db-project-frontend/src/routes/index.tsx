@@ -15,6 +15,7 @@ import CitizenLoginPage from "../pages/CitizenLoginPage";
 import CompleteProfilePage from "../pages/CompleteProfilePage";
 import CitizenDashboardPage from "../pages/CitizenDashboardPage";
 import AuthCallbackPage from "../pages/AuthCallback/AuthCallback";
+import AdminControlsPage from "../pages/AdminControlsPage";
 
 type TRoute = {
   path: string;
@@ -112,8 +113,13 @@ export const ProtectedRoutes = () => {
         path: "/upload-crimes",
         element: <UploadPage/>,
         allowedRoles: ["admin"],
+      },
+      {
+        path: "/admin-controls",
+        element: <AdminControlsPage/>,
+        allowedRoles: ["admin"],
       }
-  
+   
     ];
   
     return routes;

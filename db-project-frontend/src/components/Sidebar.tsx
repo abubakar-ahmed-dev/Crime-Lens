@@ -44,6 +44,7 @@ const Sidebar = ({
     { label: "Report Crime", icon: ICONS.ReportCrimeIcon, activeIcon: ICONS.ReportCrimeIcon_Active, route: "/report-crime" },
     { label: "Profile", icon: ICONS.DashboardIcon, activeIcon: ICONS.DashboardIcon_Active, route: "/citizen-dashboard" },
     { label: "Upload Data", icon: ICONS.UploadDataIcon, activeIcon: ICONS.UploadDataIcon_Active, route: "/upload-crimes" },
+    { label: "Admin Controls", icon: ICONS.DashboardIcon, activeIcon: ICONS.DashboardIcon_Active, route: "/admin-controls" },
     { label: "Give Feedback", icon: ICONS.GiveFeedbackIcon, activeIcon: ICONS.GiveFeedbackIcon_Active, route: "/feedback" },
   ];
 
@@ -51,7 +52,7 @@ const Sidebar = ({
 
   if (version === "admin") {
     filteredMenus = allMenus.filter((m) =>
-      ["Dashboard", "Verify Agent", "Agent Records", "Upload Data"].includes(m.label)
+      ["Dashboard", "Verify Agent", "Agent Records", "Upload Data", "Admin Controls"].includes(m.label)
     );
   } else if (version === "police") {
     filteredMenus = allMenus.filter((m) =>
