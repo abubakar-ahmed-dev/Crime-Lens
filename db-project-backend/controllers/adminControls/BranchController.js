@@ -226,10 +226,11 @@ export const assignBranchHead = async (req, res) => {
       WHERE u.id = :userId
         AND u."roleId" = 2
         AND ar.status = 'approved'
+        AND ar."branchId" = :branchId
       LIMIT 1;
       `,
       {
-        replacements: { userId },
+        replacements: { branchId, userId },
         type: QueryTypes.SELECT,
         transaction: t,
       }
@@ -240,7 +241,7 @@ export const assignBranchHead = async (req, res) => {
       await t.rollback();
       return res.status(400).json({
         success: false,
-        message: "Selected user must be an approved police agent",
+        message: "Selected user must be an approved police agent assigned to this branch",
       });
     }
 
