@@ -42,15 +42,23 @@ const emptyBranchForm = {
   longitude: "",
 };
 
+const emptyAgentForm = {
+  username: "",
+  password: "",
+  branchId: "",
+};
+
 export default function AdminControlsPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [agents, setAgents] = useState<PoliceAgent[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [branchForm, setBranchForm] = useState(emptyBranchForm);
+  const [agentForm, setAgentForm] = useState(emptyAgentForm);
   const [selectedBranchId, setSelectedBranchId] = useState("");
   const [selectedAgentId, setSelectedAgentId] = useState("");
   const [loading, setLoading] = useState(true);
   const [savingBranch, setSavingBranch] = useState(false);
+  const [savingAgent, setSavingAgent] = useState(false);
   const [assigningHead, setAssigningHead] = useState(false);
   const [clearingHead, setClearingHead] = useState(false);
   const [message, setMessage] = useState("");
@@ -71,6 +79,7 @@ export default function AdminControlsPage() {
     String(selectedBranch.branchHeadUserId) === selectedAgentId;
 
   const hasExistingHead = !!selectedBranch?.branchHeadUserId;
+  const canClearHead = hasExistingHead && (!selectedAgentId || isSelectedCurrentHead);
   const assignButtonLabel = assigningHead
     ? hasExistingHead
       ? "Replacing..."
@@ -134,6 +143,15 @@ export default function AdminControlsPage() {
     setMessage("");
   };
 
+  const handleAgentChange = (
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = event.target;
+    setAgentForm((prev) => ({ ...prev, [name]: value }));
+    setError("");
+    setMessage("");
+  };
+
   const createBranch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
@@ -175,6 +193,45 @@ export default function AdminControlsPage() {
       setError(err.message || "Failed to create branch");
     } finally {
       setSavingBranch(false);
+    }
+  };
+
+  const createPoliceAgent = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+
+    if (!agentForm.username || !agentForm.password || !agentForm.branchId) {
+      setError("Please fill in all police agent fields.");
+      return;
+    }
+
+    if (agentForm.password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setSavingAgent(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/police-agents`, {
+        method: "POST",
+        headers: getJwtAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(agentForm),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to create police agent");
+      }
+
+      setMessage("Police agent created successfully.");
+      setAgentForm(emptyAgentForm);
+      await loadData();
+    } catch (err: any) {
+      setError(err.message || "Failed to create police agent");
+    } finally {
+      setSavingAgent(false);
     }
   };
 
@@ -274,7 +331,7 @@ export default function AdminControlsPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-4">
+        <div className="flex flex-col gap-4">
           <form
             onSubmit={createBranch}
             className="bg-white rounded-2xl shadow-[0_0_5px_rgba(0,0,0,0.15)] p-4 sm:p-6 font-outfit"
@@ -369,6 +426,73 @@ export default function AdminControlsPage() {
             </div>
           </form>
 
+          <form
+            onSubmit={createPoliceAgent}
+            className="bg-white rounded-2xl shadow-[0_0_5px_rgba(0,0,0,0.15)] p-4 sm:p-6 font-outfit"
+          >
+            <div className="flex flex-col gap-1 mb-5">
+              <h2 className="font-semibold text-xl text-gray-900">Add Police Agent</h2>
+              <p className="text-sm text-[#A0A0A0]">
+                Create an approved police user directly and assign the agent to a branch.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex flex-col">
+                <label className="font-medium text-gray-700 mb-1">Username</label>
+                <input
+                  name="username"
+                  value={agentForm.username}
+                  onChange={handleAgentChange}
+                  disabled={savingAgent}
+                  className="border border-[#d9d9d9] rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Enter username"
+                />
+              </div>
+
+              <div className="flex flex-col">
+                <label className="font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  name="password"
+                  value={agentForm.password}
+                  onChange={handleAgentChange}
+                  disabled={savingAgent}
+                  className="border border-[#d9d9d9] rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Enter password"
+                />
+              </div>
+
+              <div className="flex flex-col">
+                <label className="font-medium text-gray-700 mb-1">Branch</label>
+                <select
+                  name="branchId"
+                  value={agentForm.branchId}
+                  onChange={handleAgentChange}
+                  disabled={savingAgent || branches.length === 0}
+                  className="border border-[#d9d9d9] rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
+                >
+                  <option value="">Select a branch</option>
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.id} - {branch.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <GreenButton
+                type="submit"
+                label={savingAgent ? "Creating..." : "Add Police Agent"}
+                width={190}
+                height={42}
+                disabled={savingAgent}
+              />
+            </div>
+          </form>
+
           <div className="bg-white rounded-2xl shadow-[0_0_5px_rgba(0,0,0,0.15)] p-4 sm:p-6 font-outfit">
             <div className="flex flex-col gap-1 mb-5">
               <h2 className="font-semibold text-xl text-gray-900">Assign Branch Head</h2>
@@ -453,11 +577,11 @@ export default function AdminControlsPage() {
                   }
                 />
                 <WhiteButton
-                  label={clearingHead ? "Removing head..." : "Clear Head"}
+                  label={clearingHead ? "Removing head..." : "Remove Head"}
                   width={clearingHead ? 175 : 140}
                   height={40}
                   onClick={clearHead}
-                  disabled={assigningHead || clearingHead || !selectedBranchId || !hasExistingHead}
+                  disabled={assigningHead || clearingHead || !selectedBranchId || !canClearHead}
                 />
               </div>
             </div>

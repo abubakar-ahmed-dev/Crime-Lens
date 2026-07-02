@@ -4,6 +4,7 @@ import { uploadCrimesCSV } from "../controllers/adminControls/UploadControllers.
 import {
   assignBranchHead,
   createBranch,
+  createPoliceAgent,
   getApprovedPoliceAgents,
   getBranches,
 } from "../controllers/adminControls/BranchController.js";
@@ -26,5 +27,6 @@ router.get("/branches", adminOnly, getBranches);
 router.post("/branches", adminOnly, createBranch);
 router.put("/branches/:branchId/head", adminOnly, assignBranchHead);
 router.get("/police-agents", adminOnly, getApprovedPoliceAgents);
+router.post("/police-agents", adminOnly, createPoliceAgent);
 
 export default router;

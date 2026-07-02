@@ -12,7 +12,7 @@ export default (sequelize) => {
       allowNull: true,
     },
     userId: {
-      type: DataTypes.TEXT,
+      type: DataTypes.INTEGER,
       allowNull: true,
     },
     branchId: {

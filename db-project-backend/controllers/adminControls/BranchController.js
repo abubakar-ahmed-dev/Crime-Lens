@@ -1,5 +1,6 @@
 import { QueryTypes } from "sequelize";
 import sequelize from "../../config/db.js";
+import bcrypt from "bcryptjs";
 
 const parseRequiredCoordinates = (latitude, longitude) => {
   if (
@@ -171,6 +172,109 @@ export const createBranch = async (req, res) => {
     await t.rollback();
     console.error("Create Branch Error:", error);
     res.status(500).json({ success: false, message: "Error creating branch" });
+  }
+};
+
+export const createPoliceAgent = async (req, res) => {
+  const t = await sequelize.transaction();
+
+  try {
+    const { username, password, branchId } = req.body;
+
+    if (!username || !password || !branchId) {
+      await t.rollback();
+      return res.status(400).json({ success: false, message: "Username, password, and branch are required" });
+    }
+
+    if (password.length < 6) {
+      await t.rollback();
+      return res.status(400).json({ success: false, message: "Password must be at least 6 characters" });
+    }
+
+    const branchRows = await sequelize.query(
+      `SELECT id FROM "PoliceBranch" WHERE id = :branchId LIMIT 1;`,
+      {
+        replacements: { branchId },
+        type: QueryTypes.SELECT,
+        transaction: t,
+      }
+    );
+
+    if (!branchRows[0]) {
+      await t.rollback();
+      return res.status(404).json({ success: false, message: "Branch not found" });
+    }
+
+    const existingUserRows = await sequelize.query(
+      `SELECT id FROM "User" WHERE username = :username LIMIT 1;`,
+      {
+        replacements: { username },
+        type: QueryTypes.SELECT,
+        transaction: t,
+      }
+    );
+
+    if (existingUserRows[0]) {
+      await t.rollback();
+      return res.status(409).json({ success: false, message: "Username already exists" });
+    }
+
+    const now = new Date();
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const userRows = await sequelize.query(
+      `
+      INSERT INTO "User" (username, "passwordHash", "roleId", "createdAt", "updatedAt")
+      VALUES (:username, :passwordHash, 2, :createdAt, :updatedAt)
+      RETURNING id, username, "roleId", "createdAt";
+      `,
+      {
+        replacements: {
+          username: username.trim(),
+          passwordHash,
+          createdAt: now,
+          updatedAt: now,
+        },
+        type: QueryTypes.INSERT,
+        transaction: t,
+      }
+    );
+
+    const user = userRows[0][0];
+
+    const agentRequestRows = await sequelize.query(
+      `
+      INSERT INTO "PoliceAgentRequest"
+        ("policeAgentRequestsTempId", "userId", "branchId", status, "createdAt")
+      VALUES
+        (NULL, :userId, :branchId, 'approved', :createdAt)
+      RETURNING id, "userId", "branchId", status, "createdAt";
+      `,
+      {
+        replacements: {
+          userId: user.id,
+          branchId,
+          createdAt: now,
+        },
+        type: QueryTypes.INSERT,
+        transaction: t,
+      }
+    );
+
+    await t.commit();
+
+    res.status(201).json({
+      success: true,
+      message: "Police agent created successfully",
+      data: {
+        user,
+        agentRequest: agentRequestRows[0][0],
+      },
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error("Create Police Agent Error:", error);
+    res.status(500).json({ success: false, message: "Error creating police agent" });
   }
 };
 
