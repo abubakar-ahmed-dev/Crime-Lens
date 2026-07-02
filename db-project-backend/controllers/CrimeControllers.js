@@ -49,7 +49,8 @@ const validateLocationInsideZone = async (zoneId, latitude, longitude, transacti
   if (!zoneRows[0]) {
     return {
       valid: false,
-      message: "Location must be inside the selected zone boundary",
+      message:
+        "Location must be inside the selected zone boundary. If you change the zone, select a location inside that zone before saving.",
     };
   }
 

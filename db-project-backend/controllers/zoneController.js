@@ -97,7 +97,8 @@ export const getAllZones = async (req, res) => {
       `
       SELECT 
         id,
-        name
+        name,
+        ST_AsGeoJSON(boundary)::json AS boundary
       FROM "Zone"
       ORDER BY id ASC;
       `,

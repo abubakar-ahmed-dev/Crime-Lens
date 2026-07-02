@@ -3,10 +3,15 @@ import { useEffect, useState } from "react";
 import WhiteButton from "../../../components/WhiteButton";
 import LocationPicker, { isValidLocation } from "../../../components/LocationPicker";
 import { API_BASE_URL } from "../../../config/constants";
+import {
+  isLocationInsideZoneBoundary,
+  type ZoneBoundary,
+} from "../../../utils/zoneBoundary";
 
 type ZoneOption = {
   id: number;
   name: string;
+  boundary?: ZoneBoundary;
 };
 
 interface ConfirmationPopupProps {
@@ -118,6 +123,7 @@ export default function ConfirmationPopup({
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    setLocationError("");
   };
 
   const handleSubmit = () => {
@@ -135,6 +141,25 @@ export default function ConfirmationPopup({
     if (version === "police" && !formData.zone) {
       setLocationError("Please select a zone before approval.");
       return;
+    }
+
+    if (version === "police") {
+      const selectedZone = zones.find(
+        (zone) => Number(zone.id) === Number(formData.zone)
+      );
+
+      if (
+        !isLocationInsideZoneBoundary(
+          selectedZone?.boundary,
+          Number(formData.latitude),
+          Number(formData.longitude)
+        )
+      ) {
+        setLocationError(
+          "Location must be inside the selected zone boundary. If you change the zone, select a point inside that zone before approval."
+        );
+        return;
+      }
     }
 
     onApprove?.(formData);
