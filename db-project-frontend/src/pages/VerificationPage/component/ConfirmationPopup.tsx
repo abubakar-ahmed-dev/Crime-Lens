@@ -2,6 +2,12 @@
 import { useEffect, useState } from "react";
 import WhiteButton from "../../../components/WhiteButton";
 import LocationPicker, { isValidLocation } from "../../../components/LocationPicker";
+import { API_BASE_URL } from "../../../config/constants";
+
+type ZoneOption = {
+  id: number;
+  name: string;
+};
 
 interface ConfirmationPopupProps {
   version: "admin" | "police";
@@ -61,6 +67,7 @@ export default function ConfirmationPopup({
 }: ConfirmationPopupProps) {
   const [formData, setFormData] = useState(buildInitialFormData(initialData));
   const [locationError, setLocationError] = useState("");
+  const [zones, setZones] = useState<ZoneOption[]>([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -87,10 +94,27 @@ export default function ConfirmationPopup({
     initialData.longitude,
   ]);
 
+  useEffect(() => {
+    const fetchZones = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/zones`);
+        if (!response.ok) return;
+        const data = await response.json();
+        setZones(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Error fetching zones:", error);
+      }
+    };
+
+    if (isOpen && version === "police") {
+      fetchZones();
+    }
+  }, [isOpen, version]);
+
   if (!isOpen) return null;
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -105,6 +129,11 @@ export default function ConfirmationPopup({
       })
     ) {
       setLocationError("Please provide a valid location before approval.");
+      return;
+    }
+
+    if (version === "police" && !formData.zone) {
+      setLocationError("Please select a zone before approval.");
       return;
     }
 
@@ -225,13 +254,19 @@ export default function ConfirmationPopup({
                     <label className="text-xs font-medium text-gray-700">
                       Zone #
                     </label>
-                    <input
-                      type="text"
+                    <select
                       value={formData.zone}
                       name="zone"
                       onChange={handleInputChange}
                       className="w-full text-sm bg-gray-100 mt-1 p-2 rounded border"
-                    />
+                    >
+                      <option value="">Select zone</option>
+                      {zones.map((zone) => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.id} - {zone.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
