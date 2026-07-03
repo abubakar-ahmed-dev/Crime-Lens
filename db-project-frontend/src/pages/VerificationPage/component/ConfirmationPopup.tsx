@@ -1,7 +1,8 @@
 // VerificationPage/components/ConfirmationPopup.tsx
 import { useEffect, useState } from "react";
 import WhiteButton from "../../../components/WhiteButton";
-import LocationPicker, { isValidLocation } from "../../../components/LocationPicker";
+import { isValidLocation } from "../../../components/LocationPicker";
+import CrimeRecordForm from "../../../components/CrimeRecordForm";
 import { API_BASE_URL } from "../../../config/constants";
 import { checkLocationInsideZone } from "../../../utils/zoneValidation";
 
@@ -141,6 +142,13 @@ export default function ConfirmationPopup({
     setLocationError("");
   };
 
+  const handleCrimeFieldChange = (field: string, value: string | number) => {
+    const mappedField =
+      field === "zoneId" ? "zone" : field === "incidentDate" ? "date" : field;
+    setFormData((prev) => ({ ...prev, [mappedField]: value }));
+    setLocationError("");
+  };
+
   const handleSubmit = async () => {
     if (
       version === "police" &&
@@ -193,7 +201,7 @@ export default function ConfirmationPopup({
         <h2 className="text-2xl font-semibold mb-6 pt-6 sticky top-0 bg-white pb-3">
           {version === "admin"
             ? "Confirm Agent Request Details"
-            : "Confirm Crime Report Details"}
+            : "Approve Crime Report"}
         </h2>
 
         <div className="flex flex-col gap-4">
@@ -259,102 +267,25 @@ export default function ConfirmationPopup({
               </div>
             </>
           ) : (
-            <>
-              <div className="border-b pb-4">
-                <h3 className="font-semibold text-gray-800 mb-3">Crime Info</h3>
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <label className="text-xs font-medium text-gray-700">
-                      Zone #
-                    </label>
-                    <select
-                      value={formData.zone}
-                      name="zone"
-                      onChange={handleInputChange}
-                      className="w-full text-sm bg-gray-100 mt-1 p-2 rounded border"
-                    >
-                      <option value="">Select zone</option>
-                      {zones.map((zone) => (
-                        <option key={zone.id} value={zone.id}>
-                          {zone.id} - {zone.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <label className="text-xs font-medium text-gray-700">
-                      Crime Type
-                    </label>
-                    <select
-                      value={formData.crimeTypeId}
-                      name="crimeTypeId"
-                      onChange={handleInputChange}
-                      className="w-full text-sm bg-gray-100 mt-1 p-2 rounded border"
-                    >
-                      <option value="">Select crime type</option>
-                      {crimeTypes.map((crimeType) => (
-                        <option key={crimeType.id} value={crimeType.id}>
-                          {crimeType.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <label className="text-xs font-medium text-gray-700">Date</label>
-                    <input
-                      type="date"
-                      value={formData.date}
-                      name="date"
-                      onChange={handleInputChange}
-                      className="w-full text-sm bg-gray-100 mt-1 p-2 rounded border"
-                    />
-                  </div>
-                </div>
-                <div className="bg-gray-50 p-3 rounded-lg mb-3">
-                  <label className="text-xs font-medium text-gray-700">Title</label>
-                  <textarea
-                    value={formData.title}
-                    name="title"
-                    onChange={handleInputChange}
-                    className="w-full text-sm bg-gray-100 mt-1 p-2 rounded border h-20 resize-none"
-                  />
-                </div>
-                <div className="bg-gray-50 p-3 rounded-lg mb-3">
-                  <label className="text-xs font-medium text-gray-700">
-                    Description
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    name="description"
-                    onChange={handleInputChange}
-                    className="w-full text-sm bg-gray-100 mt-1 p-2 rounded border h-20 resize-none"
-                  />
-                </div>
-              </div>
-
-              <div className="border-b pb-4 bg-green-50 p-3 rounded-lg">
-                <h3 className="font-semibold text-green-900 mb-3">
-                  Location
-                </h3>
-                <LocationPicker
-                  value={{
-                    latitude: String(formData.latitude),
-                    longitude: String(formData.longitude),
-                  }}
-                  onChange={(location) => {
-                    setFormData((prev) => ({ ...prev, ...location }));
-                    setLocationError("");
-                  }}
-                  defaultMapCenter={{
-                    latitude: String(formData.latitude || "24.899983520748542"),
-                    longitude: String(formData.longitude || "67.05814361572267"),
-                  }}
-                />
-                {locationError && (
-                  <p className="text-red-600 text-xs mt-2">{locationError}</p>
-                )}
-              </div>
-            </>
+            <CrimeRecordForm
+              value={{
+                title: formData.title,
+                description: formData.description,
+                crimeTypeId: formData.crimeTypeId,
+                incidentDate: formData.date,
+                zoneId: formData.zone,
+                latitude: String(formData.latitude),
+                longitude: String(formData.longitude),
+              }}
+              zones={zones}
+              crimeTypes={crimeTypes}
+              locationError={locationError}
+              onChange={handleCrimeFieldChange}
+              onLocationChange={(location) => {
+                setFormData((prev) => ({ ...prev, ...location }));
+                setLocationError("");
+              }}
+            />
           )}
         </div>
 

@@ -1,6 +1,8 @@
 import WhiteButton from "../../../components/WhiteButton";
 import { useState, useEffect } from "react";
-import LocationPicker, { isValidLocation } from "../../../components/LocationPicker";
+import { isValidLocation } from "../../../components/LocationPicker";
+import CrimeRecordForm from "../../../components/CrimeRecordForm";
+import GreenButton from "../../../components/GreenButton";
 import { API_BASE_URL } from "../../../config/constants";
 import { checkLocationInsideZone } from "../../../utils/zoneValidation";
 
@@ -129,94 +131,35 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
     }
   };
 
-  const locationValue = {
-    latitude: String(formData.latitude ?? ""),
-    longitude: String(formData.longitude ?? ""),
-  };
-  const defaultMapCenter = isValidLocation(locationValue)
-    ? locationValue
-    : {
-      latitude: "24.899983520748542",
-      longitude: "67.05814361572267",
-    };
-
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white p-4 sm:p-6 rounded-xl w-full max-w-[450px] shadow-xl overflow-y-auto max-h-[90vh] sm:max-h-[550px]">
+      <div className="bg-white p-4 sm:p-6 rounded-xl w-full max-w-[520px] shadow-xl overflow-y-auto max-h-[90vh]">
         <h2 className="text-xl sm:text-2xl font-semibold mb-4">
-          {version === "admin" ? "Update Agent Details" : "Update Crime Details"}
+          {version === "admin" ? "Update Agent Details" : "Update Crime Record"}
         </h2>
 
         {version === "police" ? (
-          <>
-            <label className="block mb-1">Title</label>
-            <input
-              type="text"
-              className="border rounded px-3 py-2 w-full mb-3"
-              value={formData.title}
-              onChange={(e) => handleChange("title", e.target.value)}
-            />
-
-            <label className="block mb-1">Description</label>
-            <textarea
-              className="border rounded px-3 py-2 w-full mb-3"
-              rows={3}
-              value={formData.description}
-              onChange={(e) => handleChange("description", e.target.value)}
-            />
-
-            <label className="block mb-1">Crime Type</label>
-            <select
-              className="border rounded px-3 py-2 w-full mb-3"
-              value={formData.crimeTypeId}
-              onChange={(e) => handleChange("crimeTypeId", Number(e.target.value))}
-            >
-              <option value="">Select crime type</option>
-              {crimeTypes.map((crimeType) => (
-                <option key={crimeType.id} value={crimeType.id}>
-                  {crimeType.name}
-                </option>
-              ))}
-            </select>
-
-            <label className="block mb-1">Date</label>
-            <input
-              type="date"
-              className="border rounded px-3 py-2 w-full mb-3"
-              value={formData.incidentDate}
-              onChange={(e) => handleChange("incidentDate", e.target.value)}
-            />
-
-            <label className="block mb-1">Zone</label>
-            <select
-              className="border rounded px-3 py-2 w-full mb-3"
-              value={formData.zoneId}
-              onChange={(e) => handleChange("zoneId", Number(e.target.value))}
-            >
-              <option value="">Select zone</option>
-              {zones.map((zone) => (
-                <option key={zone.id} value={zone.id}>
-                  {zone.id} - {zone.name}
-                </option>
-              ))}
-            </select>
-
-            <label className="block mb-2 font-medium">Location</label>
-            <LocationPicker
-              value={locationValue}
-              onChange={(location) => {
-                setFormData((prev: any) => ({ ...prev, ...location }));
-                setLocationError("");
-              }}
-              defaultMapCenter={defaultMapCenter}
-            />
-            {locationError && (
-              <p className="text-red-600 text-xs mt-2 mb-3">{locationError}</p>
-            )}
-            {submitError && (
-              <p className="text-red-600 text-xs mt-2 mb-3">{submitError}</p>
-            )}
-          </>
+          <CrimeRecordForm
+            value={{
+              title: formData.title,
+              description: formData.description,
+              crimeTypeId: formData.crimeTypeId,
+              incidentDate: formData.incidentDate,
+              zoneId: formData.zoneId,
+              latitude: String(formData.latitude),
+              longitude: String(formData.longitude),
+            }}
+            zones={zones}
+            crimeTypes={crimeTypes}
+            locationError={locationError}
+            submitError={submitError}
+            onChange={(field, value) => handleChange(field, value)}
+            onLocationChange={(location) => {
+              setFormData((prev: any) => ({ ...prev, ...location }));
+              setLocationError("");
+              setSubmitError("");
+            }}
+          />
         ) : (
           <>
             <label className="block mb-1">Username</label>
@@ -245,15 +188,17 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
           </>
         )}
 
-        <div className="flex justify-center gap-3">
+        <div className="flex justify-center gap-3 mt-6 pt-4 pb-2 bg-white">
           <WhiteButton label="Cancel" width={150} height={45} onClick={onClose} />
-          <button
+          <GreenButton
+            label={isSaving ? "Updating..." : version === "admin" ? "Save" : "Update"}
+            width={150}
+            height={45}
             onClick={handleSave}
             disabled={isSaving}
-            className="px-15 py-2 bg-blue-700 border-2 border-blue-500 text-white rounded-full hover:bg-blue-800"
-          >
-            {isSaving ? "Saving..." : "Save"}
-          </button>
+            rounded="full"
+            type="button"
+          />
         </div>
       </div>
     </div>
