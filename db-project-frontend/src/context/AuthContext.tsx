@@ -106,8 +106,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
+  const clearStaffAuth = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("staffRole");
+    if (localStorage.getItem("authMode") === "staff") {
+      localStorage.removeItem("authMode");
+    }
+    const currentRole = localStorage.getItem("userRole");
+    if (currentRole === "admin" || currentRole === "police") {
+      localStorage.removeItem("userRole");
+    }
+    setAuthToken(null);
+    setToken(null);
+    setUser(null);
+  };
+
+  const clearCitizenAuth = async (signOut = false) => {
+    if (signOut) {
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.error("Supabase sign out error:", err);
+      }
+    }
+
+    setCitizen(null);
+    setCitizenSession(null);
+    setCitizenToken(null);
+    localStorage.removeItem("citizen");
+    localStorage.removeItem("citizen_session");
+    localStorage.removeItem("citizen_token");
+    if (localStorage.getItem("authMode") === "citizen") {
+      localStorage.removeItem("authMode");
+    }
+    if (localStorage.getItem("userRole") === "user") {
+      localStorage.removeItem("userRole");
+    }
+  };
+
   const syncCitizenSession = async (sessionData: any) => {
     if (!sessionData?.access_token) return null;
+    if (localStorage.getItem("authMode") === "staff") return null;
 
     if (sessionData.refresh_token) {
       await supabase.auth.setSession({
@@ -120,6 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCitizenToken(sessionData.access_token);
     localStorage.setItem("citizen_token", sessionData.access_token);
     localStorage.setItem("citizen_session", JSON.stringify(sessionData));
+    localStorage.setItem("authMode", "citizen");
     localStorage.setItem("userRole", "user");
 
     return sessionData.access_token;
@@ -151,6 +192,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Initialize Supabase session from storage
     const initSupabaseSession = async () => {
+      if (localStorage.getItem("authMode") === "staff") {
+        await clearCitizenAuth(true);
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         await syncCitizenSession(session);
@@ -164,19 +210,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
+        if (localStorage.getItem("authMode") === "staff") return;
         setCitizenSession(session);
         setCitizenToken(session.access_token);
         localStorage.setItem("citizen_token", session.access_token);
         localStorage.setItem("citizen_session", JSON.stringify(session));
+        localStorage.setItem("authMode", "citizen");
         localStorage.setItem("userRole", "user");
         // Note: Google OAuth profile creation is handled by AuthCallback component
       } else if (event === 'SIGNED_OUT') {
+        if (localStorage.getItem("authMode") === "staff") return;
         setCitizenSession(null);
         setCitizenToken(null);
         setCitizen(null);
         localStorage.removeItem("citizen_token");
         localStorage.removeItem("citizen_session");
         localStorage.removeItem("citizen");
+        localStorage.removeItem("authMode");
         localStorage.removeItem("userRole");
       }
     });
@@ -184,7 +234,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       subscription.unsubscribe();
     };
-  }, [token]);
+  }, []);
 
   // Listen for citizen profile updates from other components
   useEffect(() => {
@@ -218,9 +268,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const receivedToken = data.token;
       const receivedUser = data.user;
 
+      await clearCitizenAuth(true);
+
       // persist
       localStorage.setItem("token", receivedToken);
       localStorage.setItem("user", JSON.stringify(receivedUser));
+      localStorage.setItem("authMode", "staff");
+      localStorage.setItem("staffRole", receivedUser.role);
       localStorage.setItem("userRole", receivedUser.role);
       setAuthToken(receivedToken);
       setToken(receivedToken);
@@ -238,12 +292,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Logout (Admin/Police)
    */
   const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("userRole");
-    setAuthToken(null);
-    setToken(null);
-    setUser(null);
+    clearStaffAuth();
   };
 
   /**
@@ -281,6 +330,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         provider: sessionData.user?.app_metadata?.provider || "email",
       };
 
+      clearStaffAuth();
+      localStorage.setItem("authMode", "citizen");
+      localStorage.setItem("userRole", "user");
       setCitizen(citizenWithVerification);
       localStorage.setItem("citizen", JSON.stringify(citizenWithVerification));
       await syncCitizenSession(sessionData);
@@ -324,6 +376,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Only set session/token if it exists (email confirmation might be disabled)
       if (data.session) {
+        clearStaffAuth();
+        localStorage.setItem("authMode", "citizen");
+        localStorage.setItem("userRole", "user");
         setCitizen(citizenWithVerification);
         localStorage.setItem("citizen", JSON.stringify(citizenWithVerification));
         await syncCitizenSession(data.session);
@@ -362,21 +417,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Citizen logout
    */
   const citizenLogout = async () => {
-    try {
-      // Sign out from Supabase
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.error("Supabase logout error:", err);
-    } finally {
-      // Always clear local state
-      setCitizen(null);
-      setCitizenSession(null);
-      setCitizenToken(null);
-      localStorage.removeItem("citizen");
-      localStorage.removeItem("citizen_session");
-      localStorage.removeItem("citizen_token");
-      localStorage.removeItem("userRole");
-    }
+    await clearCitizenAuth(true);
   };
 
   /**
@@ -511,7 +552,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         citizen,
         citizenToken,
         citizenSession,
-        isCitizenAuthenticated: !!citizen,
+        isCitizenAuthenticated: !!citizen && !!citizenToken,
         citizenLogin,
         citizenRegister,
         citizenGoogleLogin,

@@ -33,7 +33,8 @@ const Sidebar = ({
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
-  const { logout } = useAuth();
+  const { logout, citizenLogout } = useAuth();
+  const isCitizenSession = localStorage.getItem("authMode") === "citizen";
 
   const allMenus: MenuItem[] = [
     { label: "Dashboard", icon: ICONS.DashboardIcon, activeIcon: ICONS.DashboardIcon_Active, route: "/dashboard" },
@@ -71,7 +72,9 @@ const Sidebar = ({
   }, [location.pathname, location.search]);
 
   const buttonText =
-    version === "admin" || version === "police" ? "Logout" : "Back to Home";
+    version === "admin" || version === "police" || isCitizenSession
+      ? "Logout"
+      : "Back to Home";
 
   return (
     <div
@@ -136,9 +139,14 @@ const Sidebar = ({
           <GreenButton
             label={buttonText}
             width={220}
-            onClick={() => {
+            onClick={async () => {
               if (version === "admin" || version === "police") {
                 logout();
+                dispatch(clearRole());
+              } else if (isCitizenSession) {
+                await citizenLogout();
+                dispatch(clearRole());
+              } else {
                 dispatch(clearRole());
               }
               navigate("/");

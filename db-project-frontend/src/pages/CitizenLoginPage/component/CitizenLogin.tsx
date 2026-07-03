@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import LogowithText from "../../../assets/LogowithText.svg";
@@ -11,6 +11,7 @@ import BackButton from "../../../components/BackButton";
 export default function CitizenLogin() {
   const navigate = useNavigate();
   const { citizenLogin, citizenGoogleLogin, isCitizenAuthenticated, citizen, resendVerificationEmail } = useAuth();
+  const hasRedirected = useRef(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,16 +21,21 @@ export default function CitizenLogin() {
   const [loading, setLoading] = useState(false);
   const [resendingEmail, setResendingEmail] = useState(false);
 
+  const getCitizenTargetRoute = (citizenData: typeof citizen) =>
+    citizenData?.isProfileComplete ? "/citizen-dashboard" : "/complete-profile";
+
+  const redirectCitizenOnce = (citizenData: typeof citizen) => {
+    if (!citizenData || hasRedirected.current) return;
+    hasRedirected.current = true;
+    navigate(getCitizenTargetRoute(citizenData), { replace: true });
+  };
+
   // Redirect if already authenticated
   useEffect(() => {
     if (isCitizenAuthenticated && citizen) {
-      if (citizen.isProfileComplete) {
-        navigate("/citizen-dashboard");
-      } else {
-        navigate("/complete-profile");
-      }
+      redirectCitizenOnce(citizen);
     }
-  }, [isCitizenAuthenticated, citizen, navigate]);
+  }, [isCitizenAuthenticated, citizen]);
 
   const NavigateLogin = () => {
     navigate("/login");
@@ -52,7 +58,14 @@ export default function CitizenLogin() {
     setLoading(false);
 
     if (result.success) {
-      // Redirect will be handled by useEffect
+      const storedCitizen = localStorage.getItem("citizen");
+      let citizenData = citizen;
+      try {
+        citizenData = storedCitizen ? JSON.parse(storedCitizen) : citizen;
+      } catch {
+        citizenData = citizen;
+      }
+      redirectCitizenOnce(citizenData);
     } else {
       setError(result.message || "Login failed");
     }

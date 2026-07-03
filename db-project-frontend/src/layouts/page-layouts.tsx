@@ -11,12 +11,23 @@ const PageLayout = () => {
   const { role, roleLoaded } = useSelector((state: any) => state.currentRole);
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const storedRole = localStorage.getItem("userRole");
+  const authMode = localStorage.getItem("authMode");
+  const staffRole = localStorage.getItem("staffRole");
+  const citizenActive =
+    authMode === "citizen" &&
+    localStorage.getItem("citizen") !== null &&
+    localStorage.getItem("citizen_token") !== null;
+  const storedRole =
+    authMode === "staff"
+      ? staffRole
+      : citizenActive
+        ? "user"
+        : localStorage.getItem("userRole");
   const validStoredRole =
     storedRole === "admin" || storedRole === "police" || storedRole === "user"
       ? storedRole
       : null;
-  const layoutRole = role || validStoredRole;
+  const layoutRole = validStoredRole || role;
   const roleReady = !!layoutRole;
 
   useEffect(() => {

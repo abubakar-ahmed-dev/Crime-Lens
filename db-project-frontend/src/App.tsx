@@ -4,12 +4,15 @@ import { CitizenProtectedRoutes, PublicRoutes, ProtectedRoutes } from "./routes/
 import PageLayout from "./layouts/page-layouts";
 
 const useAuth = () => {
-  const isAuthenticated = localStorage.getItem("token") !== null;
+  const isAuthenticated =
+    localStorage.getItem("authMode") === "staff" &&
+    localStorage.getItem("token") !== null;
   return { isAuthenticated };
 };
 
 const useCitizenAuth = () => {
   const isCitizenAuthenticated =
+    localStorage.getItem("authMode") === "citizen" &&
     localStorage.getItem("citizen") !== null &&
     localStorage.getItem("citizen_token") !== null;
   return { isCitizenAuthenticated };
@@ -23,7 +26,7 @@ const ProtectedRoute = ({
   allowedRoles?: string[];
 }) => {
   const { isAuthenticated } = useAuth();
-  const role = localStorage.getItem("userRole");
+  const role = localStorage.getItem("staffRole");
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;

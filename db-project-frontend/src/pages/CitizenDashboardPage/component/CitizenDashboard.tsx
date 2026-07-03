@@ -4,7 +4,6 @@ import { useAuth } from "../../../context/AuthContext";
 import StatsCard from "../../../components/StatsCards";
 import GreenButton from "../../../components/GreenButton";
 import WhiteButton from "../../../components/WhiteButton";
-import RedButton from "../../../components/RedButton";
 
 export default function CitizenDashboard() {
   const navigate = useNavigate();
@@ -127,11 +126,6 @@ export default function CitizenDashboard() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleLogout = async () => {
-    await citizenLogout();
-    navigate("/login-citizen");
   };
 
   const handleProfileUpdate = async () => {
@@ -271,7 +265,6 @@ export default function CitizenDashboard() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Welcome, {citizen?.fullName}</span>
-              <RedButton label="Logout" width={100} height={40} onClick={handleLogout} />
             </div>
           </div>
         </div>

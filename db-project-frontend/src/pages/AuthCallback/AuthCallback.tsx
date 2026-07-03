@@ -3,6 +3,40 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../../context/AuthContext";
 import { API_BASE_URL } from "../../config/constants";
 
+const clearStaffAuth = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  localStorage.removeItem("staffRole");
+  if (localStorage.getItem("authMode") === "staff") {
+    localStorage.removeItem("authMode");
+  }
+  const currentRole = localStorage.getItem("userRole");
+  if (currentRole === "admin" || currentRole === "police") {
+    localStorage.removeItem("userRole");
+  }
+};
+
+const storeCitizenAuth = (citizen: any, sessionData: any, accessToken: string) => {
+  clearStaffAuth();
+  localStorage.setItem("authMode", "citizen");
+  localStorage.setItem("userRole", "user");
+  localStorage.setItem("citizen", JSON.stringify(citizen));
+  localStorage.setItem("citizen_session", JSON.stringify(sessionData));
+  localStorage.setItem("citizen_token", accessToken);
+};
+
+const clearCitizenAuth = () => {
+  localStorage.removeItem("citizen");
+  localStorage.removeItem("citizen_session");
+  localStorage.removeItem("citizen_token");
+  if (localStorage.getItem("authMode") === "citizen") {
+    localStorage.removeItem("authMode");
+  }
+  if (localStorage.getItem("userRole") === "user") {
+    localStorage.removeItem("userRole");
+  }
+};
+
 /**
  * AuthCallback Component
  *
@@ -116,10 +150,7 @@ export default function AuthCallback() {
               provider: "email",
             };
 
-            localStorage.setItem("citizen", JSON.stringify(verifiedCitizen));
-            localStorage.setItem("citizen_session", JSON.stringify(sessionData));
-            localStorage.setItem("citizen_token", accessToken);
-            localStorage.setItem("userRole", "user");
+            storeCitizenAuth(verifiedCitizen, sessionData, accessToken);
 
             // Clear the hash from URL
             window.history.replaceState({}, document.title, window.location.pathname);
@@ -163,10 +194,7 @@ export default function AuthCallback() {
               }
 
               // Store in localStorage first
-              localStorage.setItem("citizen", JSON.stringify(profileData.user));
-              localStorage.setItem("citizen_session", JSON.stringify(sessionData));
-              localStorage.setItem("citizen_token", accessToken);
-              localStorage.setItem("userRole", "user");
+              storeCitizenAuth(profileData.user, sessionData, accessToken);
 
               // Wait a moment for localStorage to be set and state to update
               await new Promise(resolve => setTimeout(resolve, 100));
@@ -176,10 +204,7 @@ export default function AuthCallback() {
               navigate(targetRoute);
             } else {
               await supabase.auth.signOut();
-              localStorage.removeItem("citizen");
-              localStorage.removeItem("citizen_session");
-              localStorage.removeItem("citizen_token");
-              localStorage.removeItem("userRole");
+              clearCitizenAuth();
               setError(profileData.error || profileData.message || "Google authentication failed");
               setTimeout(() => navigate(mode === "signup" ? "/register" : "/login-citizen"), 2500);
             }
