@@ -313,12 +313,6 @@ export default function AllRecords({ version }: AllRecordsProps) {
         const data = await res.json().catch(() => null);
         if (!res.ok || !data?.success) {
           const message = data?.message || "Unable to update crime.";
-          console.error("Crime update failed", {
-            status: res.status,
-            crimeId: fullCrime.id,
-            payload: updatedData,
-            response: data,
-          });
           return message;
         }
 

@@ -2,15 +2,11 @@ import WhiteButton from "../../../components/WhiteButton";
 import { useState, useEffect } from "react";
 import LocationPicker, { isValidLocation } from "../../../components/LocationPicker";
 import { API_BASE_URL } from "../../../config/constants";
-import {
-  isLocationInsideZoneBoundary,
-  type ZoneBoundary,
-} from "../../../utils/zoneBoundary";
+import { checkLocationInsideZone } from "../../../utils/zoneValidation";
 
 type ZoneOption = {
   id: number;
   name: string;
-  boundary?: ZoneBoundary;
 };
 
 interface UpdateModalProps {
@@ -79,19 +75,16 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
     }
 
     if (version === "police") {
-      const selectedZone = zones.find(
-        (zone) => Number(zone.id) === Number(formData.zoneId)
+      const zoneCheck = await checkLocationInsideZone(
+        formData.zoneId,
+        formData.latitude,
+        formData.longitude
       );
 
-      if (
-        !isLocationInsideZoneBoundary(
-          selectedZone?.boundary,
-          Number(formData.latitude),
-          Number(formData.longitude)
-        )
-      ) {
+      if (!zoneCheck.inside) {
         setLocationError(
-          "Location must be inside the selected zone boundary. If you change the zone, select a point inside that zone before saving."
+          zoneCheck.message ||
+            "Location must be inside the selected zone boundary. If you change the zone, select a point inside that zone before saving."
         );
         return;
       }

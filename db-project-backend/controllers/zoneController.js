@@ -114,3 +114,48 @@ export const getAllZones = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+export const checkLocationInsideZone = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const latitude = Number(req.body.latitude);
+    const longitude = Number(req.body.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return res.json({
+        success: true,
+        inside: false,
+        message: "Please provide a valid location.",
+      });
+    }
+
+    const rows = await db.sequelize.query(
+      `
+      SELECT ST_Covers(
+        boundary,
+        ST_SetSRID(ST_Point(:longitude, :latitude), 4326)
+      ) AS inside
+      FROM "Zone"
+      WHERE id = :id
+      LIMIT 1;
+      `,
+      {
+        replacements: { id, latitude, longitude },
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    if (!rows[0]) {
+      return res.json({
+        success: true,
+        inside: false,
+        message: "Selected zone was not found.",
+      });
+    }
+
+    res.json({ success: true, inside: Boolean(rows[0].inside) });
+  } catch (err) {
+    console.error("Error checking zone location:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
