@@ -346,9 +346,9 @@ export default function ConfirmationPopup({
                 </div>
               </div>
 
-              <div className="border-b pb-4 bg-blue-50 p-3 rounded-lg">
-                <h3 className="font-semibold text-blue-900 mb-3">
-                  Officer Additions
+              <div className="border-b pb-4 bg-green-50 p-3 rounded-lg">
+                <h3 className="font-semibold text-green-900 mb-3">
+                  Location
                 </h3>
                 <LocationPicker
                   value={{
