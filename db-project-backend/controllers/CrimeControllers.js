@@ -197,7 +197,7 @@ export const getPendingSubmissions = async (req, res) => {
              c."crimeTypeId",
              json_build_object('id', ct.id, 'name', ct.name) AS "CrimeType",
              c."zoneId",
-             json_build_object('id', z.id) AS "Zone",
+             json_build_object('id', z.id, 'name', z.name) AS "Zone",
              c.status,
              c."reportedAt",
              c."incidentDate",

@@ -206,7 +206,8 @@ export default function AllRecords({ version }: AllRecordsProps) {
                     latitude={getCrimeCoordinate(record, "latitude")}
                     longitude={getCrimeCoordinate(record, "longitude")}
 
-                    zone={record.Zone?.id || record.zoneId}   
+                    zone={record.Zone?.id || record.zoneId}
+                    zoneName={record.Zone?.name || record.zoneName || ""}   
 
                     onApprove={handleRecordProcessed}
                     onReject={handleRecordProcessed}

@@ -30,6 +30,7 @@ type VerificationCardProps =
     description: string;
     date: string;
     zone: number;
+    zoneName?: string;
     address: string;
     latitude: number | string;
     longitude: number | string;
@@ -227,7 +228,8 @@ export default function VerificationCard(props: VerificationCardProps) {
               <span className="font-semibold">Date:</span> {props.date}
             </p>
             <p>
-              <span className="font-semibold">Zone #:</span> {props.zone}
+              <span className="font-semibold">Zone:</span>{" "}
+              {props.zoneName ? `${props.zone} - ${props.zoneName}` : props.zone}
             </p>
             <p>
               <span className="font-semibold">Address:</span>{" "}
