@@ -25,6 +25,7 @@ type VerificationCardProps =
     fullName: string;
     contact: string;
     cnic: string;
+    crimeTypeId: number | string;
     crimeType: string;
     description: string;
     date: string;
@@ -94,6 +95,8 @@ export default function VerificationCard(props: VerificationCardProps) {
           zoneId: Number(updatedValues.zone),
           latitude: Number(updatedValues.latitude),
           longitude: Number(updatedValues.longitude),
+          crimeTypeId: Number(updatedValues.crimeTypeId),
+          incidentDate: updatedValues.date,
           title: updatedValues.title || "",
           description: updatedValues.description || "",
         };

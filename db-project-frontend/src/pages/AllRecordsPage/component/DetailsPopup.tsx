@@ -9,6 +9,11 @@ type ZoneOption = {
   name: string;
 };
 
+type CrimeTypeOption = {
+  id: number;
+  name: string;
+};
+
 interface UpdateModalProps {
   version: "admin" | "police";
   isOpen: boolean;
@@ -23,6 +28,7 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
   const [submitError, setSubmitError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [zones, setZones] = useState<ZoneOption[]>([]);
+  const [crimeTypes, setCrimeTypes] = useState<CrimeTypeOption[]>([]);
 
   // Sync local state when data changes
   useEffect(() => {
@@ -33,19 +39,29 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
   }, [data]);
 
   useEffect(() => {
-    const fetchZones = async () => {
+    const fetchReferenceData = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/zones`);
-        if (!response.ok) return;
-        const data = await response.json();
-        setZones(Array.isArray(data) ? data : []);
+        const [zonesResponse, crimeTypesResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/zones`),
+          fetch(`${API_BASE_URL}/crimes/types`),
+        ]);
+
+        if (zonesResponse.ok) {
+          const zonesData = await zonesResponse.json();
+          setZones(Array.isArray(zonesData) ? zonesData : []);
+        }
+
+        if (crimeTypesResponse.ok) {
+          const crimeTypesData = await crimeTypesResponse.json();
+          setCrimeTypes(Array.isArray(crimeTypesData) ? crimeTypesData : []);
+        }
       } catch (error) {
-        console.error("Error fetching zones:", error);
+        console.error("Error fetching update reference data:", error);
       }
     };
 
     if (isOpen && version === "police") {
-      fetchZones();
+      fetchReferenceData();
     }
   }, [isOpen, version]);
 
@@ -71,6 +87,16 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
 
     if (version === "police" && !formData.zoneId) {
       setLocationError("Please select a zone before saving.");
+      return;
+    }
+
+    if (version === "police" && !formData.crimeTypeId) {
+      setLocationError("Please select a crime type before saving.");
+      return;
+    }
+
+    if (version === "police" && !formData.incidentDate) {
+      setLocationError("Please select an incident date before saving.");
       return;
     }
 
@@ -139,12 +165,26 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
               onChange={(e) => handleChange("description", e.target.value)}
             />
 
-            <label className="block mb-1">Address</label>
-            <input
-              type="text"
+            <label className="block mb-1">Crime Type</label>
+            <select
               className="border rounded px-3 py-2 w-full mb-3"
-              value={formData.address}
-              onChange={(e) => handleChange("address", e.target.value)}
+              value={formData.crimeTypeId}
+              onChange={(e) => handleChange("crimeTypeId", Number(e.target.value))}
+            >
+              <option value="">Select crime type</option>
+              {crimeTypes.map((crimeType) => (
+                <option key={crimeType.id} value={crimeType.id}>
+                  {crimeType.name}
+                </option>
+              ))}
+            </select>
+
+            <label className="block mb-1">Date</label>
+            <input
+              type="date"
+              className="border rounded px-3 py-2 w-full mb-3"
+              value={formData.incidentDate}
+              onChange={(e) => handleChange("incidentDate", e.target.value)}
             />
 
             <label className="block mb-1">Zone</label>

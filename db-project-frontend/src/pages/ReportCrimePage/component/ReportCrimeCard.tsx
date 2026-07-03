@@ -10,6 +10,11 @@ type ZoneOption = {
   name: string;
 };
 
+type CrimeTypeOption = {
+  id: number;
+  name: string;
+};
+
 export default function ReportCrimeCard() {
   const navigate = useNavigate();
   const { citizen, citizenToken, isCitizenAuthenticated, refreshCitizenSession } = useAuth();
@@ -20,6 +25,7 @@ export default function ReportCrimeCard() {
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const [hideLocationPicker, setHideLocationPicker] = useState(false);
   const [zones, setZones] = useState<ZoneOption[]>([]);
+  const [crimeTypes, setCrimeTypes] = useState<CrimeTypeOption[]>([]);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -40,18 +46,28 @@ export default function ReportCrimeCard() {
   }, [isCitizenAuthenticated]);
 
   useEffect(() => {
-    const fetchZones = async () => {
+    const fetchReferenceData = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/zones`);
-        if (!response.ok) return;
-        const data = await response.json();
-        setZones(Array.isArray(data) ? data : []);
+        const [zonesResponse, crimeTypesResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/zones`),
+          fetch(`${API_BASE_URL}/crimes/types`),
+        ]);
+
+        if (zonesResponse.ok) {
+          const zonesData = await zonesResponse.json();
+          setZones(Array.isArray(zonesData) ? zonesData : []);
+        }
+
+        if (crimeTypesResponse.ok) {
+          const crimeTypesData = await crimeTypesResponse.json();
+          setCrimeTypes(Array.isArray(crimeTypesData) ? crimeTypesData : []);
+        }
       } catch (err) {
-        console.error("Error fetching zones:", err);
+        console.error("Error fetching report reference data:", err);
       }
     };
 
-    fetchZones();
+    fetchReferenceData();
   }, []);
 
   const handleChange = (
@@ -253,16 +269,11 @@ export default function ReportCrimeCard() {
                 )}`}
               >
                 <option value="">Not Selected</option>
-                <option value="1">Theft</option>
-                <option value="2">Robbery</option>
-                <option value="3">Assault</option>
-                <option value="4">Murder</option>
-                <option value="5">Kidnapping</option>
-                <option value="6">Sexual Assault</option>
-                <option value="7">Burglary</option>
-                <option value="8">Drug Possession</option>
-                <option value="9">Illegal Weapons Possession</option>
-                <option value="10">Other</option>
+                {crimeTypes.map((crimeType) => (
+                  <option key={crimeType.id} value={crimeType.id}>
+                    {crimeType.name}
+                  </option>
+                ))}
               </select>
             </div>
 
