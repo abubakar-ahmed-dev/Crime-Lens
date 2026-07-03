@@ -1,3 +1,3 @@
-Last major thing i want to do is that since the crime approve popup and crime update popup has same fields, so can we reuse this popup in updating crime. Only few things need to be changed like Title of the popup should be changed in both cases, and the submit button text should be changed in both cases. 
+Last major thing i want to do is that since the crime approve popup and crime update popup has same fields, so can we reuse this popup in updating crime. Only few things need to be changed like Title of the popup should be changed in both cases, and the submit button text should be changed in both cases. Currently the updation popup has wiered blue color save button which is out of theme color.
 
 But it has a problem, that is the agent updation and approval also uses same type of popup, and i do not know how connected they are with crime popups. so tell me what can be done

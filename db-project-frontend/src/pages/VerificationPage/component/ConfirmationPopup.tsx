@@ -358,7 +358,7 @@ export default function ConfirmationPopup({
           )}
         </div>
 
-        <div className="flex justify-center mt-6 pb-6 gap-3 sticky bottom-0 bg-white pt-4">
+        <div className="flex justify-center mt-6 pb-6 gap-3 bg-white pt-4">
           <WhiteButton label="Cancel" width={150} height={45} onClick={onClose} />
 
           <button
