@@ -89,6 +89,8 @@ export default function AllRecords({ version }: AllRecordsProps) {
     title: string;
     description: string;
     address: string;
+    crimeTypeId: number | string;
+    incidentDate: string;
     zoneId: number;
     latitude: string;
     longitude: string;
@@ -265,6 +267,8 @@ export default function AllRecords({ version }: AllRecordsProps) {
           title: c.title,
           description: c.description,
           address: c.address,
+          crimeTypeId: c.crimeTypeId,
+          incidentDate: c.incidentDate ? new Date(c.incidentDate).toISOString().slice(0, 10) : "",
           zoneId: c.zoneId,
           latitude: getCrimeCoordinate(c, "latitude"),
           longitude: getCrimeCoordinate(c, "longitude"),

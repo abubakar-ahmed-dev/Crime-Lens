@@ -207,8 +207,8 @@ export default function LocationPicker({
       </div>
 
       {mode === "map" && (
-        <div className="flex flex-col gap-3">
-          <div className="h-64 overflow-hidden rounded-lg border border-[#d9d9d9]">
+        <div className="relative z-0 flex flex-col gap-3">
+          <div className="relative z-0 h-64 overflow-hidden rounded-lg border border-[#d9d9d9]">
             <MapContainer
               center={mapCenter}
               zoom={13}

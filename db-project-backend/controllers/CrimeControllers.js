@@ -197,7 +197,7 @@ export const getPendingSubmissions = async (req, res) => {
              c."crimeTypeId",
              json_build_object('id', ct.id, 'name', ct.name) AS "CrimeType",
              c."zoneId",
-             json_build_object('id', z.id) AS "Zone",
+             json_build_object('id', z.id, 'name', z.name) AS "Zone",
              c.status,
              c."reportedAt",
              c."incidentDate",
@@ -245,7 +245,17 @@ export const approveCrimeReport = async (req, res) => {
   let t;
   try {
     const { submissionId } = req.params;
-    const { address, latitude, longitude, title, description, zoneId } = req.body;
+    const {
+      address,
+      latitude,
+      longitude,
+      title,
+      description,
+      zoneId,
+      crimeTypeId,
+      incidentDate,
+      date,
+    } = req.body;
 
     // ---------------------------
     // 1️⃣ Fetch CrimeSubmission record
@@ -324,6 +334,8 @@ export const approveCrimeReport = async (req, res) => {
     }
 
     const effectiveZoneId = zoneId || crime.zoneId;
+    const effectiveCrimeTypeId = crimeTypeId || crime.crimeTypeId;
+    const effectiveIncidentDate = incidentDate || date || crime.incidentDate;
     const zoneValidation = await validateLocationInsideZone(
       effectiveZoneId,
       coordinates.lat,
@@ -345,6 +357,8 @@ export const approveCrimeReport = async (req, res) => {
           address = :address,
           title = :title,
           description = :description,
+          "crimeTypeId" = :crimeTypeId,
+          "incidentDate" = :incidentDate,
           "zoneId" = :zoneId,
           location = ST_SetSRID(ST_Point(:longitude, :latitude), 4326),
           "latestUpdatedBy" = :latestUpdatedBy
@@ -356,6 +370,8 @@ export const approveCrimeReport = async (req, res) => {
           address: address || crime.address,
           title: title || crime.title,
           description: description || crime.description,
+          crimeTypeId: effectiveCrimeTypeId,
+          incidentDate: effectiveIncidentDate,
           zoneId: effectiveZoneId,
           latitude: coordinates.lat,
           longitude: coordinates.lng,
@@ -745,7 +761,17 @@ export const getCrimeById = async (req, res) => {
 export const updateCrime = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, address, zoneId, latitude, longitude } = req.body;
+    const {
+      title,
+      description,
+      address,
+      zoneId,
+      latitude,
+      longitude,
+      crimeTypeId,
+      incidentDate,
+      date,
+    } = req.body;
 
     // ---------------------------
     // 1️⃣ Fetch the existing crime
@@ -799,6 +825,8 @@ export const updateCrime = async (req, res) => {
       UPDATE "Crime"
       SET title = :title,
           description = :description,
+          "crimeTypeId" = :crimeTypeId,
+          "incidentDate" = :incidentDate,
           address = :address,
           "zoneId" = :zoneId,
           location = ST_SetSRID(ST_Point(:longitude, :latitude), 4326),
@@ -809,6 +837,8 @@ export const updateCrime = async (req, res) => {
         replacements: {
           title,
           description,
+          crimeTypeId: crimeTypeId || crime.crimeTypeId,
+          incidentDate: incidentDate || date || crime.incidentDate,
           address,
           zoneId: zoneId || null,
           latitude: coordinates.lat,

@@ -10,6 +10,11 @@ type ZoneOption = {
   name: string;
 };
 
+type CrimeTypeOption = {
+  id: number;
+  name: string;
+};
+
 interface ConfirmationPopupProps {
   version: "admin" | "police";
   isOpen: boolean;
@@ -27,6 +32,7 @@ interface ConfirmationPopupProps {
   fullName?: string;
   contact?: string;
   cnic?: string;
+  crimeTypeId?: number | string;
   crimeType?: string;
   description?: string;
   date?: string;
@@ -49,6 +55,7 @@ const buildInitialFormData = (initialData: Partial<ConfirmationPopupProps>) => (
   fullName: initialData.fullName || "",
   contact: initialData.contact || "",
   cnic: initialData.cnic || "",
+  crimeTypeId: initialData.crimeTypeId?.toString() || "",
   crimeType: initialData.crimeType || "",
   description: initialData.description || "",
   date: initialData.date || "",
@@ -69,6 +76,7 @@ export default function ConfirmationPopup({
   const [formData, setFormData] = useState(buildInitialFormData(initialData));
   const [locationError, setLocationError] = useState("");
   const [zones, setZones] = useState<ZoneOption[]>([]);
+  const [crimeTypes, setCrimeTypes] = useState<CrimeTypeOption[]>([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -86,6 +94,7 @@ export default function ConfirmationPopup({
     initialData.fullName,
     initialData.contact,
     initialData.cnic,
+    initialData.crimeTypeId,
     initialData.crimeType,
     initialData.description,
     initialData.date,
@@ -96,19 +105,29 @@ export default function ConfirmationPopup({
   ]);
 
   useEffect(() => {
-    const fetchZones = async () => {
+    const fetchReferenceData = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/zones`);
-        if (!response.ok) return;
-        const data = await response.json();
-        setZones(Array.isArray(data) ? data : []);
+        const [zonesResponse, crimeTypesResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/zones`),
+          fetch(`${API_BASE_URL}/crimes/types`),
+        ]);
+
+        if (zonesResponse.ok) {
+          const zonesData = await zonesResponse.json();
+          setZones(Array.isArray(zonesData) ? zonesData : []);
+        }
+
+        if (crimeTypesResponse.ok) {
+          const crimeTypesData = await crimeTypesResponse.json();
+          setCrimeTypes(Array.isArray(crimeTypesData) ? crimeTypesData : []);
+        }
       } catch (error) {
-        console.error("Error fetching zones:", error);
+        console.error("Error fetching approval reference data:", error);
       }
     };
 
     if (isOpen && version === "police") {
-      fetchZones();
+      fetchReferenceData();
     }
   }, [isOpen, version]);
 
@@ -136,6 +155,16 @@ export default function ConfirmationPopup({
 
     if (version === "police" && !formData.zone) {
       setLocationError("Please select a zone before approval.");
+      return;
+    }
+
+    if (version === "police" && !formData.crimeTypeId) {
+      setLocationError("Please select a crime type before approval.");
+      return;
+    }
+
+    if (version === "police" && !formData.date) {
+      setLocationError("Please select an incident date before approval.");
       return;
     }
 
@@ -232,42 +261,8 @@ export default function ConfirmationPopup({
           ) : (
             <>
               <div className="border-b pb-4">
-                <h3 className="font-semibold text-gray-800 mb-3">Personal Info</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <label className="text-xs font-medium text-gray-700">
-                      Full Name
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.fullName}
-                      name="fullName"
-                      onChange={handleInputChange}
-                      className="w-full text-sm bg-gray-100 mt-1 p-2 rounded border"
-                    />
-                  </div>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <label className="text-xs font-medium text-gray-700">CNIC</label>
-                    <input
-                      type="text"
-                      value={formData.cnic}
-                      name="cnic"
-                      onChange={handleInputChange}
-                      className="w-full text-sm bg-gray-100 mt-1 p-2 rounded border"
-                    />
-                  </div>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <label className="text-xs font-medium text-gray-700">
-                      Contact #
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.contact}
-                      name="contact"
-                      onChange={handleInputChange}
-                      className="w-full text-sm bg-gray-100 mt-1 p-2 rounded border"
-                    />
-                  </div>
+                <h3 className="font-semibold text-gray-800 mb-3">Crime Info</h3>
+                <div className="grid grid-cols-2 gap-3 mb-3">
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <label className="text-xs font-medium text-gray-700">
                       Zone #
@@ -286,28 +281,28 @@ export default function ConfirmationPopup({
                       ))}
                     </select>
                   </div>
-                </div>
-              </div>
-
-              <div className="border-b pb-4">
-                <h3 className="font-semibold text-gray-800 mb-3">Crime Info</h3>
-                <div className="grid grid-cols-2 gap-3 mb-3">
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <label className="text-xs font-medium text-gray-700">
                       Crime Type
                     </label>
-                    <input
-                      type="text"
-                      value={formData.crimeType}
-                      name="crimeType"
+                    <select
+                      value={formData.crimeTypeId}
+                      name="crimeTypeId"
                       onChange={handleInputChange}
                       className="w-full text-sm bg-gray-100 mt-1 p-2 rounded border"
-                    />
+                    >
+                      <option value="">Select crime type</option>
+                      {crimeTypes.map((crimeType) => (
+                        <option key={crimeType.id} value={crimeType.id}>
+                          {crimeType.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <label className="text-xs font-medium text-gray-700">Date</label>
                     <input
-                      type="text"
+                      type="date"
                       value={formData.date}
                       name="date"
                       onChange={handleInputChange}
@@ -331,15 +326,6 @@ export default function ConfirmationPopup({
                   <textarea
                     value={formData.description}
                     name="description"
-                    onChange={handleInputChange}
-                    className="w-full text-sm bg-gray-100 mt-1 p-2 rounded border h-20 resize-none"
-                  />
-                </div>
-                <div className="bg-gray-50 p-3 rounded-lg mb-3">
-                  <label className="text-xs font-medium text-gray-700">Address</label>
-                  <textarea
-                    value={formData.address}
-                    name="address"
                     onChange={handleInputChange}
                     className="w-full text-sm bg-gray-100 mt-1 p-2 rounded border h-20 resize-none"
                   />
@@ -372,7 +358,7 @@ export default function ConfirmationPopup({
           )}
         </div>
 
-        <div className="flex justify-center mt-6 pb-6 gap-3 sticky bottom-0 bg-white pt-4">
+        <div className="flex justify-center mt-6 pb-6 gap-3 bg-white pt-4">
           <WhiteButton label="Cancel" width={150} height={45} onClick={onClose} />
 
           <button

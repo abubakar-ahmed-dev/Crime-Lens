@@ -52,6 +52,12 @@ const getCrimeCoordinate = (
     : "";
 };
 
+const formatDateForInput = (value: unknown) => {
+  if (!value) return "";
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+};
+
 export default function AllRecords({ version }: AllRecordsProps) {
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -187,19 +193,21 @@ export default function AllRecords({ version }: AllRecordsProps) {
 
                     title={record.title || "No Title"}   
 
-                    fullName={record.submitterName || "Unknown"}   
-                    contact={record.submitterContact || "N/A"}     
+                    fullName={record.fullName || "Unknown"}   
+                    contact={record.contact || "N/A"}     
                     cnic={record.submitterCnic || "N/A"}           
 
+                    crimeTypeId={record.crimeTypeId || record.CrimeType?.id || ""}   
                     crimeType={record.CrimeType?.name || "Unknown"}   
-                    date={new Date(record.incidentDate).toLocaleDateString()}
+                    date={formatDateForInput(record.incidentDate)}
 
                     address={record.address || ""}
                     description={record.description || ""}
                     latitude={getCrimeCoordinate(record, "latitude")}
                     longitude={getCrimeCoordinate(record, "longitude")}
 
-                    zone={record.Zone?.id || record.zoneId}   
+                    zone={record.Zone?.id || record.zoneId}
+                    zoneName={record.Zone?.name || record.zoneName || ""}   
 
                     onApprove={handleRecordProcessed}
                     onReject={handleRecordProcessed}

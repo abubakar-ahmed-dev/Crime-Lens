@@ -25,10 +25,12 @@ type VerificationCardProps =
     fullName: string;
     contact: string;
     cnic: string;
+    crimeTypeId: number | string;
     crimeType: string;
     description: string;
     date: string;
     zone: number;
+    zoneName?: string;
     address: string;
     latitude: number | string;
     longitude: number | string;
@@ -94,6 +96,8 @@ export default function VerificationCard(props: VerificationCardProps) {
           zoneId: Number(updatedValues.zone),
           latitude: Number(updatedValues.latitude),
           longitude: Number(updatedValues.longitude),
+          crimeTypeId: Number(updatedValues.crimeTypeId),
+          incidentDate: updatedValues.date,
           title: updatedValues.title || "",
           description: updatedValues.description || "",
         };
@@ -224,7 +228,8 @@ export default function VerificationCard(props: VerificationCardProps) {
               <span className="font-semibold">Date:</span> {props.date}
             </p>
             <p>
-              <span className="font-semibold">Zone #:</span> {props.zone}
+              <span className="font-semibold">Zone:</span>{" "}
+              {props.zoneName ? `${props.zone} - ${props.zoneName}` : props.zone}
             </p>
             <p>
               <span className="font-semibold">Address:</span>{" "}
