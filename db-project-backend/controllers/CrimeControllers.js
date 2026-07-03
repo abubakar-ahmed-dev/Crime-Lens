@@ -23,6 +23,40 @@ const parseRequiredCoordinates = (latitude, longitude) => {
   return { valid: true, lat, lng };
 };
 
+const validateLocationInsideZone = async (zoneId, latitude, longitude, transaction) => {
+  if (zoneId === undefined || zoneId === null || zoneId === "") {
+    return { valid: false, message: "Zone is required" };
+  }
+
+  const zoneRows = await sequelize.query(
+    `
+    SELECT id
+    FROM "Zone"
+    WHERE id = :zoneId
+      AND ST_Covers(
+        boundary,
+        ST_SetSRID(ST_Point(:longitude, :latitude), 4326)
+      )
+    LIMIT 1;
+    `,
+    {
+      replacements: { zoneId, latitude, longitude },
+      type: QueryTypes.SELECT,
+      transaction,
+    }
+  );
+
+  if (!zoneRows[0]) {
+    return {
+      valid: false,
+      message:
+        "Location must be inside the selected zone boundary. If you change the zone, select a location inside that zone before saving.",
+    };
+  }
+
+  return { valid: true };
+};
+
 // ===================================================
 // 🌍 GET CRIMES FOR MAP (GeoJSON)
 // ===================================================
@@ -211,7 +245,7 @@ export const approveCrimeReport = async (req, res) => {
   let t;
   try {
     const { submissionId } = req.params;
-    const { address, latitude, longitude, title, description } = req.body;
+    const { address, latitude, longitude, title, description, zoneId } = req.body;
 
     // ---------------------------
     // 1️⃣ Fetch CrimeSubmission record
@@ -289,6 +323,21 @@ export const approveCrimeReport = async (req, res) => {
       });
     }
 
+    const effectiveZoneId = zoneId || crime.zoneId;
+    const zoneValidation = await validateLocationInsideZone(
+      effectiveZoneId,
+      coordinates.lat,
+      coordinates.lng,
+      t
+    );
+    if (!zoneValidation.valid) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: zoneValidation.message,
+      });
+    }
+
     const updatedCrimeRows = await sequelize.query(
       `
       UPDATE "Crime"
@@ -296,6 +345,7 @@ export const approveCrimeReport = async (req, res) => {
           address = :address,
           title = :title,
           description = :description,
+          "zoneId" = :zoneId,
           location = ST_SetSRID(ST_Point(:longitude, :latitude), 4326),
           "latestUpdatedBy" = :latestUpdatedBy
       WHERE id = :crimeId
@@ -306,6 +356,7 @@ export const approveCrimeReport = async (req, res) => {
           address: address || crime.address,
           title: title || crime.title,
           description: description || crime.description,
+          zoneId: effectiveZoneId,
           latitude: coordinates.lat,
           longitude: coordinates.lng,
           latestUpdatedBy: req.user.id,
@@ -725,6 +776,18 @@ export const updateCrime = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: coordinates.message,
+      });
+    }
+
+    const zoneValidation = await validateLocationInsideZone(
+      zoneId,
+      coordinates.lat,
+      coordinates.lng
+    );
+    if (!zoneValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: zoneValidation.message,
       });
     }
 

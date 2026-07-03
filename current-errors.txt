@@ -1,6 +1,36 @@
-I tried signing up. it went good, but when it redirects, it should redirect me to complete profile page, but it shows authentication error, and redirect me to login citizen page. The console printed this error:
+When i am updating with wrong location, i am getting this error in console:
 
-Backend fetch error: TypeError: Cannot read properties of undefined (reading 'isProfileComplete')
-    at handleCallback (AuthCallback.tsx:135:52)
+AllRecords.tsx:308 
+ PUT http://localhost:5001/api/crimes/update/12 400 (Bad Request)
+$RefreshSig$	@	AllRecords.tsx:308
+$RefreshSig$	@	DetailsPopup.tsx:104
+<button>		
+$RefreshSig$	@	DetailsPopup.tsx:217
+<UpdateModal>		
+$RefreshSig$	@	AllRecords.tsx:406
+<AllRecords>		
+AllRecordsPage	@	index.tsx:19
+<AllRecordsPage>		
+(anonymous)	@	index.tsx:104
+App	@	App.tsx:65
+<App>		
+(anonymous)	@	main.tsx:13
+---
+AllRecords.tsx:316 Crime update failed 
+{status: 400, crimeId: '12', payload: {…}, response: {…}}
+$RefreshSig$	@	AllRecords.tsx:316
+await in $RefreshSig$		
+$RefreshSig$	@	DetailsPopup.tsx:104
+<button>		
+$RefreshSig$	@	DetailsPopup.tsx:217
+<UpdateModal>		
+$RefreshSig$	@	AllRecords.tsx:406
+<AllRecords>		
+AllRecordsPage	@	index.tsx:19
+<AllRecordsPage>		
+(anonymous)	@	index.tsx:104
+App	@	App.tsx:65
+<App>		
+(anonymous)	@	main.tsx:13
 
-The isProfileComplete is column in CrimeReportsSubmitter. it is set to false when a new user is created. In above process, a new entry is created both in auth.users table, and crime reports submitters table
+may be this is not error, but response not handled properly

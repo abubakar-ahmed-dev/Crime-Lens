@@ -5,6 +5,11 @@ import { supabase, useAuth } from "../../../context/AuthContext";
 import LocationPicker, { isValidLocation } from "../../../components/LocationPicker";
 import GreenButton from "../../../components/GreenButton";
 
+type ZoneOption = {
+  id: number;
+  name: string;
+};
+
 export default function ReportCrimeCard() {
   const navigate = useNavigate();
   const { citizen, citizenToken, isCitizenAuthenticated, refreshCitizenSession } = useAuth();
@@ -14,6 +19,7 @@ export default function ReportCrimeCard() {
   const [loading, setLoading] = useState(false);
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const [hideLocationPicker, setHideLocationPicker] = useState(false);
+  const [zones, setZones] = useState<ZoneOption[]>([]);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -32,6 +38,21 @@ export default function ReportCrimeCard() {
       setShowAuthPrompt(true);
     }
   }, [isCitizenAuthenticated]);
+
+  useEffect(() => {
+    const fetchZones = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/zones`);
+        if (!response.ok) return;
+        const data = await response.json();
+        setZones(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Error fetching zones:", err);
+      }
+    };
+
+    fetchZones();
+  }, []);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -280,20 +301,11 @@ export default function ReportCrimeCard() {
                 )}`}
               >
                 <option value="">Select a zone...</option>
-                <option value="1">North Nazimabad</option>
-                <option value="2">Saddar & Civil Lines</option>
-                <option value="3">Lyari</option>
-                <option value="4">Garden & Old City</option>
-                <option value="5">Gulshan-e-Iqbal</option>
-                <option value="6">Gulistan-e-Johar</option>
-                <option value="7">Clifton & Defence</option>
-                <option value="8">North Karachi</option>
-                <option value="10">Korangi</option>
-                <option value="11">Malir</option>
-                <option value="12">Shah Faisal Colony</option>
-                <option value="13">Orangi Town</option>
-                <option value="14">Baldia Town</option>
-                <option value="15">Surjani Town</option>
+                {zones.map((zone) => (
+                  <option key={zone.id} value={zone.id}>
+                    {zone.name}
+                  </option>
+                ))}
               </select>
             </div>
 

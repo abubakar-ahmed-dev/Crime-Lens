@@ -95,6 +95,20 @@ export default function AllRecords({ version }: AllRecordsProps) {
   }
 
   const [fullCrime, setFullCrime] = useState<FullCrimeDetails | null>(null);
+
+  const fetchPoliceRecords = async () => {
+    const res = await fetch(`${API_BASE_URL}/crimes/all`, {
+      headers: getJwtAuthHeaders(),
+    });
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || !data?.success) {
+      throw new Error(data?.message || "Failed to fetch crimes");
+    }
+
+    return data.data;
+  };
+
   // ---------------------------
   // FETCH DATA
   // ---------------------------
@@ -106,19 +120,11 @@ export default function AllRecords({ version }: AllRecordsProps) {
         let res, data;
 
         if (version === "police") {
-          res = await fetch(`${API_BASE_URL}/crimes/all`, {
-            headers: getJwtAuthHeaders(),
-          });
-          if (!res.ok) throw new Error("Network response was not ok");
-          data = await res.json();
+          data = await fetchPoliceRecords();
           if (!mounted) return;
 
-          if (data.success) {
-            setRecords(data.data);
-            setBackupRecords(data.data);
-          } else {
-            console.error("Error fetching crimes:", data.message);
-          }
+          setRecords(data);
+          setBackupRecords(data);
         } else if (version === "admin") {
           res = await fetch(`${API_BASE_URL}/agent/all`, {
             headers: getJwtAuthHeaders(),
@@ -287,8 +293,9 @@ export default function AllRecords({ version }: AllRecordsProps) {
         );
         const data = await res.json();
         if (!data.success) {
-          alert("Update failed: " + data.message);
-          return;
+          const message = data.message || "Unable to update agent.";
+          alert("Update failed: " + message);
+          return message;
         }
         const newList = records.map((r: any) =>
           r.agentId === selectedAgent.agentId ? updatedData : r
@@ -303,16 +310,15 @@ export default function AllRecords({ version }: AllRecordsProps) {
           headers: getJwtAuthHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(updatedData),
         });
-        const data = await res.json();
-        if (!data.success) {
-          alert("Update failed: " + data.message);
-          return;
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.success) {
+          const message = data?.message || "Unable to update crime.";
+          return message;
         }
-        const newList = records.map((r: any) =>
-          r.id === fullCrime.id ? { ...r, zoneId: fullCrime.zoneId } : r
-        );
-        setRecords(newList);
-        setBackupRecords(newList);
+
+        const refreshedRecords = await fetchPoliceRecords();
+        setRecords(refreshedRecords);
+        setBackupRecords(refreshedRecords);
         setSelectedRecords([]);
         setFullCrime(null);
       }

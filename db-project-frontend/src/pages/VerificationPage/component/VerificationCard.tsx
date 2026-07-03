@@ -91,6 +91,7 @@ export default function VerificationCard(props: VerificationCardProps) {
         endpoint = `${API_BASE_URL}/user/approve/${props.submissionId}`;
         body = {
           address: updatedValues.address || "",
+          zoneId: Number(updatedValues.zone),
           latitude: Number(updatedValues.latitude),
           longitude: Number(updatedValues.longitude),
           title: updatedValues.title || "",

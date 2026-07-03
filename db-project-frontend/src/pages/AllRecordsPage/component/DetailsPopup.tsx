@@ -1,32 +1,63 @@
 import WhiteButton from "../../../components/WhiteButton";
 import { useState, useEffect } from "react";
 import LocationPicker, { isValidLocation } from "../../../components/LocationPicker";
+import { API_BASE_URL } from "../../../config/constants";
+import { checkLocationInsideZone } from "../../../utils/zoneValidation";
+
+type ZoneOption = {
+  id: number;
+  name: string;
+};
 
 interface UpdateModalProps {
   version: "admin" | "police";
   isOpen: boolean;
   data: any; // FullCrimeDetails for police, AgentDetails for admin
   onClose: () => void;
-  onSubmit: (updatedData: any) => void;
+  onSubmit: (updatedData: any) => Promise<string | void> | string | void;
 }
 
 export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }: UpdateModalProps) {
   const [formData, setFormData] = useState(data);
   const [locationError, setLocationError] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [zones, setZones] = useState<ZoneOption[]>([]);
 
   // Sync local state when data changes
   useEffect(() => {
     setFormData(data);
     setLocationError("");
+    setSubmitError("");
+    setIsSaving(false);
   }, [data]);
+
+  useEffect(() => {
+    const fetchZones = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/zones`);
+        if (!response.ok) return;
+        const data = await response.json();
+        setZones(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Error fetching zones:", error);
+      }
+    };
+
+    if (isOpen && version === "police") {
+      fetchZones();
+    }
+  }, [isOpen, version]);
 
   if (!isOpen || !formData) return null;
 
   const handleChange = (field: string, value: any) => {
     setFormData((prev: any) => ({ ...prev, [field]: value }));
+    setLocationError("");
+    setSubmitError("");
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (
       version === "police" &&
       !isValidLocation({
@@ -38,7 +69,38 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
       return;
     }
 
-    onSubmit(formData);
+    if (version === "police" && !formData.zoneId) {
+      setLocationError("Please select a zone before saving.");
+      return;
+    }
+
+    if (version === "police") {
+      const zoneCheck = await checkLocationInsideZone(
+        formData.zoneId,
+        formData.latitude,
+        formData.longitude
+      );
+
+      if (!zoneCheck.inside) {
+        setLocationError(
+          zoneCheck.message ||
+            "Location must be inside the selected zone boundary. If you change the zone, select a point inside that zone before saving."
+        );
+        return;
+      }
+    }
+
+    setIsSaving(true);
+    setSubmitError("");
+
+    try {
+      const errorMessage = await onSubmit(formData);
+      if (typeof errorMessage === "string" && errorMessage) {
+        setSubmitError(errorMessage);
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const locationValue = {
@@ -86,12 +148,18 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
             />
 
             <label className="block mb-1">Zone</label>
-            <input
-              type="number"
+            <select
               className="border rounded px-3 py-2 w-full mb-3"
               value={formData.zoneId}
               onChange={(e) => handleChange("zoneId", Number(e.target.value))}
-            />
+            >
+              <option value="">Select zone</option>
+              {zones.map((zone) => (
+                <option key={zone.id} value={zone.id}>
+                  {zone.id} - {zone.name}
+                </option>
+              ))}
+            </select>
 
             <label className="block mb-2 font-medium">Location</label>
             <LocationPicker
@@ -104,6 +172,9 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
             />
             {locationError && (
               <p className="text-red-600 text-xs mt-2 mb-3">{locationError}</p>
+            )}
+            {submitError && (
+              <p className="text-red-600 text-xs mt-2 mb-3">{submitError}</p>
             )}
           </>
         ) : (
@@ -138,9 +209,10 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
           <WhiteButton label="Cancel" width={150} height={45} onClick={onClose} />
           <button
             onClick={handleSave}
+            disabled={isSaving}
             className="px-15 py-2 bg-blue-700 border-2 border-blue-500 text-white rounded-full hover:bg-blue-800"
           >
-            Save
+            {isSaving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
