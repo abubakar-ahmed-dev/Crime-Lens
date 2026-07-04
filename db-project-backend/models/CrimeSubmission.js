@@ -46,7 +46,7 @@ export default (sequelize) => {
 
     CrimeSubmission.belongsTo(models.Crime, {
       foreignKey: "CrimeId",
-      onDelete: "SET NULL",
+      onDelete: "RESTRICT",
       onUpdate: "CASCADE",
     });
   };

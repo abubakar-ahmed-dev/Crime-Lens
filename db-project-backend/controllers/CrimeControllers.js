@@ -873,14 +873,30 @@ export const deleteCrime = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const crime = await Crime.findByPk(id);
-    if (!crime) {
+    const updatedRows = await sequelize.query(
+      `
+      UPDATE "Crime"
+      SET status = 'deleted'
+      WHERE id = :id
+        AND status <> 'deleted'
+      RETURNING id, status;
+      `,
+      {
+        replacements: { id },
+        type: QueryTypes.UPDATE,
+      }
+    );
+
+    const updatedCrime = updatedRows[0][0];
+    if (!updatedCrime) {
       return res.status(404).json({ success: false, message: "Crime not found" });
     }
 
-    await crime.destroy();
-
-    res.status(200).json({ success: true, message: "Crime deleted successfully" });
+    res.status(200).json({
+      success: true,
+      message: "Crime deleted successfully",
+      data: updatedCrime,
+    });
   } catch (error) {
     console.error("Delete Crime Error:", error);
     res.status(500).json({ success: false, message: "Error deleting crime" });

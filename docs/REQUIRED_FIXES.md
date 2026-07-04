@@ -51,7 +51,7 @@ This file lists repository fixes identified from the current code, configuration
 - [ ] Reconcile `DB Project Schema-DDL.sql`, `scripts/supabase-setup.sql`, Sequelize models, and actual runtime queries.
 - [ ] Add or document definitions for required database views:
   - `view_PendingSubmissions`
-  - `view_AllCrimes`
+  - `view_all_crimes`
   - `viewAllAgents`
 - [ ] Validate `User.id` type consistency across SQL scripts, Sequelize models, and foreign keys.
 - [ ] Validate `PoliceAgentRequest.userId` type consistency across SQL scripts, Sequelize models, and inserts.

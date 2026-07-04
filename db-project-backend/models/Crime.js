@@ -28,7 +28,7 @@ export default (sequelize) => {
       defaultValue: DataTypes.NOW,
     },
     status: {
-      type: DataTypes.ENUM("pending", "approved", "rejected"),
+      type: DataTypes.ENUM("pending", "approved", "rejected", "deleted"),
       allowNull: false,
       defaultValue: "pending",
     },
@@ -63,7 +63,7 @@ export default (sequelize) => {
     Crime.belongsTo(models.CrimeType, { foreignKey: "crimeTypeId", onDelete: "RESTRICT", onUpdate: "CASCADE" });
     Crime.belongsTo(models.Zone, { foreignKey: "zoneId", onDelete: "SET NULL", onUpdate: "CASCADE" });
     Crime.belongsTo(models.User, { foreignKey: "latestUpdatedBy", as: "latestUpdater", onDelete: "SET NULL", onUpdate: "CASCADE" });
-    Crime.hasMany(models.CrimeSubmission, { foreignKey: "CrimeId", onDelete: "SET NULL", onUpdate: "CASCADE" });
+    Crime.hasMany(models.CrimeSubmission, { foreignKey: "CrimeId", onDelete: "RESTRICT", onUpdate: "CASCADE" });
   };
 
   return Crime;

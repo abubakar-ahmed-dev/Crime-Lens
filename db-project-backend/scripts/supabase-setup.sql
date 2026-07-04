@@ -12,7 +12,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- Create ENUM Types
 -- ============================================
 
-CREATE TYPE "enum_Crime_status" AS ENUM ('pending', 'approved', 'rejected');
+CREATE TYPE "enum_Crime_status" AS ENUM ('pending', 'approved', 'rejected', 'deleted');
 CREATE TYPE "enum_PoliceAgentRequest_status" AS ENUM ('pending', 'approved', 'rejected');
 CREATE TYPE "enum_UploadLog_status" AS ENUM ('completed', 'failed', 'uploaded');
 CREATE TYPE "enum_ProfileStatus" AS ENUM ('pending', 'complete');
@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS "CrimeSubmission" (
     "submittedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "CrimeId" BIGINT NOT NULL,
     CONSTRAINT "CrimeSubmission_submitterId_fkey" FOREIGN KEY ("submitterId") REFERENCES "CrimeReportsSubmitter"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "CrimeSubmission_CrimeId_fkey" FOREIGN KEY ("CrimeId") REFERENCES "Crime"("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "CrimeSubmission_CrimeId_fkey" FOREIGN KEY ("CrimeId") REFERENCES "Crime"("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- PoliceAgentRequestsTemp table
