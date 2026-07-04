@@ -186,7 +186,15 @@ export default function VerificationCard(props: VerificationCardProps) {
               {props.branchZoneName ? `${props.branchId} - ${props.branchZoneName}` : props.branchId}
             </p>
             <p>
+              <span className="font-semibold">Branch Contact #:</span>{" "}
+              {props.branchContact}
+            </p>
+            <p>
               <span className="font-semibold">Username:</span> {props.username}
+            </p>
+            <p>
+              <span className="font-semibold">Request Date:</span>{" "}
+              {props.requestDate}
             </p>
           </div>
         </>
