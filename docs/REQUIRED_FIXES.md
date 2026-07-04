@@ -53,12 +53,12 @@ This file lists repository fixes identified from the current code, configuration
   - `view_PendingSubmissions`
   - `view_all_crimes`
   - `viewAllAgents`
-- [ ] Validate `User.id` type consistency across SQL scripts, Sequelize models, and foreign keys.
-- [ ] Validate `PoliceAgentRequest.userId` type consistency across SQL scripts, Sequelize models, and inserts.
-- [ ] Validate `CrimeReportsSubmitter` schema compatibility with both legacy anonymous submitter fields and current citizen profile fields.
-- [ ] Confirm whether `CrimeSubmission.userId` should reference `CrimeReportsSubmitter.submitterCnic`, Supabase user ID, or another stable citizen identifier.
-- [ ] Ensure `CrimeSubmission.CrimeId` nullability and foreign key behavior are consistent. The setup SQL marks it `NOT NULL` but uses `ON DELETE SET NULL`.
-- [ ] Decide whether `activitylog` is required. It exists in setup SQL but has no model/controller usage.
+- [x] Validate `User.id` type consistency across SQL scripts, Sequelize models, and foreign keys.
+- [x] Validate `PoliceAgentRequest.userId` type consistency across SQL scripts, Sequelize models, and inserts.
+- [x] Validate `CrimeReportsSubmitter` schema compatibility with both legacy anonymous submitter fields and current citizen profile fields.
+- [x] Confirm whether `CrimeSubmission.userId` should reference `CrimeReportsSubmitter.submitterCnic`, Supabase user ID, or another stable citizen identifier.
+- [x] Ensure `CrimeSubmission.CrimeId` nullability and foreign key behavior are consistent. It remains `NOT NULL` and uses `ON DELETE RESTRICT`.
+- [x] Decide whether `activitylog` is required. It exists in setup SQL but has no model/controller usage.
 - [ ] Remove duplicate or conflicting index/type declarations from schema files.
 
 ## Environment And Configuration

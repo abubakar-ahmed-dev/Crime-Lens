@@ -48,8 +48,6 @@ CREATE TABLE IF NOT EXISTS "User" (
     "username" TEXT NOT NULL UNIQUE,
     "passwordHash" TEXT NOT NULL,
     "roleId" INTEGER NOT NULL,
-    "isActive" BOOLEAN DEFAULT TRUE,
-    "lastLogin" TIMESTAMP WITH TIME ZONE,
     "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "User_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "Role"("id") ON DELETE RESTRICT ON UPDATE CASCADE
@@ -60,7 +58,6 @@ CREATE TABLE IF NOT EXISTS "CrimeReportsSubmitter" (
     "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     "supabaseUserId" TEXT UNIQUE,
     "email" TEXT NOT NULL UNIQUE,
-    "password" TEXT,
     "submitterCnic" TEXT UNIQUE,
     "fullName" TEXT NOT NULL,
     "contact" TEXT,

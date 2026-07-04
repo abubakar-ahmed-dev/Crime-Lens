@@ -104,21 +104,6 @@ export const login = async (req, res) => {
     });
 
     // ---------------------------
-    // RAW SQL: Update last_login
-    // ---------------------------
-    const updateQuery = `
-      UPDATE "User"
-      SET last_login = NOW()
-      WHERE id = :id
-    `;
-
-    db.sequelize.query(updateQuery, {
-      type: QueryTypes.UPDATE,
-      replacements: { id: user.id },
-    }).catch(() => {});
-
-
-    // ---------------------------
     // FINAL RESPONSE (unchanged)
     // ---------------------------
     return res.json({
