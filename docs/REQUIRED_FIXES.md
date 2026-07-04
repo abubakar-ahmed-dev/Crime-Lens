@@ -33,18 +33,18 @@ This file lists repository fixes identified from the current code, configuration
 
 ## Backend Bugs
 
-- [ ] Fix transaction scope issues in `CrimeControllers2.js`; catch blocks reference `t` where it may be out of scope.
-- [ ] Fix `approveCrimeReport` and `rejectCrimeReport` transaction handling so all early returns rollback or commit consistently.
-- [ ] Fix `agentController.rejectAgentRequest`:
+- [x] Fix transaction scope issues in `CrimeControllers.js`; catch blocks reference `t` where it may be out of scope.
+- [x] Fix `approveCrimeReport` and `rejectCrimeReport` transaction handling so all early returns rollback or commit consistently.
+- [x] Fix `agentController.rejectAgentRequest`:
   - It commits before later update/delete queries.
   - It references `reason` even though `reason` is commented out and undefined.
   - It uses a transaction after it has already been committed.
-- [ ] Fix `agentController.deleteAgent`; the catch block commits instead of rolling back.
-- [ ] Review `agentController.agentRequest`; early validation failures after opening a transaction should rollback before returning.
-- [ ] Review all raw SQL updates that interpolate latitude/longitude directly into SQL and replace with safe query parameters where possible.
-- [ ] Fix direct SQL interpolation in `zoneController.getZoneSeverity` for `crimeType`, `zoneId`, `startDate`, and `endDate`.
-- [ ] Remove sensitive debug logging from auth flow, especially plaintext password and password hash logs.
-- [ ] Ensure password fields are never returned to frontend responses, especially pending agent request data.
+- [x] Fix `agentController.deleteAgent`; the catch block commits instead of rolling back.
+- [x] Review `agentController.agentRequest`; early validation failures after opening a transaction should rollback before returning.
+- [x] Review all raw SQL updates that interpolate latitude/longitude directly into SQL and replace with safe query parameters where possible.
+- [x] Fix direct SQL interpolation in `zoneController.getZoneSeverity` for `crimeType`, `zoneId`, `startDate`, and `endDate`.
+- [x] Remove sensitive debug logging from auth flow, especially plaintext password and password hash logs.
+- [x] Ensure password fields are never returned to frontend responses, especially pending agent request data.
 
 ## Database And Schema
 

@@ -12,9 +12,7 @@ const { Crime, User, Criminal , CrimeSubmission, PoliceAgentRequestsTemp, CrimeR
 
 export const agentRequest = async (req, res) => {
 
-  const t = await sequelize.transaction();
-  console.log('controller', req.body)
-
+  let t;
   try {
     const { branchId, username, password } = req.body;
 
@@ -24,6 +22,8 @@ export const agentRequest = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Missing required fields" });
     }
+
+    t = await sequelize.transaction();
 
     // 1️⃣ Validate branch exists (PoliceBranch)
     // Assuming table name = "PoliceBranch" and PK = "id"  ⚠ verify
@@ -39,6 +39,7 @@ export const agentRequest = async (req, res) => {
     );
 
     if (branch.length === 0) {
+      await t.rollback();
       return res
         .status(404)
         .json({ success: false, message: "Branch not found" });
@@ -57,6 +58,7 @@ export const agentRequest = async (req, res) => {
     );
 
     if (existingUser.length > 0) {
+      await t.rollback();
       return res
         .status(409)
         .json({ success: false, message: "Username already exists" });
@@ -120,7 +122,7 @@ export const agentRequest = async (req, res) => {
       },
     });
   } catch (error) {
-    if (t) await t.rollback();
+    if (t && !t.finished) await t.rollback();
     console.error("Agent Request Error:", error);
     res
       .status(500)
@@ -176,6 +178,7 @@ export const verifyAgentRequest = async (req, res) => {
     }
 
     if (agentRequest.status !== "pending") {
+      await t.rollback();
       return res.status(400).json({
         success: false,
         message: "Request has already been processed",
@@ -291,7 +294,7 @@ export const verifyAgentRequest = async (req, res) => {
       },
     });
   } catch (error) {
-    if (t) await t.rollback();
+    if (t && !t.finished) await t.rollback();
     console.error("Verify Agent Error:", error);
     res
       .status(500)
@@ -309,7 +312,6 @@ export const rejectAgentRequest = async (req, res) => {
 
   try {
     const { requestId } = req.params;
-    // const { reason } = req.body;
 
     // ---------------------------
     // 1️⃣ Fetch agent request + temp entry
@@ -331,7 +333,6 @@ export const rejectAgentRequest = async (req, res) => {
         transaction: t,
       }
     );
-    await t.commit();
     const agentRequest = agentRequestRows[0];
 
     if (!agentRequest) {
@@ -341,10 +342,17 @@ export const rejectAgentRequest = async (req, res) => {
         .json({ success: false, message: "Request not found" });
     }
 
+    if (agentRequest.status !== "pending") {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Request has already been processed",
+      });
+    }
+
     // ---------------------------
-    // 2️⃣ Update status and add rejection reason
+    // 2️⃣ Update status
     // ---------------------------
-    const now = new Date();
     await sequelize.query(
       `
       UPDATE "PoliceAgentRequest"
@@ -353,8 +361,6 @@ export const rejectAgentRequest = async (req, res) => {
       `,
       {
         replacements: {
-          reason,
-          verifiedAt: now,
           requestId,
         },
         type: QueryTypes.UPDATE,
@@ -377,6 +383,8 @@ export const rejectAgentRequest = async (req, res) => {
       }
     );
 
+    await t.commit();
+
     // ---------------------------
     // 4️⃣ Response (frontend format unchanged)
     // ---------------------------
@@ -386,7 +394,7 @@ export const rejectAgentRequest = async (req, res) => {
       data: { requestId: agentRequest.agentRequestId, status: "rejected" },
     });
   } catch (error) {
-    if (t) await t.rollback();
+    if (t && !t.finished) await t.rollback();
     console.error("Reject Agent Error:", error);
     res
       .status(500)
@@ -707,7 +715,7 @@ export const updateAgent = async (req, res) => {
 
     return res.json({ success: true, message: "Agent updated successfully" });
   } catch (err) {
-    await t.rollback();
+    if (!t.finished) await t.rollback();
     console.error("Error updating agent:", err);
     return res.status(500).json({ success: false, message: "Server error" });
   }
@@ -789,7 +797,7 @@ export const deleteAgent = async (req, res) => {
       message: "Agent and associated user deleted successfully",
     });
   } catch (err) {
-    await t.commit();
+    if (!t.finished) await t.rollback();
     console.error("Error deleting agent:", err);
     return res
       .status(500)

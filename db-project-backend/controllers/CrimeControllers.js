@@ -398,7 +398,7 @@ export const approveCrimeReport = async (req, res) => {
       },
     });
   } catch (error) {
-    if (t) await t.rollback();
+    if (t && !t.finished) await t.rollback();
     console.error("Approve Crime Error:", error);
     res.status(500).json({
       success: false,
@@ -408,12 +408,12 @@ export const approveCrimeReport = async (req, res) => {
 };
 
 export const rejectCrimeReport = async (req, res) => {
+  let t;
   try {
     const { submissionId } = req.params;
-    const { reason } = req.body;
 
     
-  const t = await sequelize.transaction();
+    t = await sequelize.transaction();
 
     // ---------------------------
     // 1️⃣ Fetch CrimeSubmission record
@@ -467,6 +467,14 @@ export const rejectCrimeReport = async (req, res) => {
       });
     }
 
+    if (crime.status !== "pending") {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Crime report already processed",
+      });
+    }
+
     // ---------------------------
     // 3️⃣ Update Crime status to rejected
     // ---------------------------
@@ -495,7 +503,7 @@ export const rejectCrimeReport = async (req, res) => {
       data: { crimeId: updatedCrime.id, status: updatedCrime.status },
     });
   } catch (error) {
-    if (t) await t.rollback();
+    if (t && !t.finished) await t.rollback();
     console.error("Reject Crime Error:", error);
     res.status(500).json({
       success: false,
@@ -621,7 +629,7 @@ export const reportCrime = async (req, res) => {
       },
     });
   } catch (error) {
-    if (t) await t.rollback();
+    if (t && !t.finished) await t.rollback();
     console.error("Report Crime Error:", error);
     res.status(500).json({ success: false, message: "Error adding crime" });
   }

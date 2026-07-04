@@ -1,50 +1,33 @@
 // backend/controllers/zoneController.js
 import db from "../models/index.js";
-import { Op , QueryTypes } from "sequelize";
+import { QueryTypes } from "sequelize";
 
 export const getZoneSeverity = async (req, res) => {
   try {
     const { crimeType, zoneId, startDate, endDate } = req.query;
-
-    const crimeWhere = {};
+    const conditions = [`"Crime"."status" = 'approved'`];
+    const replacements = {};
 
     if (crimeType && crimeType !== "All") {
-      crimeWhere["$CrimeType.name$"] = crimeType;
+      conditions.push(`"CrimeType".name = :crimeType`);
+      replacements.crimeType = crimeType;
     }
 
     if (zoneId && zoneId !== "All") {
-      crimeWhere.zoneId = zoneId;
+      conditions.push(`"Zone".id = :zoneId`);
+      replacements.zoneId = zoneId;
     }
 
-    if (startDate || endDate) {
-      crimeWhere.incidentDate = {};
-      if (startDate) crimeWhere.incidentDate[Op.gte] = new Date(startDate);
-      if (endDate) crimeWhere.incidentDate[Op.lte] = new Date(endDate);
+    if (startDate) {
+      conditions.push(`"Crime"."incidentDate" >= :startDate`);
+      replacements.startDate = new Date(startDate).toISOString();
     }
 
-    // Build Filters
-    const filterCrimeType =
-      crimeType && crimeType !== "All"
-        ? `AND "CrimeType".name = '${crimeType}'`
-        : "";
+    if (endDate) {
+      conditions.push(`"Crime"."incidentDate" <= :endDate`);
+      replacements.endDate = new Date(endDate).toISOString();
+    }
 
-    const filterZone =
-      zoneId && zoneId !== "All"
-        ? `AND "Zone".id = ${zoneId}`
-        : "";
-
-    const filterStart = startDate
-      ? `AND "Crime"."incidentDate" >= '${startDate}'`
-      : "";
-
-    const filterEnd = endDate
-      ? `AND "Crime"."incidentDate" <= '${endDate}'`
-      : "";
-
-    // ▼ THE IMPORTANT NEW FILTER: approved crimes only ▼
-    const filterApproved = `AND "Crime"."status" = 'approved'`;
-
-    // SQL Query
     const zones = await db.sequelize.query(
       `
       SELECT 
@@ -57,39 +40,33 @@ export const getZoneSeverity = async (req, res) => {
         ON "Crime"."zoneId" = "Zone".id
       LEFT JOIN "CrimeType" 
         ON "CrimeType".id = "Crime"."crimeTypeId"
-      WHERE 1=1
-        ${filterApproved}
-        ${filterCrimeType}
-        ${filterZone}
-        ${filterStart}
-        ${filterEnd}
+      WHERE ${conditions.join(" AND ")}
       GROUP BY "Zone".id
       ORDER BY "Zone".id ASC;
-    `,
-      { type: db.sequelize.QueryTypes.SELECT }
+      `,
+      {
+        replacements,
+        type: QueryTypes.SELECT,
+      }
     );
+
     res.json(
       zones.map((z) => {
-        const coords = z.boundary?.coordinates?.[0] || []; // GeoJSON polygon outer ring
+        const coords = z.boundary?.coordinates?.[0] || [];
 
         return {
           zoneId: z.id,
           zoneName: z.name,
           totalSeverity: Number(z.totalSeverity),
-
-          // Convert GeoJSON -> Leaflet
-          cordinates: coords.map(([lng, lat]) => [lat, lng])
+          cordinates: coords.map(([lng, lat]) => [lat, lng]),
         };
       })
     );
   } catch (err) {
-    console.log("\n zoneController catch error ");
     console.error("Error fetching zone severity:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
-
-
 
 export const getAllZones = async (req, res) => {
   try {
@@ -107,7 +84,6 @@ export const getAllZones = async (req, res) => {
       }
     );
 
-    // zones is already an array of objects like: [{ id: 1, name: "Zone A" }, ...]
     res.json(zones);
   } catch (err) {
     console.error("Error fetching zones:", err);
