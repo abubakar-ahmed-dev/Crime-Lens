@@ -3,8 +3,10 @@ import { useEffect, useState } from "react";
 import WhiteButton from "../../../components/WhiteButton";
 import { isValidLocation } from "../../../components/LocationPicker";
 import CrimeRecordForm from "../../../components/CrimeRecordForm";
+import AgentRecordForm, { type AgentBranchOption } from "../../../components/AgentRecordForm";
 import { API_BASE_URL } from "../../../config/constants";
 import { checkLocationInsideZone } from "../../../utils/zoneValidation";
+import { getJwtAuthHeaders } from "../../../utils/authHeaders";
 
 type ZoneOption = {
   id: number;
@@ -23,10 +25,7 @@ interface ConfirmationPopupProps {
 
   requestId?: string | number;
   branchId?: string;
-  branchContact?: string;
   username?: string;
-  password?: string;
-  requestDate?: string;
 
   title?: string;
   submissionId?: string | number;
@@ -48,10 +47,7 @@ interface ConfirmationPopupProps {
 
 const buildInitialFormData = (initialData: Partial<ConfirmationPopupProps>) => ({
   branchId: initialData.branchId || "",
-  branchContact: initialData.branchContact || "",
   username: initialData.username || "",
-  password: initialData.password || "",
-  requestDate: initialData.requestDate || "",
   title: initialData.title || "",
   fullName: initialData.fullName || "",
   contact: initialData.contact || "",
@@ -78,6 +74,7 @@ export default function ConfirmationPopup({
   const [locationError, setLocationError] = useState("");
   const [zones, setZones] = useState<ZoneOption[]>([]);
   const [crimeTypes, setCrimeTypes] = useState<CrimeTypeOption[]>([]);
+  const [branches, setBranches] = useState<AgentBranchOption[]>([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -87,10 +84,7 @@ export default function ConfirmationPopup({
   }, [
     isOpen,
     initialData.branchId,
-    initialData.branchContact,
     initialData.username,
-    initialData.password,
-    initialData.requestDate,
     initialData.title,
     initialData.fullName,
     initialData.contact,
@@ -108,6 +102,17 @@ export default function ConfirmationPopup({
   useEffect(() => {
     const fetchReferenceData = async () => {
       try {
+        if (version === "admin") {
+          const response = await fetch(`${API_BASE_URL}/admin/branches`, {
+            headers: getJwtAuthHeaders(),
+          });
+          const data = await response.json().catch(() => null);
+          if (response.ok && data?.success) {
+            setBranches(Array.isArray(data.data) ? data.data : []);
+          }
+          return;
+        }
+
         const [zonesResponse, crimeTypesResponse] = await Promise.all([
           fetch(`${API_BASE_URL}/zones`),
           fetch(`${API_BASE_URL}/crimes/types`),
@@ -127,20 +132,12 @@ export default function ConfirmationPopup({
       }
     };
 
-    if (isOpen && version === "police") {
+    if (isOpen) {
       fetchReferenceData();
     }
   }, [isOpen, version]);
 
   if (!isOpen) return null;
-
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setLocationError("");
-  };
 
   const handleCrimeFieldChange = (field: string, value: string | number) => {
     const mappedField =
@@ -150,6 +147,16 @@ export default function ConfirmationPopup({
   };
 
   const handleSubmit = async () => {
+    if (version === "admin") {
+      if (!formData.username || !formData.branchId) {
+        setLocationError("Please provide username and branch before approval.");
+        return;
+      }
+
+      onApprove?.(formData);
+      return;
+    }
+
     if (
       version === "police" &&
       !isValidLocation({
@@ -207,64 +214,20 @@ export default function ConfirmationPopup({
         <div className="flex flex-col gap-4">
           {version === "admin" ? (
             <>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <label className="text-sm font-medium text-gray-700">Branch ID</label>
-                <input
-                  type="text"
-                  name="branchId"
-                  onChange={handleInputChange}
-                  value={formData.branchId}
-                  className="inputBox bg-gray-100 mt-1"
-                />
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <label className="text-sm font-medium text-gray-700">
-                  Branch Contact #
-                </label>
-                <input
-                  type="text"
-                  value={formData.branchContact}
-                  name="branchContact"
-                  onChange={handleInputChange}
-                  className="inputBox bg-gray-100 mt-1"
-                />
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <label className="text-sm font-medium text-gray-700">Username</label>
-                <input
-                  type="text"
-                  value={formData.username}
-                  name="username"
-                  onChange={handleInputChange}
-                  className="inputBox bg-gray-100 mt-1"
-                />
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <label className="text-sm font-medium text-gray-700">Password</label>
-                <input
-                  type="text"
-                  value={formData.password}
-                  name="password"
-                  onChange={handleInputChange}
-                  className="inputBox bg-gray-100 mt-1"
-                />
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <label className="text-sm font-medium text-gray-700">
-                  Request Date
-                </label>
-                <input
-                  type="text"
-                  value={formData.requestDate}
-                  name="requestDate"
-                  onChange={handleInputChange}
-                  className="inputBox bg-gray-100 mt-1"
-                />
-              </div>
+              <AgentRecordForm
+                value={{
+                  username: formData.username,
+                  branchId: formData.branchId,
+                }}
+                branches={branches}
+                onChange={(field, value) => {
+                  setFormData((prev) => ({ ...prev, [field]: value }));
+                  setLocationError("");
+                }}
+              />
+              {locationError && (
+                <p className="text-red-600 text-xs mt-2">{locationError}</p>
+              )}
             </>
           ) : (
             <CrimeRecordForm

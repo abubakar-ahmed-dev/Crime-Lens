@@ -10,9 +10,9 @@ type VerificationCardProps =
     version: "admin";
     requestId: string | number;
     branchId: string;
+    branchZoneName?: string;
     branchContact: string;
     username: string;
-    password: string;
     requestDate: string;
     onContact?: () => void;
     onReject?: (reason?: string) => void;
@@ -87,7 +87,11 @@ export default function VerificationCard(props: VerificationCardProps) {
       if (props.version === "admin") {
         // @ts-ignore
         endpoint = `${API_BASE_URL}/agent/verify/${props.requestId}`;
-        body = { roleId: 2 }; // Default to police officer role
+        body = {
+          roleId: 2,
+          username: updatedValues.username,
+          branchId: Number(updatedValues.branchId),
+        }; // Default to police officer role
       } else {
         // @ts-ignore
         endpoint = `${API_BASE_URL}/user/approve/${props.submissionId}`;
@@ -178,21 +182,11 @@ export default function VerificationCard(props: VerificationCardProps) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 text-sm text-gray-800">
             <p>
-              <span className="font-semibold">Branch ID:</span> {props.branchId}
-            </p>
-            <p>
-              <span className="font-semibold">Branch Contact #:</span>{" "}
-              {props.branchContact}
+              <span className="font-semibold">Branch:</span>{" "}
+              {props.branchZoneName ? `${props.branchId} - ${props.branchZoneName}` : props.branchId}
             </p>
             <p>
               <span className="font-semibold">Username:</span> {props.username}
-            </p>
-            <p>
-              <span className="font-semibold">Password:</span> {props.password}
-            </p>
-            <p>
-              <span className="font-semibold">Request Date:</span>{" "}
-              {props.requestDate}
             </p>
           </div>
         </>

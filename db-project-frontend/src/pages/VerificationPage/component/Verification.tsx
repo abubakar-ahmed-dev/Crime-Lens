@@ -170,9 +170,9 @@ export default function AllRecords({ version }: AllRecordsProps) {
                     version="admin"
                     requestId={record.id}
                     branchId={record.PoliceBranch?.id || "N/A"}
+                    branchZoneName={record.PoliceBranch?.zoneName || ""}
                     branchContact={record.PoliceBranch?.contactNumber || "N/A"}
                     username={record.PoliceAgentRequestsTemp?.username || ""}
-                    password={record.PoliceAgentRequestsTemp?.password || ""}
                     requestDate={
                       record.PoliceAgentRequestsTemp?.createdAt
                         ? new Date(record.PoliceAgentRequestsTemp.createdAt).toLocaleDateString()

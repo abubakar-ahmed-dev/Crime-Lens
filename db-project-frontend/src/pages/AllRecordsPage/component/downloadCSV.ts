@@ -17,13 +17,13 @@ export const downloadCSV = (
     let rows: string[][] = [];
   
     if (version === "admin") {
-      headers = ["Agent ID", "Branch ID", "Username", "Password", "Branch Contact #", "Date of Creation"];
+      headers = ["Agent ID", "Username", "Zone", "Branch ID", "Branch Contact #", "Date of Creation"];
   
       rows = records.map((r: any) => [
         String(r.agentId ?? ""),
-        String(r.branchId ?? ""),
         String(r.username ?? ""),
-        String(r.password ?? ""),
+        String(r.zoneName ?? ""),
+        String(r.branchId ?? ""),
         String(r.branchContact ?? ""),
         String(new Date(r.createdAt).toLocaleDateString()),
       ]);
