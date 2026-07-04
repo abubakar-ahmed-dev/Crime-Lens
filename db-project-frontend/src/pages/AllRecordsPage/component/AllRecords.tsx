@@ -16,7 +16,7 @@ export interface AgentRecord {
   agentId: number;
   branchId: number | null;
   username: string;
-  password: string;
+  zoneName: string | null;
   branchContact: string | null;
   createdAt: string; // YYYY-MM-DD
 }
@@ -111,6 +111,19 @@ export default function AllRecords({ version }: AllRecordsProps) {
     return data.data;
   };
 
+  const fetchAdminRecords = async () => {
+    const res = await fetch(`${API_BASE_URL}/agent/all`, {
+      headers: getJwtAuthHeaders(),
+    });
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || !data?.success) {
+      throw new Error(data?.message || "Failed to fetch agents");
+    }
+
+    return data.data;
+  };
+
   // ---------------------------
   // FETCH DATA
   // ---------------------------
@@ -119,7 +132,7 @@ export default function AllRecords({ version }: AllRecordsProps) {
 
     const fetchData = async () => {
       try {
-        let res, data;
+        let data;
 
         if (version === "police") {
           data = await fetchPoliceRecords();
@@ -128,19 +141,11 @@ export default function AllRecords({ version }: AllRecordsProps) {
           setRecords(data);
           setBackupRecords(data);
         } else if (version === "admin") {
-          res = await fetch(`${API_BASE_URL}/agent/all`, {
-            headers: getJwtAuthHeaders(),
-          });
-          if (!res.ok) throw new Error("Network response was not ok");
-          data = await res.json();
+          data = await fetchAdminRecords();
           if (!mounted) return;
 
-          if (data.success) {
-            setRecords(data.data);
-            setBackupRecords(data.data);
-          } else {
-            console.error("Error fetching agents:", data.message);
-          }
+          setRecords(data);
+          setBackupRecords(data);
         }
       } catch (err) {
         console.error("Fetch Request Error:", err);
@@ -301,11 +306,9 @@ export default function AllRecords({ version }: AllRecordsProps) {
           alert("Update failed: " + message);
           return message;
         }
-        const newList = records.map((r: any) =>
-          r.agentId === selectedAgent.agentId ? updatedData : r
-        );
-        setRecords(newList);
-        setBackupRecords(newList);
+        const refreshedRecords = await fetchAdminRecords();
+        setRecords(refreshedRecords);
+        setBackupRecords(refreshedRecords);
         setSelectedRecords([]);
         setSelectedAgent(null);
       } else if (version === "police" && fullCrime) {

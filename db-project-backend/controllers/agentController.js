@@ -139,7 +139,7 @@ export const verifyAgentRequest = async (req, res) => {
 
   try {
     const { requestId } = req.params;
-    const { roleId } = req.body; // roleId for the new agent
+    const { roleId, username, branchId } = req.body; // roleId for the new agent
 
     // ---------------------------
     // 1️⃣ Fetch pending agent request + temp data
@@ -186,6 +186,34 @@ export const verifyAgentRequest = async (req, res) => {
     // 2️⃣ Create new user in User table
     // ---------------------------
     const now = new Date();
+    const finalUsername = username || agentRequest.username;
+    const finalBranchId = branchId || agentRequest.branchId;
+
+    const branchRows = await sequelize.query(
+      `SELECT id FROM "PoliceBranch" WHERE id = :branchId LIMIT 1;`,
+      {
+        replacements: { branchId: finalBranchId },
+        type: QueryTypes.SELECT,
+        transaction: t,
+      }
+    );
+    if (!branchRows[0]) {
+      await t.rollback();
+      return res.status(404).json({ success: false, message: "Branch not found" });
+    }
+
+    const existingUserRows = await sequelize.query(
+      `SELECT id FROM "User" WHERE username = :username LIMIT 1;`,
+      {
+        replacements: { username: finalUsername },
+        type: QueryTypes.SELECT,
+        transaction: t,
+      }
+    );
+    if (existingUserRows[0]) {
+      await t.rollback();
+      return res.status(409).json({ success: false, message: "Username already exists" });
+    }
 
     // Hash the password before storing
     const hashedPassword = await bcrypt.hash(agentRequest.password, 10);
@@ -198,7 +226,7 @@ export const verifyAgentRequest = async (req, res) => {
       `,
       {
         replacements: {
-          username: agentRequest.username,
+          username: finalUsername,
           passwordHash: hashedPassword, // Hashed password
           roleId: roleId || 2,
           createdAt: now,
@@ -218,12 +246,14 @@ export const verifyAgentRequest = async (req, res) => {
       `
       UPDATE "PoliceAgentRequest"
       SET "userId" = :userId,
+          "branchId" = :branchId,
           status = 'approved'
       WHERE id = :requestId
       `,
       {
         replacements: {
           userId: newUser.id,
+          branchId: finalBranchId,
           verifiedAt: now,
           requestId,
         },
@@ -256,7 +286,7 @@ export const verifyAgentRequest = async (req, res) => {
       data: {
         userId: newUser.id,
         username: newUser.username,
-        branchId: agentRequest.branchId,
+        branchId: finalBranchId,
         status: "approved",
       },
     });
@@ -380,17 +410,19 @@ export const getPendingRequests = async (req, res) => {
 
         t.id AS "tempId",
         t.username AS "tempUsername",
-        t.password AS "tempPassword",
         t."createdAt" AS "tempCreatedAt",
 
         b.id AS "branchId",
         b.name AS "branchName",
-        b."contactNumber" AS "branchContactNumber"
+        b."contactNumber" AS "branchContactNumber",
+        z.name AS "zoneName"
       FROM "PoliceAgentRequest" ar
       JOIN "PoliceAgentRequestsTemp" t
         ON t.id = ar."policeAgentRequestsTempId"
       JOIN "PoliceBranch" b
         ON b.id = ar."branchId"
+      LEFT JOIN "Zone" z
+        ON z.id = b."zoneId"
       WHERE ar.status = 'pending'
       ORDER BY ar.id ASC;
       `,
@@ -409,13 +441,13 @@ export const getPendingRequests = async (req, res) => {
       PoliceAgentRequestsTemp: {
         id: r.tempId,
         username: r.tempUsername,
-        password: r.tempPassword,
         createdAt: r.tempCreatedAt,
       },
       PoliceBranch: {
         id: r.branchId,
         name: r.branchName,
         contactNumber: r.branchContactNumber,
+        zoneName: r.zoneName,
       },
     }));
 
@@ -445,17 +477,19 @@ export const getRequestById = async (req, res) => {
 
         t.id AS "tempId",
         t.username AS "tempUsername",
-        t.password AS "tempPassword",
         t."createdAt" AS "tempCreatedAt",
 
         b.id AS "branchId",
         b.name AS "branchName",
-        b."contactNumber" AS "branchContactNumber"
+        b."contactNumber" AS "branchContactNumber",
+        z.name AS "zoneName"
       FROM "PoliceAgentRequest" ar
       JOIN "PoliceAgentRequestsTemp" t
         ON t.id = ar."policeAgentRequestsTempId"
       JOIN "PoliceBranch" b
         ON b.id = ar."branchId"
+      LEFT JOIN "Zone" z
+        ON z.id = b."zoneId"
       WHERE ar.id = :requestId
       LIMIT 1;
       `,
@@ -482,13 +516,13 @@ export const getRequestById = async (req, res) => {
       PoliceAgentRequestsTemp: {
         id: r.tempId,
         username: r.tempUsername,
-        password: r.tempPassword,
         createdAt: r.tempCreatedAt,
       },
       PoliceBranch: {
         id: r.branchId,
         name: r.branchName,
         contactNumber: r.branchContactNumber,
+        zoneName: r.zoneName,
       },
     };
 
@@ -505,7 +539,21 @@ export const getRequestById = async (req, res) => {
 export const getAllAgents = async (req, res) => {
   try {
     const agents = await sequelize.query(
-      `SELECT * FROM "viewAllAgents";`,
+      `
+      SELECT 
+        par.id AS "agentId",
+        u.username AS "username",
+        z.name AS "zoneName",
+        par."branchId" AS "branchId",
+        pb."contactNumber" AS "branchContact",
+        par."createdAt" AS "createdAt"
+      FROM "PoliceAgentRequest" par
+      LEFT JOIN "User" u ON u.id = par."userId"
+      LEFT JOIN "PoliceBranch" pb ON pb.id = par."branchId"
+      LEFT JOIN "Zone" z ON z.id = pb."zoneId"
+      WHERE par.status = 'approved'
+      ORDER BY par.id ASC;
+      `,
       { type: QueryTypes.SELECT }
     );
 
@@ -523,7 +571,7 @@ export const getAllAgents = async (req, res) => {
 
 export const updateAgent = async (req, res) => {
   const agentId = req.params.id;
-  const { username, password, branchId } = req.body;
+  const { username, branchId } = req.body;
 
   const t = await sequelize.transaction();
 
@@ -555,6 +603,21 @@ export const updateAgent = async (req, res) => {
         .json({ success: false, message: "Agent not found" });
     }
 
+    if (branchId !== undefined && branchId !== null && branchId !== "") {
+      const branchRows = await sequelize.query(
+        `SELECT id FROM "PoliceBranch" WHERE id = :branchId LIMIT 1;`,
+        {
+          replacements: { branchId },
+          type: QueryTypes.SELECT,
+          transaction: t,
+        }
+      );
+      if (!branchRows[0]) {
+        await t.rollback();
+        return res.status(404).json({ success: false, message: "Branch not found" });
+      }
+    }
+
     // ---------------------------
     // 2️⃣ Update branchId in PoliceAgentRequest
     // ---------------------------
@@ -579,7 +642,7 @@ export const updateAgent = async (req, res) => {
     // ---------------------------
     const userRows = await sequelize.query(
       `
-      SELECT id, username, "passwordHash"
+      SELECT id, username
       FROM "User"
       WHERE id = :userId
       LIMIT 1
@@ -602,29 +665,34 @@ export const updateAgent = async (req, res) => {
     }
 
     // ---------------------------
-    // 4️⃣ Update username/password in User
+    // 4️⃣ Update username in User
     // ---------------------------
     const updatedUsername = username ?? user.username;
 
-    // If password is being updated, hash it; otherwise keep existing hash
-    let updatedPassword;
-    if (password) {
-      updatedPassword = await bcrypt.hash(password, 10);
-    } else {
-      updatedPassword = user.passwordHash;
+    if (updatedUsername !== user.username) {
+      const existingUserRows = await sequelize.query(
+        `SELECT id FROM "User" WHERE username = :username AND id <> :userId LIMIT 1;`,
+        {
+          replacements: { username: updatedUsername, userId: user.id },
+          type: QueryTypes.SELECT,
+          transaction: t,
+        }
+      );
+      if (existingUserRows[0]) {
+        await t.rollback();
+        return res.status(409).json({ success: false, message: "Username already exists" });
+      }
     }
 
     await sequelize.query(
       `
       UPDATE "User"
-      SET username = :username,
-          "passwordHash" = :passwordHash
+      SET username = :username
       WHERE id = :userId
       `,
       {
         replacements: {
           username: updatedUsername,
-          passwordHash: updatedPassword,
           userId: user.id,
         },
         type: QueryTypes.UPDATE,

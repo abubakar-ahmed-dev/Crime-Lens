@@ -26,9 +26,9 @@ export default function AllRecordsSearch({ version, onSearchChange }: AllRecords
     version === "admin"
       ? [
           { value: "agentId", label: "Agent ID" },
-          { value: "branchId", label: "Branch ID" },
           { value: "username", label: "Username" },
-          { value: "password", label: "Password" },
+          { value: "zoneName", label: "Zone" },
+          { value: "branchId", label: "Branch ID" },
           { value: "branchContact", label: "Branch Contact #" },
           { value: "createdAt", label: "Date of Creation" },
         ]

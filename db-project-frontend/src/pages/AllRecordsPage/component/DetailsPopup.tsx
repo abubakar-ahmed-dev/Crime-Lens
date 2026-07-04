@@ -2,9 +2,11 @@ import WhiteButton from "../../../components/WhiteButton";
 import { useState, useEffect } from "react";
 import { isValidLocation } from "../../../components/LocationPicker";
 import CrimeRecordForm from "../../../components/CrimeRecordForm";
+import AgentRecordForm, { type AgentBranchOption } from "../../../components/AgentRecordForm";
 import GreenButton from "../../../components/GreenButton";
 import { API_BASE_URL } from "../../../config/constants";
 import { checkLocationInsideZone } from "../../../utils/zoneValidation";
+import { getJwtAuthHeaders } from "../../../utils/authHeaders";
 
 type ZoneOption = {
   id: number;
@@ -31,6 +33,7 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
   const [isSaving, setIsSaving] = useState(false);
   const [zones, setZones] = useState<ZoneOption[]>([]);
   const [crimeTypes, setCrimeTypes] = useState<CrimeTypeOption[]>([]);
+  const [branches, setBranches] = useState<AgentBranchOption[]>([]);
 
   // Sync local state when data changes
   useEffect(() => {
@@ -43,6 +46,17 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
   useEffect(() => {
     const fetchReferenceData = async () => {
       try {
+        if (version === "admin") {
+          const response = await fetch(`${API_BASE_URL}/admin/branches`, {
+            headers: getJwtAuthHeaders(),
+          });
+          const data = await response.json().catch(() => null);
+          if (response.ok && data?.success) {
+            setBranches(Array.isArray(data.data) ? data.data : []);
+          }
+          return;
+        }
+
         const [zonesResponse, crimeTypesResponse] = await Promise.all([
           fetch(`${API_BASE_URL}/zones`),
           fetch(`${API_BASE_URL}/crimes/types`),
@@ -62,7 +76,7 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
       }
     };
 
-    if (isOpen && version === "police") {
+    if (isOpen) {
       fetchReferenceData();
     }
   }, [isOpen, version]);
@@ -76,6 +90,11 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
   };
 
   const handleSave = async () => {
+    if (version === "admin" && (!formData.username || !formData.branchId)) {
+      setSubmitError("Please provide username and branch before saving.");
+      return;
+    }
+
     if (
       version === "police" &&
       !isValidLocation({
@@ -162,29 +181,17 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
           />
         ) : (
           <>
-            <label className="block mb-1">Username</label>
-            <input
-              type="text"
-              className="border rounded- px-3 py-2 w-full mb-3"
-              value={formData.username}
-              onChange={(e) => handleChange("username", e.target.value)}
+            <AgentRecordForm
+              value={{
+                username: formData.username,
+                branchId: formData.branchId,
+              }}
+              branches={branches}
+              onChange={(field, value) => handleChange(field, value)}
             />
-
-            <label className="block mb-1">Password</label>
-            <input
-              type="text"
-              className="border rounded px-3 py-2 w-full mb-3"
-              value={formData.password}
-              onChange={(e) => handleChange("password", e.target.value)}
-            />
-
-            <label className="block mb-1">Branch ID</label>
-            <input
-              type="number"
-              className="border rounded px-3 py-2 w-full mb-3"
-              value={formData.branchId}
-              onChange={(e) => handleChange("branchId", Number(e.target.value))}
-            />
+            {submitError && (
+              <p className="text-red-600 text-xs mt-2 mb-3">{submitError}</p>
+            )}
           </>
         )}
 
