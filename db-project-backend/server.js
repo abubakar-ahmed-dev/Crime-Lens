@@ -22,9 +22,13 @@ dotenv.config();
 validateEnv();
 
 const app = express();
+const corsOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 app.use(cors({
-  origin: ["http://localhost:5173"],
+  origin: corsOrigins,
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true,
 }));

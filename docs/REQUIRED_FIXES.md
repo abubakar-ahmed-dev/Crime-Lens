@@ -63,16 +63,16 @@ This file lists repository fixes identified from the current code, configuration
 
 ## Environment And Configuration
 
-- [ ] Update backend environment validation to include `DATABASE_URL`, because `config/db.js` uses it.
-- [ ] Remove unused required DB variables from `envValidation.js` or update `config/db.js` to use them consistently:
+- [x] Update backend environment validation to include `DATABASE_URL`, because `config/db.js` uses it.
+- [x] Remove unused required DB variables from `envValidation.js` or update `config/db.js` to use them consistently:
   - `DB_NAME`
   - `DB_USER`
   - `DB_PASS`
   - `DB_HOST`
   - `DB_PORT`
   - `DB_DIALECT`
-- [ ] Document required `.env` variables for backend and frontend.
-- [ ] Review CORS configuration. It currently allows only `http://localhost:5173`.
+- [x] Document required `.env` variables for backend and frontend.
+- [x] Review CORS configuration. It now uses configurable `CORS_ORIGINS` with `http://localhost:5173` as the default.
 - [ ] Decide production API/frontend URLs and document them.
 
 ## API Consistency

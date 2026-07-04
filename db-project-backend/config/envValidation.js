@@ -6,20 +6,17 @@
  */
 
 const requiredEnvVars = [
+  'DATABASE_URL',
   'SUPABASE_URL',
   'SUPABASE_ANON_KEY',
   'JWT_SECRET',
-  'DB_NAME',
-  'DB_USER',
-  'DB_PASS',
-  'DB_HOST',
-  'DB_PORT',
-  'DB_DIALECT',
 ];
 
 const optionalEnvVars = [
   'SUPABASE_SERVICE_ROLE_KEY',
+  'CORS_ORIGINS',
   'PORT',
+  'NODE_ENV',
 ];
 
 /**
@@ -40,6 +37,9 @@ export function validateEnv() {
   // Check optional variables and warn if using defaults
   if (!process.env.PORT) {
     usingDefaults.push('PORT (will use default: 5001)');
+  }
+  if (!process.env.CORS_ORIGINS) {
+    usingDefaults.push('CORS_ORIGINS (will use default: http://localhost:5173)');
   }
   // if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
   //   usingDefaults.push('SUPABASE_SERVICE_ROLE_KEY (admin features limited)');
@@ -80,15 +80,12 @@ export function getConfig() {
       secret: process.env.JWT_SECRET,
     },
     database: {
-      name: process.env.DB_NAME,
-      user: process.env.DB_USER,
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT,
-      dialect: process.env.DB_DIALECT,
+      url: process.env.DATABASE_URL,
     },
     server: {
       port: parseInt(process.env.PORT || '5001', 10),
       env: process.env.NODE_ENV || 'development',
+      corsOrigins: process.env.CORS_ORIGINS || 'http://localhost:5173',
     },
   };
 }
