@@ -124,7 +124,7 @@ export const uploadCrimesCSV = async (req, res, next) => {
       const reportedAtObj = row.reportedAt ? parseFlexibleDate(row.reportedAt) : incidentDateObj;
 
       // Status validation
-      const validStatuses = ["pending", "approved", "rejected"];
+      const validStatuses = ["pending", "approved"];
       if (!validStatuses.includes(row.status)) row.status = "pending";
 
       // Foreign key checks
