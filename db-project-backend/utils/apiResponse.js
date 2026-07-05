@@ -49,6 +49,7 @@ export function error(res, { message, statusCode = 400, code } = {}) {
   const response = {
     success: false,
     error: message,
+    message,
   };
 
   if (code) {

@@ -58,22 +58,32 @@ export const authorizeCitizen = async (req, res, next) => {
     const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({ error: "No authorization token provided" });
+      return res.status(401).json({
+        success: false,
+        error: "No authorization token provided",
+        message: "No authorization token provided",
+      });
     }
 
     // Verify the token with Supabase
     const { data, error } = await supabase.auth.getUser(token);
 
     if (error || !data.user) {
-      return res.status(401).json({ error: "Invalid or expired token" });
+      return res.status(401).json({
+        success: false,
+        error: "Invalid or expired token",
+        message: "Invalid or expired token",
+      });
     }
 
     // Check if email is verified (only applies to email/password signups, not OAuth)
     // The email_confirmed_at field is null when email is not verified
     if (!data.user.email_confirmed_at && !data.user.app_metadata?.provider) {
       return res.status(403).json({
+        success: false,
         error: "Please verify your email first. Check your inbox for the verification link.",
-        code: "EMAIL_NOT_VERIFIED"
+        message: "Please verify your email first. Check your inbox for the verification link.",
+        code: "EMAIL_NOT_VERIFIED",
       });
     }
 
@@ -89,7 +99,11 @@ export const authorizeCitizen = async (req, res, next) => {
     next();
   } catch (error) {
     console.error("Citizen auth error:", error);
-    return res.status(401).json({ error: "Unauthorized" });
+    return res.status(401).json({
+      success: false,
+      error: "Unauthorized",
+      message: "Unauthorized",
+    });
   }
 };
 
