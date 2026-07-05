@@ -46,7 +46,6 @@ const Sidebar = ({
     { label: "Profile", icon: ICONS.DashboardIcon, activeIcon: ICONS.DashboardIcon_Active, route: "/citizen-dashboard" },
     { label: "Upload Data", icon: ICONS.UploadDataIcon, activeIcon: ICONS.UploadDataIcon_Active, route: "/upload-crimes" },
     { label: "Admin Controls", icon: ICONS.DashboardIcon, activeIcon: ICONS.DashboardIcon_Active, route: "/admin-controls" },
-    { label: "Give Feedback", icon: ICONS.GiveFeedbackIcon, activeIcon: ICONS.GiveFeedbackIcon_Active, route: "/feedback" },
   ];
 
   let filteredMenus: MenuItem[] = allMenus;

@@ -4,6 +4,7 @@ import { useAuth } from "../../../context/AuthContext";
 import StatsCard from "../../../components/StatsCards";
 import GreenButton from "../../../components/GreenButton";
 import WhiteButton from "../../../components/WhiteButton";
+import { API_BASE_URL } from "../../../config/constants";
 
 export default function CitizenDashboard() {
   const navigate = useNavigate();
@@ -78,7 +79,7 @@ export default function CitizenDashboard() {
       }
 
       // Try to fetch reports
-      let response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/citizens/my-reports`, {
+      let response = await fetch(`${API_BASE_URL}/citizens/my-reports`, {
         headers: {
           "Authorization": `Bearer ${token}`,
         },
@@ -97,7 +98,7 @@ export default function CitizenDashboard() {
             throw new Error("Failed to get refreshed token");
           }
 
-          response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/citizens/my-reports`, {
+          response = await fetch(`${API_BASE_URL}/citizens/my-reports`, {
             headers: {
               "Authorization": `Bearer ${token}`,
             },
@@ -142,7 +143,7 @@ export default function CitizenDashboard() {
       }
 
       // Try to update profile
-      let response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/citizens/update-profile`, {
+      let response = await fetch(`${API_BASE_URL}/citizens/update-profile`, {
         method: "PUT",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -168,7 +169,7 @@ export default function CitizenDashboard() {
             throw new Error("Failed to get refreshed token");
           }
 
-          response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/citizens/update-profile`, {
+          response = await fetch(`${API_BASE_URL}/citizens/update-profile`, {
             method: "PUT",
             headers: {
               "Authorization": `Bearer ${token}`,
