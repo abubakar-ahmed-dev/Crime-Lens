@@ -29,12 +29,27 @@ const PageLayout = () => {
       : null;
   const layoutRole = validStoredRole || role;
   const roleReady = !!layoutRole;
+  const publicNavigationRoutes = ["/dashboard", "/statistics"];
+  const isPublicNavigationRoute = publicNavigationRoutes.some((route) =>
+    location.pathname.startsWith(route)
+  );
 
   useEffect(() => {
     if (validStoredRole && (!roleLoaded || role !== validStoredRole)) {
       dispatch(setRole(validStoredRole));
     }
   }, [dispatch, role, roleLoaded, validStoredRole]);
+
+  useEffect(() => {
+    if (
+      !validStoredRole &&
+      !role &&
+      !authMode &&
+      isPublicNavigationRoute
+    ) {
+      dispatch(setRole("user"));
+    }
+  }, [authMode, dispatch, isPublicNavigationRoute, role, validStoredRole]);
 
   const handleNavigation = (path: string) => {
     navigate(path);
