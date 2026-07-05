@@ -373,34 +373,44 @@ export default function CitizenDashboard() {
                 </button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="text-left text-sm text-gray-600 border-b">
-                      <th className="pb-3 font-medium">Title</th>
-                      <th className="pb-3 font-medium">Type</th>
-                      <th className="pb-3 font-medium">Date</th>
-                      <th className="pb-3 font-medium">Zone</th>
-                      <th className="pb-3 font-medium">Status</th>
+              <div className="w-full bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="overflow-x-auto overflow-y-auto max-h-[500px] rounded-b-lg">
+                <table className="min-w-[720px] w-full text-left border-collapse text-xs sm:text-sm">
+                  <thead className="sticky top-0 bg-[#237E54] text-white text-sm whitespace-nowrap">
+                    <tr>
+                      <th className="px-2 sm:px-4 py-3 font-medium border-b">Title</th>
+                      <th className="px-2 sm:px-4 py-3 font-medium border-b">Type</th>
+                      <th className="px-2 sm:px-4 py-3 font-medium border-b">Date</th>
+                      <th className="px-2 sm:px-4 py-3 font-medium border-b">Zone</th>
+                      <th className="px-2 sm:px-4 py-3 font-medium border-b">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="text-sm">
-                    {filteredReports.map((report) => (
-                      <tr key={report.id} className="border-b hover:bg-gray-50">
-                        <td className="py-3">
-                          <p className="font-medium text-gray-800">{report.title}</p>
+                  <tbody>
+                    {filteredReports.map((report, index) => (
+                      <tr
+                        key={report.id}
+                        className={`text-sm hover:bg-gray-100 ${
+                          index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                        }`}
+                      >
+                        <td className="px-2 sm:px-4 py-3 border-b min-w-[220px]">
+                          <p className="font-medium text-gray-800 truncate max-w-[240px]">{report.title}</p>
                           {report.description && (
-                            <p className="text-gray-500 text-xs mt-1 truncate max-w-xs">
+                            <p className="text-gray-500 text-xs mt-1 truncate max-w-[260px]">
                               {report.description}
                             </p>
                           )}
                         </td>
-                        <td className="py-3 text-gray-600">{report.crimeType}</td>
-                        <td className="py-3 text-gray-600">
+                        <td className="px-2 sm:px-4 py-3 border-b text-gray-600 whitespace-nowrap">
+                          {report.crimeType || report.crimetype || "N/A"}
+                        </td>
+                        <td className="px-2 sm:px-4 py-3 border-b text-gray-600 whitespace-nowrap">
                           {new Date(report.incidentDate).toLocaleDateString()}
                         </td>
-                        <td className="py-3 text-gray-600">{report.zone || "N/A"}</td>
-                        <td className="py-3">
+                        <td className="px-2 sm:px-4 py-3 border-b text-gray-600 whitespace-nowrap">
+                          {report.zoneName || report.zonename || report.zone || "N/A"}
+                        </td>
+                        <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(report.status)}`}>
                             {report.status}
                           </span>
@@ -409,6 +419,7 @@ export default function CitizenDashboard() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
             </div>

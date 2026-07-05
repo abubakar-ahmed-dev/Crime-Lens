@@ -493,10 +493,10 @@ export const getMyReports = asyncHandler(async (req, res) => {
       c."incidentDate",
       c."reportedAt",
       c."status",
-      c."address" as crimeAddress,
-      ct."name" as crimeType,
+      c."address" as "crimeAddress",
+      ct."name" as "crimeType",
       ct."severity",
-      z."name" as zoneName,
+      z."name" as "zoneName",
       cs."submittedAt"
     FROM "CrimeSubmission" cs
     JOIN "Crime" c ON cs."CrimeId" = c."id"

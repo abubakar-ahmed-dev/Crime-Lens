@@ -253,27 +253,29 @@ export default function VerificationCard(props: VerificationCardProps) {
       )}
 
       {/* Footer Buttons */}
-      <div className="border-t-2 border-[#d9d9d9] mt-4 pt-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <WhiteButton
-          label="Contact for Verification"
-          width={300}
-          height={40}
-          onClick={handleContactCopy}
-        />
-        <div className="flex flex-wrap gap-2">
+      <div className="border-t-2 border-[#d9d9d9] mt-4 pt-6 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+        <div className="w-full lg:w-[240px] xl:w-[280px] shrink-0">
+          <WhiteButton
+            label="Contact for Verification"
+            height={40}
+            fullWidth
+            onClick={handleContactCopy}
+          />
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto lg:justify-end">
           <button
             onClick={() => setShowRejectConfirm(true)}
             disabled={loading}
-            className="px-6 py-1 bg-[#b80404] hover:bg-red-900 border-2 border-[#b80404] disabled:bg-gray-400 text-white text-sm rounded-full font-normal transition-colors"
-            style={{ width: 200, height: 40 }}
+            className="w-full sm:flex-1 lg:w-[160px] xl:w-[190px] px-6 py-1 bg-[#b80404] hover:bg-red-900 border-2 border-[#b80404] disabled:bg-gray-400 text-white text-sm rounded-full font-normal transition-colors"
+            style={{ height: 40 }}
           >
             {loading ? "Processing..." : "Reject"}
           </button>
           <button
             onClick={() => setOpenConfirm(true)}
             disabled={loading}
-            className="px-6 py-1 bg-linear-to-r from-[#145332] to-[#237E54] border-2 border-[#237E54] hover:from-[#145332] hover:to-[#145332] disabled:bg-gray-400 text-white text-sm rounded-full font-normal transition-colors"
-            style={{ width: 200, height: 40 }}
+            className="w-full sm:flex-1 lg:w-[160px] xl:w-[190px] px-6 py-1 bg-linear-to-r from-[#145332] to-[#237E54] border-2 border-[#237E54] hover:from-[#145332] hover:to-[#145332] disabled:bg-gray-400 text-white text-sm rounded-full font-normal transition-colors"
+            style={{ height: 40 }}
           >
             {loading ? "Processing..." : "Approve"}
           </button>
