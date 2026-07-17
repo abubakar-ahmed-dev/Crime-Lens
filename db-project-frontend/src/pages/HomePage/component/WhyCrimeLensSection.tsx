@@ -1,5 +1,5 @@
 import SectionWrapper from "./shared/SectionWrapper";
-import { Database, Map, TrendingUp, Shield, ArrowRight } from "lucide-react";
+import { Database, Map, TrendingUp, Shield, ChevronDown } from "lucide-react";
 
 const WhyCrimeLensSection = () => {
   return (
@@ -23,78 +23,75 @@ const WhyCrimeLensSection = () => {
             </p>
           </div>
 
-          {/* Right Side - Enhanced Flow Diagram */}
+          {/* Right Side - Vertical Flow Diagram */}
           <div className="flex-1">
-            <div className="homepage-card p-10 bg-white">
-              <div className="space-y-8">
+            <div className="relative">
+              {/* Vertical Line */}
+              <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-[#145332] to-[#237E54] hidden md:block"></div>
+
+              <div className="space-y-8 relative">
                 {/* Step 1 */}
                 <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0">
-                    <div className="icon-circle-border">
-                      <Database className="w-6 h-6 text-[#237E54]" />
+                  <div className="relative z-10">
+                    <div className="icon-circle">
+                      <Database className="w-6 h-6 text-white" />
                     </div>
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 pt-2">
                     <div className="font-semibold text-gray-900 text-lg mb-1">Raw Reports</div>
                     <div className="text-gray-600">Scattered crime data from multiple sources</div>
                   </div>
                 </div>
 
-                {/* Arrow */}
-                <div className="flex justify-center">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-50">
-                    <ArrowRight className="w-4 h-4 text-[#237E54]" />
-                  </div>
+                {/* Down Arrow */}
+                <div className="flex justify-center pl-6">
+                  <ChevronDown className="w-6 h-6 text-[#237E54]" />
                 </div>
 
                 {/* Step 2 */}
                 <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0">
-                    <div className="icon-circle-border">
-                      <Shield className="w-6 h-6 text-[#237E54]" />
+                  <div className="relative z-10">
+                    <div className="icon-circle">
+                      <Shield className="w-6 h-6 text-white" />
                     </div>
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 pt-2">
                     <div className="font-semibold text-gray-900 text-lg mb-1">Structured Database</div>
                     <div className="text-gray-600">Verified, organized, and validated records</div>
                   </div>
                 </div>
 
-                {/* Arrow */}
-                <div className="flex justify-center">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-50">
-                    <ArrowRight className="w-4 h-4 text-[#237E54]" />
-                  </div>
+                {/* Down Arrow */}
+                <div className="flex justify-center pl-6">
+                  <ChevronDown className="w-6 h-6 text-[#237E54]" />
                 </div>
 
                 {/* Step 3 */}
                 <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0">
-                    <div className="icon-circle-border">
-                      <Map className="w-6 h-6 text-[#237E54]" />
+                  <div className="relative z-10">
+                    <div className="icon-circle">
+                      <Map className="w-6 h-6 text-white" />
                     </div>
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 pt-2">
                     <div className="font-semibold text-gray-900 text-lg mb-1">Interactive Maps</div>
-                        <div className="text-gray-600">Geographic visualization and clustering</div>
+                    <div className="text-gray-600">Geographic visualization and clustering</div>
                   </div>
                 </div>
 
-                {/* Arrow */}
-                <div className="flex justify-center">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-50">
-                    <ArrowRight className="w-4 h-4 text-[#237E54]" />
-                  </div>
+                {/* Down Arrow */}
+                <div className="flex justify-center pl-6">
+                  <ChevronDown className="w-6 h-6 text-[#237E54]" />
                 </div>
 
                 {/* Step 4 */}
                 <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0">
+                  <div className="relative z-10">
                     <div className="icon-circle">
                       <TrendingUp className="w-6 h-6 text-white" />
                     </div>
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 pt-2">
                     <div className="font-semibold text-gray-900 text-lg mb-1">Actionable Insights</div>
                     <div className="text-gray-600">Data-driven decisions for safer communities</div>
                   </div>

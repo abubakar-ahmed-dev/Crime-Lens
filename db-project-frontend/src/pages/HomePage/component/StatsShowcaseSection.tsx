@@ -4,7 +4,7 @@ import { TrendingUp, BarChart, PieChart, Calendar, ArrowRight } from "lucide-rea
 
 const StatsShowcaseSection = () => {
   return (
-    <SectionWrapper className="bg-gray-50">
+    <SectionWrapper className="bg-green-50">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-20">
 

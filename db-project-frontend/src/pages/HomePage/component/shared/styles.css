@@ -53,18 +53,6 @@
   overflow: hidden;
 }
 
-.screenshot-frame::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 40px;
-  background: #F9FAFB;
-  border-bottom: 1px solid #E5E7EB;
-  z-index: 1;
-}
-
 .icon-circle {
   width: 48px;
   height: 48px;

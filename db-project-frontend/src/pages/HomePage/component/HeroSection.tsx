@@ -2,7 +2,7 @@ import SectionWrapper from "./shared/SectionWrapper";
 import PrimaryButton from "./shared/PrimaryButton";
 import LogowithText from "../../../assets/LogowithText.svg";
 import DashboardPreview from "../../../assets/homepage/dashboard-preview.webp";
-import { ArrowRight, CheckCircle2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Shield } from "lucide-react";
 
 const HeroSection = () => {
   return (
@@ -27,7 +27,7 @@ const HeroSection = () => {
 
             {/* Headline */}
             <div className="space-y-6">
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight text-gray-900">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight text-gray-900">
                 Understand Crime.
                 <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#145332] to-[#237E54] mt-2">
                   Build Safer Communities.
@@ -60,16 +60,8 @@ const HeroSection = () => {
             {/* Trust Indicator */}
             <div className="flex items-center gap-6 pt-6">
               <div className="flex items-center gap-3">
-                <div className="flex -space-x-2">
-                  <div className="w-8 h-8 rounded-full bg-green-100 border-2 border-white flex items-center justify-center">
-                    <CheckCircle2 className="w-4 h-4 text-[#237E54]" />
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-green-200 border-2 border-white flex items-center justify-center">
-                    <CheckCircle2 className="w-4 h-4 text-[#237E54]" />
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-green-300 border-2 border-white flex items-center justify-center">
-                    <CheckCircle2 className="w-4 h-4 text-[#237E54]" />
-                  </div>
+                <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                  <Shield className="w-6 h-6 text-[#237E54]" />
                 </div>
                 <div className="text-sm">
                   <div className="font-semibold text-gray-900">25,000+ reports processed</div>
