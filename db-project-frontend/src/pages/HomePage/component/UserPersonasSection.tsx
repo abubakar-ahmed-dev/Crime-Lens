@@ -22,7 +22,7 @@ const PersonaCard = ({ icon, title, description, linkText, href }: PersonaCardPr
       <div className="text-center">
         <a
           href={href}
-          className="inline-flex items-center text-[#237E54] font-medium group-hover:text-[#145332] transition-colors"
+          className="inline-flex items-center text-[#237E54] font-semibold group-hover:text-[#145332] transition-colors"
         >
           {linkText}
           <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -37,33 +37,33 @@ const UserPersonasSection = () => {
     <SectionWrapper className="bg-gray-50">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-            Built for everyone who cares about safety
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-50 border border-green-100 mb-6">
+            <span className="text-sm font-bold text-[#145332]">WHO USES CRIMELENS</span>
+          </div>
+          <h2 className="text-[40px] md:text-[42px] font-bold text-gray-900 mb-6">
+            Built For Everyone Working Towards Safer Communities
           </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Whether you're a citizen, police department, or researcher, CrimeLens has tools for you
-          </p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-8">
           <PersonaCard
             icon={<Users className="w-8 h-8 text-white" />}
-            title="Citizens"
-            description="Report incidents, track local crime patterns, and stay informed about safety in your neighborhood."
+            title="For Citizens"
+            description="Stay informed about what's happening in your area. Report incidents, explore data, and build a safer community."
             linkText="Get started"
             href="/register"
           />
           <PersonaCard
             icon={<Shield className="w-8 h-8 text-white" />}
-            title="Police Departments"
-            description="Verify reports, manage crime records, and analyze patterns to allocate resources effectively."
+            title="For Police Departments"
+            description="Investigate effectively, monitor trends, allocate resources, and improve public safety with data-driven insights."
             linkText="Learn more"
-            href="/login-admin"
+            href="/login"
           />
           <PersonaCard
             icon={<Search className="w-8 h-8 text-white" />}
-            title="Researchers"
-            description="Access verified crime data, study trends, and generate insights for policy and planning."
+            title="For Researchers"
+            description="Access structured crime data for analysis, studies, and building a better understanding of crime patterns."
             linkText="Explore data"
             href="/statistics"
           />

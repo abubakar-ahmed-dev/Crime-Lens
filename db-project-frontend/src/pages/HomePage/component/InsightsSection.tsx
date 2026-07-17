@@ -1,5 +1,5 @@
 import SectionWrapper from "./shared/SectionWrapper";
-import { ArrowRight, TrendingUp, BarChart3, MapPin, Calendar } from "lucide-react";
+import { TrendingUp, BarChart3, MapPin, Calendar } from "lucide-react";
 
 type InsightCardProps = {
   icon: React.ReactNode;
@@ -11,7 +11,7 @@ type InsightCardProps = {
 const InsightCard = ({ icon, question, answer, className = "" }: InsightCardProps) => {
   return (
     <div className={`homepage-card p-8 bg-white ${className}`}>
-      <div className="flex items-start gap-4 mb-4">
+      <div className="flex items-center gap-4 mb-4">
         <div className="flex-shrink-0">
           <div className="icon-circle-border">
             {icon}
@@ -20,7 +20,6 @@ const InsightCard = ({ icon, question, answer, className = "" }: InsightCardProp
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">{question}</h3>
           <div className="flex items-center gap-2 text-[#237E54]">
-            <ArrowRight className="w-4 h-4" />
             <span className="font-medium">{answer}</span>
           </div>
         </div>
@@ -32,7 +31,7 @@ const InsightCard = ({ icon, question, answer, className = "" }: InsightCardProp
 const InsightsSection = () => {
   return (
     <SectionWrapper className="bg-white">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
             Questions CrimeLens answers
@@ -43,7 +42,7 @@ const InsightsSection = () => {
         </div>
 
         {/* Asymmetric Grid with Dashboard-Style Layout */}
-        <div className="grid md:grid-cols-2 gap-6 max-w-6xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
           {/* First Row - Large Feature Card */}
           <div className="md:col-span-2">
             <div className="homepage-card p-8 bg-gradient-to-br from-green-50 to-white">
@@ -58,10 +57,10 @@ const InsightsSection = () => {
                     Where is crime increasing?
                   </h3>
                   <p className="text-gray-600">
-                    CrimeLens shows it with interactive heatmaps and trend analysis.
+                    Identify hotspots and emerging areas of concern in real time.
                   </p>
                 </div>
-                <ArrowRight className="w-6 h-6 text-[#237E54]" />
+                
               </div>
             </div>
           </div>
@@ -71,14 +70,14 @@ const InsightsSection = () => {
             <InsightCard
               icon={<BarChart3 className="w-6 h-6 text-[#237E54]" />}
               question="Which crimes are most common?"
-              answer="CrimeLens answers it."
+              answer="See category-wise breakdowns and compare regions."
             />
           </div>
           <div className="md:col-span-1">
             <InsightCard
               icon={<Calendar className="w-6 h-6 text-[#237E54]" />}
               question="How has crime changed over time?"
-              answer="View historical trends."
+              answer="Track historical trends and measure changes over time."
             />
           </div>
 
@@ -96,10 +95,10 @@ const InsightsSection = () => {
                     Which neighborhoods need attention?
                   </h3>
                   <p className="text-gray-600">
-                    Identify hotspots instantly with zone-based analysis and severity mapping.
+                    Prioritize resources and interventions where they're needed most.
                   </p>
                 </div>
-                <ArrowRight className="w-6 h-6 text-[#237E54]" />
+                
               </div>
             </div>
           </div>

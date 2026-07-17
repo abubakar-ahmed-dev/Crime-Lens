@@ -18,12 +18,12 @@ const WorkflowStep = ({ icon, title, description, isLast = false }: WorkflowStep
 
       {/* Content */}
       <h3 className="text-xl font-semibold text-gray-900 mb-2">{title}</h3>
-      <p className="text-gray-600 max-w-xs">{description}</p>
+      <p className="text-gray-600 max-w-[170px]">{description}</p>
 
       {/* Connector Arrow */}
       {!isLast && (
-        <div className="hidden md:block absolute left-full top-1/2 -translate-y-1/2 ml-4">
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-50">
+        <div className="hidden md:block absolute left-full top-1/2 -translate-y-1/2 -ml-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-white">
             <ChevronRight className="w-5 h-5 text-[#237E54]" />
           </div>
         </div>
@@ -90,7 +90,7 @@ const WorkflowSection = () => {
         </div>
 
         {/* Mobile Vertical Connector */}
-        <div className="md:hidden flex flex-col items-center gap-4 mt-8">
+        {/* <div className="md:hidden flex flex-col items-center gap-4 mt-8">
           <div className="flex flex-col gap-2 w-full">
             {[
               { label: "Report" },
@@ -105,7 +105,7 @@ const WorkflowSection = () => {
               </div>
             ))}
           </div>
-        </div>
+        </div> */}
       </div>
     </SectionWrapper>
   );

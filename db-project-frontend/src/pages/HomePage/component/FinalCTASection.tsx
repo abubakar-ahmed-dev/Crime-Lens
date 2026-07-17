@@ -13,7 +13,7 @@ const FinalCTASection = () => {
       <div className="max-w-4xl mx-auto text-center relative z-10">
         {/* Badge */}
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 mb-8">
-          <span className="text-white/90 text-sm font-medium">Join thousands of users</span>
+          <span className="text-white/90 text-[20] font-bold">Join Thousands of Users</span>
         </div>
 
         {/* Heading */}
