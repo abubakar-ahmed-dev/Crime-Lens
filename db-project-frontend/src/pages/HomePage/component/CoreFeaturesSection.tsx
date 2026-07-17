@@ -21,7 +21,7 @@ const FeatureCard = ({ icon, title, description, linkText, href }: FeatureCardPr
       <p className="text-gray-600 leading-relaxed mb-6 text-center">{description}</p>
       <a
         href={href}
-        className="inline-flex items-center justify-center w-full text-[#237E54] font-medium group-hover:text-[#145332] transition-colors"
+        className="inline-flex items-center justify-center w-full text-[#237E54] font-semibold group-hover:text-[#145332] transition-colors"
       >
         {linkText}
         <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -32,7 +32,7 @@ const FeatureCard = ({ icon, title, description, linkText, href }: FeatureCardPr
 
 const CoreFeaturesSection = () => {
   return (
-    <SectionWrapper className="bg-white">
+    <SectionWrapper className="bg-white -mb-16">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
@@ -47,30 +47,30 @@ const CoreFeaturesSection = () => {
           <FeatureCard
             icon={<Map className="w-7 h-7 text-white" />}
             title="Interactive Maps"
-            description="Explore crime geographically with filters, zones, and real-time updates."
+            description="Explore crimes on an interactive map. Filter by location, category, date, zones, and more to find exactly what you need."
             linkText="Explore map"
             href="/map"
           />
           <FeatureCard
             icon={<BarChart3 className="w-7 h-7 text-white" />}
             title="Statistics Dashboard"
-            description="Analyze trends, patterns, and historical crime data with visual charts."
+            description="Visualize trends, compare regions, and uncover patterns with powerful charts and dashboard."
             linkText="View statistics"
             href="/statistics"
           />
           <FeatureCard
             icon={<MessageSquare className="w-7 h-7 text-white" />}
             title="Community Reporting"
-            description="Citizens can submit reports directly and track verification status."
+            description="Empower Citizens to report incidents easily and help build safer neighborhoods together."
             linkText="Report crime"
             href="/report-crime"
           />
           <FeatureCard
             icon={<Search className="w-7 h-7 text-white" />}
-            title="Advanced Search"
-            description="Filter by crime type, location, date range, and more."
+            title="Radial Search"
+            description="Search and Filter crimes around a specific location, and get informed about the nearest and relevant incidents easily."
             linkText="Search records"
-            href="/map"
+            href="/map?mode=radius&radius=500"
           />
         </div>
       </div>

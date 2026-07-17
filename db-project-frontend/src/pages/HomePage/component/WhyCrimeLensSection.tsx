@@ -1,5 +1,5 @@
 import SectionWrapper from "./shared/SectionWrapper";
-import { Database, Map, TrendingUp, Shield, ChevronDown } from "lucide-react";
+import { Database, Map, TrendingUp, Shield } from "lucide-react";
 
 const WhyCrimeLensSection = () => {
   return (
@@ -24,12 +24,12 @@ const WhyCrimeLensSection = () => {
           </div>
 
           {/* Right Side - Vertical Flow Diagram */}
-          <div className="flex-1">
+          <div className="flex-1 ml-20">
             <div className="relative">
               {/* Vertical Line */}
               <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-[#145332] to-[#237E54] hidden md:block"></div>
 
-              <div className="space-y-8 relative">
+              <div className="space-y-13 relative">
                 {/* Step 1 */}
                 <div className="flex items-start gap-4">
                   <div className="relative z-10">
@@ -43,10 +43,7 @@ const WhyCrimeLensSection = () => {
                   </div>
                 </div>
 
-                {/* Down Arrow */}
-                <div className="flex justify-center pl-6">
-                  <ChevronDown className="w-6 h-6 text-[#237E54]" />
-                </div>
+                
 
                 {/* Step 2 */}
                 <div className="flex items-start gap-4">
@@ -61,10 +58,6 @@ const WhyCrimeLensSection = () => {
                   </div>
                 </div>
 
-                {/* Down Arrow */}
-                <div className="flex justify-center pl-6">
-                  <ChevronDown className="w-6 h-6 text-[#237E54]" />
-                </div>
 
                 {/* Step 3 */}
                 <div className="flex items-start gap-4">
@@ -77,11 +70,6 @@ const WhyCrimeLensSection = () => {
                     <div className="font-semibold text-gray-900 text-lg mb-1">Interactive Maps</div>
                     <div className="text-gray-600">Geographic visualization and clustering</div>
                   </div>
-                </div>
-
-                {/* Down Arrow */}
-                <div className="flex justify-center pl-6">
-                  <ChevronDown className="w-6 h-6 text-[#237E54]" />
                 </div>
 
                 {/* Step 4 */}
