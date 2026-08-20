@@ -47,6 +47,17 @@ export default (sequelize) => {
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    mediaCount: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+      field: "mediaCount",
+    },
+    thumbnailUrl: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: "thumbnailUrl",
+    },
   }, {
     tableName: "Crime",
     timestamps: false,
@@ -64,6 +75,7 @@ export default (sequelize) => {
     Crime.belongsTo(models.Zone, { foreignKey: "zoneId", onDelete: "SET NULL", onUpdate: "CASCADE" });
     Crime.belongsTo(models.User, { foreignKey: "latestUpdatedBy", as: "latestUpdater", onDelete: "SET NULL", onUpdate: "CASCADE" });
     Crime.hasMany(models.CrimeSubmission, { foreignKey: "CrimeId", onDelete: "RESTRICT", onUpdate: "CASCADE" });
+    Crime.hasMany(models.CrimeMedia, { foreignKey: "CrimeId", onDelete: "CASCADE", onUpdate: "CASCADE" });
   };
 
   return Crime;
