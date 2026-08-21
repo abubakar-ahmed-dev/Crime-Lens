@@ -424,13 +424,13 @@ interface Crime {
 ---
 
 ## Phase 11: Frontend Core Components Implementation
-**Status:** Remaining
+**Status:** ✅ COMPLETED (2026-08-21)
 **Type:** Frontend
 **Dependencies:** Phase 9 (types), Phase 10 (API)
 **Parallelizable:** No
 
 ### Frontend Tasks
-- [ ] Create `src/components/MediaUploader.tsx`
+- [x] Create `src/components/MediaUploader.tsx`
   - Drag & drop functionality
   - File type/size validation
   - Image/video previews
@@ -439,20 +439,20 @@ interface Crime {
   - Upload progress indicators
   - Error handling
 
-- [ ] Create `src/components/MediaGallery.tsx`
+- [x] Create `src/components/MediaGallery.tsx`
   - Grid layout for images/videos
   - Lightbox for full-size viewing
   - Video player component
   - Caption display
   - Responsive design
 
-- [ ] Create `src/components/MediaVisibilityToggle.tsx`
+- [x] Create `src/components/MediaVisibilityToggle.tsx`
   - Toggle switch for public/police_only
   - Visual indicator of current state
   - Tooltip explaining implications
   - Smooth animations
 
-- [ ] Create `src/components/PoliceMediaEditor.tsx`
+- [x] Create `src/components/PoliceMediaEditor.tsx`
   - Add new media button
   - Remove media buttons
   - Visibility toggles for each item
