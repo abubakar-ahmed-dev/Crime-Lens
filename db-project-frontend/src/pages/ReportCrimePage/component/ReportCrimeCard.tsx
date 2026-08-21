@@ -24,27 +24,29 @@ type FileWithCaption = {
   fileType: 'image' | 'video';
 };
 
+type UploadedMediaItem = {
+  id: number;
+  publicId: string;
+  originalName: string;
+  mimeType: string;
+  fileSize: number;
+  fileType: 'image' | 'video';
+  url: string;
+  thumbnailUrl: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+  uploadedBy: 'citizen' | 'police';
+  uploadedAt: string;
+  visibility: 'public' | 'police_only';
+  caption?: string;
+  evidenceMarked: boolean;
+};
+
 type UploadMediaResponse = {
   success: boolean;
   data?: {
-    media: Array<{
-      id: number;
-      publicId: string;
-      originalName: string;
-      mimeType: string;
-      fileSize: number;
-      fileType: 'image' | 'video';
-      url: string;
-      thumbnailUrl: string;
-      width?: number;
-      height?: number;
-      duration?: number;
-      uploadedBy: 'citizen' | 'police';
-      uploadedAt: string;
-      visibility: 'public' | 'police_only';
-      caption?: string;
-      evidenceMarked: boolean;
-    }>;
+    media: UploadedMediaItem[];
     crimeId: number;
     count: number;
   };
@@ -167,7 +169,7 @@ export default function ReportCrimeCard() {
       }
 
       // First, upload media if any files are selected
-      let mediaData = [];
+      let mediaData: UploadedMediaItem[] = [];
       if (mediaFiles.length > 0) {
         setUploadProgress(10);
 
@@ -184,7 +186,7 @@ export default function ReportCrimeCard() {
           if (uploadResult && uploadResult.success) {
             mediaData = uploadResult.data?.media || [];
           } else {
-            const errorMessage = uploadResult?.message || uploadResult?.data?.message || "Failed to upload media. Please try again.";
+            const errorMessage = uploadResult?.message || uploadResult?.message || "Failed to upload media. Please try again.";
             setError(errorMessage);
             setSuccessMsg("");
             setLoading(false);
