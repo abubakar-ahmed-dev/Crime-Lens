@@ -564,22 +564,22 @@ const handleSubmit = async () => {
 ---
 
 ## Phase 13: Frontend Page Integration - Map View
-**Status:** Remaining
+**Status:** ✅ COMPLETED (2026-08-21)
 **Type:** Frontend
 **Dependencies:** Phase 11 (components)
 **Parallelizable:** Yes (with Phase 12)
 
 ### Frontend Tasks
-- [ ] Update `src/pages/MapViewPage/components/CrimeMarkers.tsx`
-- [ ] Add media indicator to markers
-- [ ] Add thumbnail display to popups
-- [ ] Filter media by visibility for citizens
-- [ ] Show all media for police/admin
-- [ ] Add media count badges
-- [ ] Add visibility badges for police
-- [ ] Update popup layout for thumbnails
-- [ ] Test public view (public media only)
-- [ ] Test police view (all media)
+- [x] Update `src/pages/MapViewPage/components/CrimeMarkers.tsx`
+- [x] Add media indicator to markers
+- [x] Add thumbnail display to popups
+- [x] Filter media by visibility for citizens
+- [x] Show all media for police/admin
+- [x] Add media count badges
+- [x] Add visibility badges for police
+- [x] Update popup layout for thumbnails
+- [x] Test public view (public media only)
+- [x] Test police view (all media)
 
 ### Integration Details
 ```typescript
