@@ -24,6 +24,33 @@ type FileWithCaption = {
   fileType: 'image' | 'video';
 };
 
+type UploadMediaResponse = {
+  success: boolean;
+  data?: {
+    media: Array<{
+      id: number;
+      publicId: string;
+      originalName: string;
+      mimeType: string;
+      fileSize: number;
+      fileType: 'image' | 'video';
+      url: string;
+      thumbnailUrl: string;
+      width?: number;
+      height?: number;
+      duration?: number;
+      uploadedBy: 'citizen' | 'police';
+      uploadedAt: string;
+      visibility: 'public' | 'police_only';
+      caption?: string;
+      evidenceMarked: boolean;
+    }>;
+    crimeId: number;
+    count: number;
+  };
+  message?: string;
+};
+
 export default function ReportCrimeCard() {
   const navigate = useNavigate();
   const { citizen, citizenToken, isCitizenAuthenticated, refreshCitizenSession } = useAuth();
@@ -149,7 +176,7 @@ export default function ReportCrimeCard() {
           const uploadResult = await uploadMedia(
             mediaFiles.map(f => f.file),
             mediaFiles.map(f => f.caption)
-          );
+          ) as UploadMediaResponse;
 
           setUploadProgress(70);
 
