@@ -276,21 +276,21 @@ DELETE /api/crimes/:crimeId/media/:mediaId - Remove from crime
 ---
 
 ## Phase 8: Update Crime Controllers for Media Integration
-**Status:** Remaining
+**Status:** ✅ COMPLETED (2026-08-21)
 **Type:** Backend
 **Dependencies:** Phase 3 (models), Phase 6 (media controller)
 **Parallelizable:** Yes (with Phase 7)
 
 ### Backend Tasks
-- [ ] Update `reportCrime` to handle media array
-- [ ] Update `getCrimesForMap` to include thumbnailUrl
-- [ ] Update `getCrimesForMap` to filter media by visibility for public
-- [ ] Update `getPendingSubmissions` to include media
-- [ ] Update `approveCrimeReport` to handle media edits
-- [ ] Update `getAllCrimes` to include full media URLs
-- [ ] Update `updateCrime` to handle media changes
-- [ ] Update `deleteCrime` to handle media cascade
-- [ ] Test all updated functions
+- [x] Update `reportCrime` to handle media array
+- [x] Update `getCrimesForMap` to include thumbnailUrl
+- [x] Update `getCrimesForMap` to filter media by visibility for public
+- [x] Update `getPendingSubmissions` to include media
+- [x] Update `approveCrimeReport` to handle media edits
+- [x] Update `getAllCrimes` to include full media URLs
+- [x] Update `updateCrime` to handle media changes
+- [x] Update `deleteCrime` to handle media cascade
+- [x] Test all updated functions
 
 ### Function Updates
 ```javascript
