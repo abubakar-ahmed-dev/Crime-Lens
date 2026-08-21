@@ -27,6 +27,26 @@ export interface CrimeRecord {
   submitterCnic: string | null;
   crimeTypeName: string;
   incidentDate: string; // YYYY-MM-DD
+  title?: string;
+  description?: string;
+  address?: string;
+  thumbnailUrl?: string;
+  mediaCount?: number;
+  media?: CrimeMediaItem[];
+}
+
+export interface CrimeMediaItem {
+  id: number;
+  fileType: 'image' | 'video';
+  url: string;
+  thumbnailUrl: string;
+  caption?: string;
+  visibility: 'public' | 'police_only';
+  evidenceMarked: boolean;
+  originalName: string;
+  fileSize: number;
+  uploadedBy: 'citizen' | 'police';
+  uploadedAt: string;
 }
 
 const isValidStoredCoordinate = (
