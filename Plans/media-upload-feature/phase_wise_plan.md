@@ -326,19 +326,19 @@ DELETE /api/crimes/:crimeId/media/:mediaId - Remove from crime
 ---
 
 ## Phase 9: Frontend Type Definitions & Interfaces
-**Status:** Remaining
+**Status:** ✅ COMPLETED (2026-08-21)
 **Type:** Frontend
 **Dependencies:** Phase 3 (backend models)
 **Parallelizable:** Yes (with backend phases)
 
 ### Frontend Tasks
-- [ ] Update `src/pages/MapViewPage/components/types.tsx`
-- [ ] Add CrimeMedia interface
-- [ ] Add visibility field to Crime interface
-- [ ] Add mediaCount field to Crime interface
-- [ ] Add thumbnailUrl field to Crime interface
-- [ ] Create media-related types for API responses
-- [ ] Update other type files as needed
+- [x] Update `src/pages/MapViewPage/components/types.tsx`
+- [x] Add CrimeMedia interface
+- [x] Add visibility field to Crime interface
+- [x] Add mediaCount field to Crime interface
+- [x] Add thumbnailUrl field to Crime interface
+- [x] Create media-related types for API responses
+- [x] Update other type files as needed
 
 ### Type Definitions
 ```typescript
