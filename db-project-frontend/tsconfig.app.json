@@ -22,8 +22,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
 
-    /* 👇 Optional but improves import paths */
-    "baseUrl": "src"
   },
   "include": [
     "src",
