@@ -52,7 +52,7 @@ const CrimeMarker: React.FC<{ crime: Crime }> = ({ crime }) => {
           <h3 className="font-bold text-base mb-2">{crime.title || "No title"}</h3>
 
           {/* Media Section */}
-          {crime.mediaCount > 0 && (
+          {(crime.mediaCount ?? 0) > 0 && (
             <div className="mb-3 p-2 bg-gray-50 rounded-lg">
               <div className="flex items-center justify-between mb-2">
                 <span className="font-semibold text-gray-700">
@@ -91,11 +91,10 @@ const CrimeMarker: React.FC<{ crime: Crime }> = ({ crime }) => {
                   {crime.media.slice(0, 3).map((media) => (
                     <span
                       key={media.id}
-                      className={`text-xs px-2 py-1 rounded ${
-                        media.visibility === 'public'
+                      className={`text-xs px-2 py-1 rounded ${media.visibility === 'public'
                           ? 'bg-green-100 text-green-700'
                           : 'bg-blue-100 text-blue-700'
-                      }`}
+                        }`}
                     >
                       {media.visibility === 'public' ? '🌐' : '🔒'}
                     </span>

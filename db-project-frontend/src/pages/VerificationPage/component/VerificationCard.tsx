@@ -2,8 +2,11 @@
 import { useState } from "react";
 import WhiteButton from "../../../components/WhiteButton";
 import ConfirmationPopup from "./ConfirmationPopup";
+import MediaGallery from "../../../components/MediaGallery";
+import PoliceMediaEditor from "../../../components/PoliceMediaEditor";
 import { API_BASE_URL } from "../../../config/constants";
 import { getJwtAuthHeaders } from "../../../utils/authHeaders";
+import type { CrimeMedia } from "../../../pages/MapViewPage/components/types";
 
 type VerificationCardProps =
   | {
@@ -34,10 +37,19 @@ type VerificationCardProps =
     address: string;
     latitude: number | string;
     longitude: number | string;
+    media?: CrimeMedia[];
     onContact?: () => void;
     onReject?: (reason?: string) => void;
-    onApprove?: () => void;
+    onApprove?: (mediaChanges?: MediaChanges) => void;
   };
+
+interface MediaChanges {
+  toRemove?: number[];
+  visibilityChanges?: Record<number, 'public' | 'police_only'>;
+  captionUpdates?: Record<number, string>;
+  evidenceMarkedChanges?: Record<number, boolean>;
+  toAdd?: Array<{ file: File; caption: string }>;
+}
 
 export default function VerificationCard(props: VerificationCardProps) {
   const [openConfirm, setOpenConfirm] = useState(false);
@@ -45,6 +57,11 @@ export default function VerificationCard(props: VerificationCardProps) {
   const [showSnackbar, setShowSnackbar] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [mediaChanges, setMediaChanges] = useState<MediaChanges>({});
+  const [editMediaMode, setEditMediaMode] = useState(false);
+
+  // Get media for police version
+  const crimeMedia = props.version === "police" ? (props as any).media || [] : [];
 
   // Copy contact number to clipboard and show snackbar
   const handleContactCopy = async () => {
@@ -73,6 +90,58 @@ export default function VerificationCard(props: VerificationCardProps) {
     setTimeout(() => setShowSnackbar(false), 2500);
 
     props.onContact?.();
+  };
+
+  // Media change handlers for police version
+  const handleMediaRemove = (mediaId: number) => {
+    setMediaChanges(prev => ({
+      ...prev,
+      toRemove: [...(prev.toRemove || []), mediaId]
+    }));
+  };
+
+  const handleVisibilityChange = (mediaId: number, newVisibility: 'public' | 'police_only') => {
+    setMediaChanges(prev => ({
+      ...prev,
+      visibilityChanges: {
+        ...(prev.visibilityChanges || {}),
+        [mediaId]: newVisibility
+      }
+    }));
+  };
+
+  const handleCaptionChange = (mediaId: number, newCaption: string) => {
+    setMediaChanges(prev => ({
+      ...prev,
+      captionUpdates: {
+        ...(prev.captionUpdates || {}),
+        [mediaId]: newCaption
+      }
+    }));
+  };
+
+  const handleEvidenceMarkChange = (mediaId: number, marked: boolean) => {
+    setMediaChanges(prev => ({
+      ...prev,
+      evidenceMarkedChanges: {
+        ...(prev.evidenceMarkedChanges || {}),
+        [mediaId]: marked
+      }
+    }));
+  };
+
+  const handleMediaAdd = (files: Array<{ file: File; caption: string }>) => {
+    setMediaChanges(prev => ({
+      ...prev,
+      toAdd: [...(prev.toAdd || []), ...files]
+    }));
+  };
+
+  const hasMediaChanges = () => {
+    return Object.keys(mediaChanges).some(key => {
+      const value = mediaChanges[key as keyof MediaChanges];
+      return Array.isArray(value) ? value.length > 0 : Object.keys(value).length > 0;
+    });
   };
 
   // Handle Approve
@@ -104,6 +173,7 @@ export default function VerificationCard(props: VerificationCardProps) {
           incidentDate: updatedValues.date,
           title: updatedValues.title || "",
           description: updatedValues.description || "",
+          mediaChanges: hasMediaChanges() ? mediaChanges : undefined,
         };
       }
 
@@ -119,7 +189,8 @@ export default function VerificationCard(props: VerificationCardProps) {
 
       if (response.ok && result.success) {
         setOpenConfirm(false);
-        props.onApprove?.();
+        // Pass media changes to parent component
+        props.onApprove?.(hasMediaChanges() ? mediaChanges : undefined);
       } else {
         setError(result.message || "Failed to approve");
       }
@@ -242,6 +313,52 @@ export default function VerificationCard(props: VerificationCardProps) {
               {props.description || "--"}
             </p>
           </div>
+
+          {/* Media Section for Police Version */}
+          {crimeMedia.length > 0 && (
+            <>
+              <hr className="my-4 border-t-2 border-[#d9d9d9]" />
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-semibold text-[#7d7d7d]">Attached Evidence:</h3>
+                <button
+                  onClick={() => setEditMediaMode(!editMediaMode)}
+                  className="text-xs px-3 py-1 rounded-full border border-[#237E54] text-[#237E54] hover:bg-green-50 transition-colors"
+                >
+                  {editMediaMode ? 'View Mode' : 'Edit Media'}
+                </button>
+              </div>
+
+              {editMediaMode ? (
+                <PoliceMediaEditor
+                  crimeId={Number(props.submissionId)}
+                  media={crimeMedia}
+                  onMediaUpdate={(mediaId, updates) => {
+                    if (updates.visibility) handleVisibilityChange(mediaId, updates.visibility);
+                    if (updates.caption !== undefined) handleCaptionChange(mediaId, updates.caption);
+                    if (updates.evidenceMarked !== undefined) handleEvidenceMarkChange(mediaId, updates.evidenceMarked);
+                  }}
+                  onMediaDelete={(mediaId) => handleMediaRemove(mediaId)}
+                  onMediaAdd={(files) => handleMediaAdd(files)}
+                  disabled={loading}
+                />
+              ) : (
+                <MediaGallery
+                  media={crimeMedia}
+                  userRole="police"
+                  editable={false}
+                />
+              )}
+
+              {/* Media Changes Indicator */}
+              {hasMediaChanges() && (
+                <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-700">
+                    ⚠️ You have pending media changes that will be applied on approval.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
         </>
       )}
 

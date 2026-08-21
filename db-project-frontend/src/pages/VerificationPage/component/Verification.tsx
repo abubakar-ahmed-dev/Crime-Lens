@@ -100,7 +100,8 @@ export default function AllRecords({ version }: AllRecordsProps) {
   };
 
   // Handle successful approval/rejection
-  const handleRecordProcessed = () => {
+  const handleRecordProcessed = (mediaChanges?: any) => {
+    console.log("Record processed with media changes:", mediaChanges);
     fetchRecords(); // Refresh the list
   };
 
@@ -207,7 +208,9 @@ export default function AllRecords({ version }: AllRecordsProps) {
                     longitude={getCrimeCoordinate(record, "longitude")}
 
                     zone={record.Zone?.id || record.zoneId}
-                    zoneName={record.Zone?.name || record.zoneName || ""}   
+                    zoneName={record.Zone?.name || record.zoneName || ""}
+
+                    media={record.media || record.CrimeMedia || []}
 
                     onApprove={handleRecordProcessed}
                     onReject={handleRecordProcessed}
