@@ -4,6 +4,8 @@ import { API_BASE_URL } from "../../../config/constants";
 import { supabase, useAuth } from "../../../context/AuthContext";
 import LocationPicker, { isValidLocation } from "../../../components/LocationPicker";
 import GreenButton from "../../../components/GreenButton";
+import MediaUploader from "../../../components/MediaUploader";
+import { uploadMedia } from "../../../services/api";
 
 type ZoneOption = {
   id: number;
@@ -13,6 +15,13 @@ type ZoneOption = {
 type CrimeTypeOption = {
   id: number;
   name: string;
+};
+
+type FileWithCaption = {
+  file: File;
+  caption: string;
+  preview: string;
+  fileType: 'image' | 'video';
 };
 
 export default function ReportCrimeCard() {
@@ -26,6 +35,8 @@ export default function ReportCrimeCard() {
   const [hideLocationPicker, setHideLocationPicker] = useState(false);
   const [zones, setZones] = useState<ZoneOption[]>([]);
   const [crimeTypes, setCrimeTypes] = useState<CrimeTypeOption[]>([]);
+  const [mediaFiles, setMediaFiles] = useState<FileWithCaption[]>([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -111,6 +122,7 @@ export default function ReportCrimeCard() {
     }
 
     setLoading(true);
+    setUploadProgress(0);
 
     try {
       let accessToken = citizenToken || localStorage.getItem("citizen_token");
@@ -127,6 +139,47 @@ export default function ReportCrimeCard() {
         return;
       }
 
+      // First, upload media if any files are selected
+      let mediaData = [];
+      if (mediaFiles.length > 0) {
+        setUploadProgress(10);
+
+        try {
+          setUploadProgress(30);
+          const uploadResult = await uploadMedia(
+            mediaFiles.map(f => f.file),
+            mediaFiles.map(f => f.caption)
+          );
+
+          setUploadProgress(70);
+
+          if (uploadResult.success && uploadResult.data) {
+            mediaData = uploadResult.data.media || [];
+          } else {
+            setError(uploadResult.message || "Failed to upload media. Please try again.");
+            setSuccessMsg("");
+            setLoading(false);
+            setUploadProgress(0);
+            return;
+          }
+        } catch (uploadError) {
+          console.error("Error uploading media:", uploadError);
+          setError("Failed to upload media. Please try again.");
+          setSuccessMsg("");
+          setLoading(false);
+          setUploadProgress(0);
+          return;
+        }
+      }
+
+      setUploadProgress(90);
+
+      // Submit crime report with media data
+      const requestBody = {
+        ...formData,
+        mediaData: mediaData.length > 0 ? mediaData : undefined,
+      };
+
       let response = await fetch(
         `${API_BASE_URL}/user/report-crime`,
         {
@@ -135,7 +188,7 @@ export default function ReportCrimeCard() {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${accessToken}`,
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(requestBody),
         }
       );
 
@@ -157,7 +210,7 @@ export default function ReportCrimeCard() {
               "Content-Type": "application/json",
               "Authorization": `Bearer ${accessToken}`,
             },
-            body: JSON.stringify(formData),
+            body: JSON.stringify(requestBody),
           }
         );
       }
@@ -180,6 +233,10 @@ export default function ReportCrimeCard() {
           latitude: "",
           longitude: "",
         });
+        setMediaFiles([]);
+        setUploadProgress(0);
+        setMediaFiles([]);
+        setUploadProgress(0);
 
         // Redirect to dashboard after 2 seconds
         setTimeout(() => {
@@ -195,6 +252,7 @@ export default function ReportCrimeCard() {
       setSuccessMsg("");
     } finally {
       setLoading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -377,6 +435,21 @@ export default function ReportCrimeCard() {
               {formData.description.length}/300 characters
             </p>
           </div>
+
+          {/* Media Upload Section */}
+          <div className="mt-6">
+            <h3 className="font-medium text-gray-700 mb-2">Attach Evidence (Optional):</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              You can add up to 5 images and 2 videos (max 5MB each). All media will be visible to the public by default.
+            </p>
+            <MediaUploader
+              onFilesSelected={(files) => setMediaFiles(files)}
+              existingFiles={mediaFiles}
+              disabled={loading}
+              maxImages={5}
+              maxVideos={2}
+            />
+          </div>
         </div>
 
         <div>
@@ -402,6 +475,22 @@ export default function ReportCrimeCard() {
             <strong>Submitting as:</strong> {citizen?.fullName} ({citizen?.email})
           </p>
         </div>
+
+        {/* Upload Progress */}
+        {uploadProgress > 0 && uploadProgress < 100 && (
+          <div className="bg-blue-50 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-blue-600 font-medium">Uploading media...</p>
+              <p className="text-sm text-blue-600">{uploadProgress}%</p>
+            </div>
+            <div className="w-full bg-blue-200 rounded-full h-2">
+              <div
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* SUBMIT BUTTON */}
         <div className="flex justify-center pt-4">
