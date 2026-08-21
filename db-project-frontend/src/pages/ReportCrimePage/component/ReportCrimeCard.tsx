@@ -153,18 +153,21 @@ export default function ReportCrimeCard() {
 
           setUploadProgress(70);
 
-          if (uploadResult.success && uploadResult.data) {
-            mediaData = uploadResult.data.media || [];
+          // Handle the response from uploadMedia
+          if (uploadResult && uploadResult.success) {
+            mediaData = uploadResult.data?.media || [];
           } else {
-            setError(uploadResult.message || "Failed to upload media. Please try again.");
+            const errorMessage = uploadResult?.message || uploadResult?.data?.message || "Failed to upload media. Please try again.";
+            setError(errorMessage);
             setSuccessMsg("");
             setLoading(false);
             setUploadProgress(0);
             return;
           }
-        } catch (uploadError) {
+        } catch (uploadError: any) {
           console.error("Error uploading media:", uploadError);
-          setError("Failed to upload media. Please try again.");
+          const errorMessage = uploadError?.response?.data?.message || uploadError?.message || "Failed to upload media. Please try again.";
+          setError(errorMessage);
           setSuccessMsg("");
           setLoading(false);
           setUploadProgress(0);
@@ -233,8 +236,6 @@ export default function ReportCrimeCard() {
           latitude: "",
           longitude: "",
         });
-        setMediaFiles([]);
-        setUploadProgress(0);
         setMediaFiles([]);
         setUploadProgress(0);
 
