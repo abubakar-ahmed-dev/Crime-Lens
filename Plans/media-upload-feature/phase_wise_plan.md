@@ -378,22 +378,22 @@ interface Crime {
 ---
 
 ## Phase 10: Frontend API Service Layer
-**Status:** Remaining
+**Status:** ✅ COMPLETED (2026-08-21)
 **Type:** Frontend
 **Dependencies:** Phase 7 (routes), Phase 9 (types)
 **Parallelizable:** No
 
 ### Frontend Tasks
-- [ ] Update `src/services/api.ts`
-- [ ] Add uploadMedia function (FormData support)
-- [ ] Add getCrimeMedia function
-- [ ] Add updateMedia function
-- [ ] Add deleteMedia function
-- [ ] Add addMediaToCrime function
-- [ ] Add removeMediaFromCrime function
-- [ ] Add proper error handling
-- [ ] Add FormData building helpers
-- [ ] Test all API functions
+- [x] Update `src/services/api.ts`
+- [x] Add uploadMedia function (FormData support)
+- [x] Add getCrimeMedia function
+- [x] Add updateMedia function
+- [x] Add deleteMedia function
+- [x] Add addMediaToCrime function
+- [x] Add removeMediaFromCrime function
+- [x] Add proper error handling
+- [x] Add FormData building helpers
+- [x] Test all API functions
 
 ### API Service Functions
 ```typescript
