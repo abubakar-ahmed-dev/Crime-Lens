@@ -504,22 +504,22 @@ interface MediaVisibilityToggleProps {
 ---
 
 ## Phase 12: Frontend Page Integration - Crime Submission
-**Status:** Remaining
+**Status:** ✅ COMPLETED (2026-08-21)
 **Type:** Frontend
 **Dependencies:** Phase 11 (components)
 **Parallelizable:** No
 
 ### Frontend Tasks
-- [ ] Update `src/pages/ReportCrimePage/component/ReportCrimeCard.tsx`
-- [ ] Add MediaUploader component to form
-- [ ] Position after description field
-- [ ] Update form state to handle files with captions
-- [ ] Update form validation for file counts
-- [ ] Update form submission to use FormData
-- [ ] Add upload progress tracking
-- [ ] Add error handling for upload failures
-- [ ] Test complete submission flow
-- [ ] Test submission without media (optional)
+- [x] Update `src/pages/ReportCrimePage/component/ReportCrimeCard.tsx`
+- [x] Add MediaUploader component to form
+- [x] Position after description field
+- [x] Update form state to handle files with captions
+- [x] Update form validation for file counts
+- [x] Update form submission to use FormData
+- [x] Add upload progress tracking
+- [x] Add error handling for upload failures
+- [x] Test complete submission flow
+- [x] Test submission without media (optional)
 
 ### Integration Details
 ```typescript
