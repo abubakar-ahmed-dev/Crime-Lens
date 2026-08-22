@@ -176,17 +176,18 @@ export const getImageThumbnail = (publicId) => {
  * @returns {string} Thumbnail URL (image)
  */
 export const getVideoThumbnail = (publicId) => {
-  // For video thumbnails, construct URL with video thumbnail transformation
-  // Cloudinary automatically extracts first frame when you request an image format
-  return cloudinary.url(publicId, {
-    resource_type: 'video',
-    format: 'jpg', // This tells Cloudinary to convert video to image
-    transformation: [
-      { width: 200, height: 200, crop: 'fill', gravity: 'auto' },
-      { quality: 'auto' },
-    ],
-    secure: true,
-  });
+  // Manually construct the video thumbnail URL
+  // Format: https://res.cloudinary.com/{cloud_name}/video/upload/{transformations}/{public_id}.jpg
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+
+  // Remove file extension if present
+  const publicIdClean = publicId.replace(/\.(mp4|mov|webm|avi)$/i, '');
+
+  // Construct transformation: 200x200 fill, auto quality
+  const transformation = 'c_fill,g_auto,h_200,q_auto,w_200';
+
+  // Build the URL
+  return `https://res.cloudinary.com/${cloudName}/video/upload/${transformation}/${publicIdClean}.jpg`;
 };
 
 /**
