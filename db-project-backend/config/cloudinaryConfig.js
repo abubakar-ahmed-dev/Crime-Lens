@@ -167,7 +167,17 @@ export const uploadMultipleFiles = async (files, crimeId) => {
  * @returns {string} Thumbnail URL
  */
 export const getImageThumbnail = (publicId) => {
-  return cloudinary.url(publicId, THUMBNAIL_OPTIONS.image);
+  // Manually construct the image thumbnail URL for consistency
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+
+  // Remove file extension if present
+  const publicIdClean = publicId.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '');
+
+  // Construct transformation: 200x200 fill, auto quality, auto format
+  const transformation = 'c_fill,g_auto,h_200,q_auto,w_200';
+
+  // Build the URL
+  return `https://res.cloudinary.com/${cloudName}/image/upload/${transformation}/${publicIdClean}`;
 };
 
 /**
