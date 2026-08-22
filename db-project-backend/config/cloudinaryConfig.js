@@ -66,11 +66,12 @@ const THUMBNAIL_OPTIONS = {
     ],
   },
 
-  // Video thumbnails (first frame)
+  // Video thumbnails (first frame extracted as image)
   video: {
     resource_type: "video",
+    format: "jpg", // Convert video first frame to JPG
     transformation: [
-      { width: 200, height: 200, crop: "fill" },
+      { width: 200, height: 200, crop: "fill", gravity: "auto" },
       { quality: "auto", fetch_format: "auto" },
     ],
   },
@@ -172,10 +173,20 @@ export const getImageThumbnail = (publicId) => {
 /**
  * Generate thumbnail URL for a video (first frame)
  * @param {string} publicId - Cloudinary public ID
- * @returns {string} Thumbnail URL
+ * @returns {string} Thumbnail URL (image)
  */
 export const getVideoThumbnail = (publicId) => {
-  return cloudinary.url(publicId, THUMBNAIL_OPTIONS.video);
+  // For video thumbnails, we need to use cloudinary.image to get an image URL
+  // This extracts the first frame and converts it to an image
+  return cloudinary.url(publicId, {
+    ...THUMBNAIL_OPTIONS.video,
+    format: 'jpg', // Ensure output is JPG image
+    // Add explicit transformation to get first frame as image
+    transformation: [
+      { width: 200, height: 200, crop: "fill", gravity: "auto" },
+      { quality: "auto" },
+    ],
+  });
 };
 
 /**

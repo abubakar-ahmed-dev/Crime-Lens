@@ -77,13 +77,23 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                 src={item.thumbnailUrl || item.url}
                 alt={item.caption || item.originalName}
                 className="w-full h-32 object-cover rounded-lg"
+                onError={(e) => {
+                  // Fallback to full URL if thumbnail fails
+                  (e.target as HTMLImageElement).src = item.url;
+                }}
               />
             ) : (
               <div className="relative w-full h-32">
-                <video
+                {/* For videos, use img tag with thumbnailUrl (should be JPG of first frame) */}
+                <img
                   src={item.thumbnailUrl || item.url}
+                  alt={item.caption || item.originalName}
                   className="w-full h-full object-cover rounded-lg"
-                  muted
+                  onError={(e) => {
+                    // Fallback placeholder if thumbnail fails
+                    const target = e.target as HTMLImageElement;
+                    target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23d1d5db"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="24"%3E🎥%3C/text%3E%3C/svg%3E';
+                  }}
                 />
                 <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg">
                   <svg className="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 20 20">
