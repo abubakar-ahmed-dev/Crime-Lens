@@ -1,5 +1,5 @@
 //VerificationPage/components/VerificationCard.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import WhiteButton from "../../../components/WhiteButton";
 import ConfirmationPopup from "./ConfirmationPopup";
 import MediaGallery from "../../../components/MediaGallery";
@@ -60,8 +60,16 @@ export default function VerificationCard(props: VerificationCardProps) {
   const [mediaChanges, setMediaChanges] = useState<MediaChanges>({});
   const [editMediaMode, setEditMediaMode] = useState(false);
 
+  // Local state for displayed media (with optimistic updates)
+  const [displayedMedia, setDisplayedMedia] = useState<CrimeMedia[]>([]);
+
   // Get media for police version
   const crimeMedia = props.version === "police" ? (props as any).media || [] : [];
+
+  // Sync displayedMedia with crimeMedia when props change
+  useEffect(() => {
+    setDisplayedMedia(crimeMedia);
+  }, [crimeMedia]);
 
   // Copy contact number to clipboard and show snackbar
   const handleContactCopy = async () => {
@@ -108,6 +116,11 @@ export default function VerificationCard(props: VerificationCardProps) {
         [mediaId]: newVisibility
       }
     }));
+
+    // Optimistic update - update displayed media immediately
+    setDisplayedMedia(prev => prev.map(m =>
+      m.id === mediaId ? { ...m, visibility: newVisibility } : m
+    ));
   };
 
   const handleCaptionChange = (mediaId: number, newCaption: string) => {
@@ -118,6 +131,11 @@ export default function VerificationCard(props: VerificationCardProps) {
         [mediaId]: newCaption
       }
     }));
+
+    // Optimistic update - update displayed media immediately
+    setDisplayedMedia(prev => prev.map(m =>
+      m.id === mediaId ? { ...m, caption: newCaption } : m
+    ));
   };
 
   const handleEvidenceMarkChange = (mediaId: number, marked: boolean) => {
@@ -128,6 +146,11 @@ export default function VerificationCard(props: VerificationCardProps) {
         [mediaId]: marked
       }
     }));
+
+    // Optimistic update - update displayed media immediately
+    setDisplayedMedia(prev => prev.map(m =>
+      m.id === mediaId ? { ...m, evidenceMarked: marked } : m
+    ));
   };
 
   const handleMediaAdd = (files: Array<{ file: File; caption: string }>) => {
@@ -331,7 +354,7 @@ export default function VerificationCard(props: VerificationCardProps) {
               {editMediaMode ? (
                 <PoliceMediaEditor
                   crimeId={Number(props.submissionId)}
-                  media={crimeMedia}
+                  media={displayedMedia}
                   onMediaUpdate={(mediaId, updates) => {
                     if (updates.visibility) handleVisibilityChange(mediaId, updates.visibility);
                     if (updates.caption !== undefined) handleCaptionChange(mediaId, updates.caption);
@@ -343,7 +366,7 @@ export default function VerificationCard(props: VerificationCardProps) {
                 />
               ) : (
                 <MediaGallery
-                  media={crimeMedia}
+                  media={displayedMedia}
                   userRole="police"
                   editable={false}
                 />
