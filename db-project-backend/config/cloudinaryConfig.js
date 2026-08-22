@@ -89,13 +89,32 @@ const THUMBNAIL_OPTIONS = {
  */
 export const uploadFile = async (fileBuffer, originalName, crimeId) => {
   try {
+    // Detect file type from buffer or use original name
+    const fileExtension = originalName.split('.').pop().toLowerCase();
+    const mimeTypes = {
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+      'mp4': 'video/mp4',
+      'mov': 'video/quicktime',
+      'webm': 'video/webm',
+    };
+    const mimeType = mimeTypes[fileExtension] || 'image/jpeg';
+
+    // Convert buffer to base64 data URI for Cloudinary
+    const base64Data = fileBuffer.toString('base64');
+    const dataUri = `data:${mimeType};base64,${base64Data}`;
+
     const options = {
       ...UPLOAD_OPTIONS,
       folder: `crimes/${crimeId}`, // Organize by crime ID
       public_id: `${Date.now()}_${originalName.split(".")[0]}`, // Unique ID
+      resource_type: mimeType.startsWith('video') ? 'video' : 'image',
     };
 
-    const result = await cloudinary.uploader.upload(fileBuffer, options);
+    const result = await cloudinary.uploader.upload(dataUri, options);
 
     return {
       success: true,
