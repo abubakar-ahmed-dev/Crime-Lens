@@ -8,7 +8,7 @@ import { addMediaToCrime, removeMediaFromCrime, updateMedia, buildMediaFormData,
 interface PoliceMediaEditorProps {
   crimeId: number;
   media: CrimeMedia[];
-  onMediaUpdate: (updatedMedia: CrimeMedia[]) => void;
+  onMediaUpdate?: (mediaId: number, updates: MediaUpdate) => void;
   onCancel: () => void;
 }
 
@@ -121,7 +121,10 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
     const updatedMedia = media.map(m =>
       m.id === mediaId ? { ...m, ...updates } : m
     );
-    onMediaUpdate(updatedMedia);
+    // Call parent's onMediaUpdate with mediaId and updates if provided
+    if (onMediaUpdate) {
+      onMediaUpdate(mediaId, updates);
+    }
 
     // Track in changes
     setMediaChanges(prev => ({
@@ -139,16 +142,39 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
       if (!result.success) {
         // Rollback on error
         setErrors([result.message || 'Failed to update media']);
-        // Revert to original state
-        const revertedMedia = media.map(m =>
-          m.id === mediaId ? m : m
-        );
-        onMediaUpdate(revertedMedia);
+        // Revert on error by calling parent with original values
+        if (onMediaUpdate) {
+          const originalMedia = media.find(m => m.id === mediaId);
+          if (originalMedia) {
+            if (updates.visibility !== undefined) {
+              onMediaUpdate(mediaId, { visibility: originalMedia.visibility });
+            }
+            if (updates.caption !== undefined) {
+              onMediaUpdate(mediaId, { caption: originalMedia.caption });
+            }
+            if (updates.evidenceMarked !== undefined) {
+              onMediaUpdate(mediaId, { evidenceMarked: originalMedia.evidenceMarked });
+            }
+          }
+        }
       }
     } catch (error) {
       setErrors(['Failed to update media. Please try again.']);
-      // Revert to original state
-      onMediaUpdate(media);
+      // Revert on error
+      if (onMediaUpdate) {
+        const originalMedia = media.find(m => m.id === mediaId);
+        if (originalMedia) {
+          if (updates.visibility !== undefined) {
+            onMediaUpdate(mediaId, { visibility: originalMedia.visibility });
+          }
+          if (updates.caption !== undefined) {
+            onMediaUpdate(mediaId, { caption: originalMedia.caption });
+          }
+          if (updates.evidenceMarked !== undefined) {
+            onMediaUpdate(mediaId, { evidenceMarked: originalMedia.evidenceMarked });
+          }
+        }
+      }
     }
   }, [media, onMediaUpdate]);
 
@@ -159,11 +185,10 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
       clearTimeout(debounceTimeoutsRef.current[mediaId]);
     }
 
-    // Optimistic update - update UI immediately
-    const updatedMedia = media.map(m =>
-      m.id === mediaId ? { ...m, caption: newCaption } : m
-    );
-    onMediaUpdate(updatedMedia);
+    // Optimistic update - call parent immediately
+    if (onMediaUpdate) {
+      onMediaUpdate(mediaId, { caption: newCaption });
+    }
 
     // Set new timeout to call API after 500ms of no typing
     debounceTimeoutsRef.current[mediaId] = setTimeout(async () => {
@@ -172,14 +197,17 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
         if (!result.success) {
           setErrors([result.message || 'Failed to update caption']);
           // Revert on error
-          const revertedMedia = media.map(m =>
-            m.id === mediaId ? m : m
-          );
-          onMediaUpdate(revertedMedia);
+          const originalMedia = media.find(m => m.id === mediaId);
+          if (originalMedia && onMediaUpdate) {
+            onMediaUpdate(mediaId, { caption: originalMedia.caption });
+          }
         }
       } catch (error) {
         setErrors(['Failed to update caption. Please try again.']);
-        onMediaUpdate(media);
+        const originalMedia = media.find(m => m.id === mediaId);
+        if (originalMedia && onMediaUpdate) {
+          onMediaUpdate(mediaId, { caption: originalMedia.caption });
+        }
       }
     }, 500);
   }, [media, onMediaUpdate]);
