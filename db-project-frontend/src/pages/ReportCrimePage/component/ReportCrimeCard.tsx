@@ -175,9 +175,25 @@ export default function ReportCrimeCard() {
 
         try {
           setUploadProgress(30);
+          // Get fresh token from Supabase session
+          let token = citizenToken || localStorage.getItem("citizen_token");
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            token = session.access_token;
+          }
+
+          if (!token) {
+            setError("Your session has expired. Please login again.");
+            setLoading(false);
+            setUploadProgress(0);
+            return;
+          }
+
           const uploadResult = await uploadMedia(
             mediaFiles.map(f => f.file),
-            mediaFiles.map(f => f.caption)
+            mediaFiles.map(f => f.caption),
+            undefined,
+            token
           ) as UploadMediaResponse;
 
           setUploadProgress(70);

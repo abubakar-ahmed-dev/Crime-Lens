@@ -30,9 +30,10 @@ export const loginUser = async (username, password, verify_role) => {
  * @param {File[]} files - Array of files to upload
  * @param {string[]} captions - Array of captions (same length as files)
  * @param {number} [crimeId] - Optional crime ID for existing crimes
+ * @param {string} [authToken] - Optional authorization token (for citizen auth)
  * @returns {Promise<Object>} Response with created media array
  */
-export const uploadMedia = async (files, captions = [], crimeId = null) => {
+export const uploadMedia = async (files, captions = [], crimeId = null, authToken = null) => {
   const formData = new FormData();
 
   // Append files
@@ -52,10 +53,18 @@ export const uploadMedia = async (files, captions = [], crimeId = null) => {
     formData.append("crimeId", crimeId.toString());
   }
 
+  // Build headers
+  const headers: Record<string, string> = {
+    "Content-Type": "multipart/form-data",
+  };
+
+  // Add auth token if provided (for citizen Supabase auth)
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
+  }
+
   const res = await api.post("/media/upload", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+    headers,
   });
 
   return res.data; // { success, data: { media, crimeId, count } }
