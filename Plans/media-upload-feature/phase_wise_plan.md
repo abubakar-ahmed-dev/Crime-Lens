@@ -673,22 +673,22 @@ const handleApproval = async () => {
 ---
 
 ## Phase 15: Frontend Page Integration - Records Management
-**Status:** Remaining
+**Status:** ✅ COMPLETED (2026-08-21)
 **Type:** Frontend
 **Dependencies:** Phase 11 (components)
 **Parallelizable:** Yes (with Phases 12-14)
 
 ### Frontend Tasks
-- [ ] Update `src/pages/AllRecordsPage/component/DetailsPopup.tsx`
-- [ ] Add MediaGallery for approved crimes
-- [ ] Add PoliceMediaEditor for edit mode
-- [ ] Update crime update form to handle media operations
-- [ ] Add visibility management for approved crimes
-- [ ] Update Crime.latestUpdatedBy tracking
-- [ ] Test media addition to approved crimes
-- [ ] Test media removal from approved crimes
-- [ ] Test visibility changes
-- [ ] Test caption updates
+- [x] Update `src/pages/AllRecordsPage/component/DetailsPopup.tsx`
+- [x] Add MediaGallery for approved crimes
+- [x] Add PoliceMediaEditor for edit mode
+- [x] Update crime update form to handle media operations
+- [x] Add visibility management for approved crimes
+- [x] Update Crime.latestUpdatedBy tracking
+- [x] Test media addition to approved crimes
+- [x] Test media removal from approved crimes
+- [x] Test visibility changes
+- [x] Test caption updates
 
 ### Integration Details
 ```typescript
