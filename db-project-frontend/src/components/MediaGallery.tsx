@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CrimeMedia } from '../pages/MapViewPage/components/types';
+import type { CrimeMedia } from '../pages/MapViewPage/components/types.tsx';
 
 interface MediaGalleryProps {
   media: CrimeMedia[];

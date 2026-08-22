@@ -208,6 +208,3 @@ export const UPLOAD_CONFIG = {
   MAX_IMAGE_COUNT: parseInt(process.env.MAX_IMAGE_COUNT) || 5,
   MAX_VIDEO_COUNT: parseInt(process.env.MAX_VIDEO_COUNT) || 2,
 };
-
-// Export validation functions
-export { validateFileCount, validateFileSize, getFileCategory };

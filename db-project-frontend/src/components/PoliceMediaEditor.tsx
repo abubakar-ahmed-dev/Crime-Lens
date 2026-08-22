@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { CrimeMedia, MediaUpdate, MediaOperations } from '../pages/MapViewPage/components/types';
+import type { CrimeMedia, MediaUpdate, MediaOperations } from '../pages/MapViewPage/components/types';
 import MediaUploader from './MediaUploader';
 import MediaGallery from './MediaGallery';
 import MediaVisibilityToggle from './MediaVisibilityToggle';
