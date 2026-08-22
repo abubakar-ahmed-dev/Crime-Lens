@@ -176,16 +176,16 @@ export const getImageThumbnail = (publicId) => {
  * @returns {string} Thumbnail URL (image)
  */
 export const getVideoThumbnail = (publicId) => {
-  // For video thumbnails, we need to use cloudinary.image to get an image URL
-  // This extracts the first frame and converts it to an image
+  // For video thumbnails, construct URL with video thumbnail transformation
+  // Cloudinary automatically extracts first frame when you request an image format
   return cloudinary.url(publicId, {
-    ...THUMBNAIL_OPTIONS.video,
-    format: 'jpg', // Ensure output is JPG image
-    // Add explicit transformation to get first frame as image
+    resource_type: 'video',
+    format: 'jpg', // This tells Cloudinary to convert video to image
     transformation: [
-      { width: 200, height: 200, crop: "fill", gravity: "auto" },
-      { quality: "auto" },
+      { width: 200, height: 200, crop: 'fill', gravity: 'auto' },
+      { quality: 'auto' },
     ],
+    secure: true,
   });
 };
 
