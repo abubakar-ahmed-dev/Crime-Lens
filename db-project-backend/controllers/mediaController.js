@@ -109,7 +109,43 @@ export const uploadMedia = async (req, res) => {
 
     const uploadResults = await Promise.all(uploadPromises);
 
-    // Generate thumbnails
+    // If uploading to existing crime, create CrimeMedia records
+    // If uploading for new crime (no crimeId yet), just return uploaded data
+    if (!targetCrimeId) {
+      await t.commit();
+
+      // Return media data without creating database records
+      // These will be created when the crime is submitted
+      const mediaData = uploadResults.map((upload) => {
+        const thumbnailUrl = getThumbnail(upload.publicId, upload.fileType);
+        return {
+          publicId: upload.publicId,
+          originalName: upload.originalName,
+          mimeType: upload.mimeType,
+          fileSize: upload.fileSize,
+          fileType: upload.fileType,
+          url: upload.url,
+          thumbnailUrl: thumbnailUrl,
+          width: upload.width,
+          height: upload.height,
+          duration: upload.duration,
+          uploadedBy: upload.uploadedBy,
+          caption: upload.caption,
+        };
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Media uploaded successfully (pending crime creation)",
+        data: {
+          media: mediaData,
+          crimeId: null,
+          count: mediaData.length,
+        },
+      });
+    }
+
+    // Generate thumbnails and create CrimeMedia records for existing crime
     const mediaRecords = uploadResults.map((upload) => {
       const thumbnailUrl = getThumbnail(upload.publicId, upload.fileType);
       return {
