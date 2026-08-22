@@ -718,18 +718,18 @@ const handleUpdateCrime = async () => {
 ---
 
 ## Phase 16: Frontend Page Integration - Citizen Dashboard
-**Status:** Remaining
+**Status:** ✅ COMPLETED (2026-08-22)
 **Type:** Frontend
 **Dependencies:** Phase 11 (components)
 **Parallelizable:** Yes (with Phases 12-15)
 
 ### Frontend Tasks
-- [ ] Update citizen dashboard to show media previews
-- [ ] Add media count to crime report cards
-- [ ] Add thumbnail indicators
-- [ ] Update "My Reports" to show media status
-- [ ] Test citizen view of submitted reports
-- [ ] Verify media visibility is public by default
+- [x] Update citizen dashboard to show media previews
+- [x] Add media count to crime report cards
+- [x] Add thumbnail indicators
+- [x] Update "My Reports" to show media status
+- [x] Test citizen view of submitted reports
+- [x] Verify media visibility is public by default
 
 ### Deliverables
 - Citizen dashboard updated
