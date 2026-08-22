@@ -54,7 +54,7 @@ export const uploadMedia = async (files, captions = [], crimeId = null, authToke
   }
 
   // Build headers
-  const headers: Record<string, string> = {
+  const headers = {
     "Content-Type": "multipart/form-data",
   };
 
