@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type { CrimeMedia, MediaUpdate, MediaOperations } from '../pages/MapViewPage/components/types';
 import MediaUploader from './MediaUploader';
 import MediaGallery from './MediaGallery';
@@ -36,6 +36,7 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const debounceTimeoutsRef = useRef<Record<number, NodeJS.Timeout>>({});
 
   const handleAddMedia = useCallback(async () => {
     if (newFiles.length === 0) return;
@@ -116,41 +117,81 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
   }, [crimeId, media, onMediaUpdate]);
 
   const handleUpdateMedia = useCallback(async (mediaId: number, updates: MediaUpdate) => {
-    setIsSaving(true);
-    setErrors([]);
+    // Optimistic update - update UI immediately
+    const updatedMedia = media.map(m =>
+      m.id === mediaId ? { ...m, ...updates } : m
+    );
+    onMediaUpdate(updatedMedia);
 
+    // Track in changes
+    setMediaChanges(prev => ({
+      ...prev,
+      toUpdate: [
+        ...(prev.toUpdate || []),
+        { mediaId, ...updates },
+      ],
+    }));
+
+    // Then make API call silently
     try {
-      setUploadProgress(10);
-
       const result = await updateMedia(mediaId, updates);
 
-      setUploadProgress(90);
-
-      if (result.success) {
-        // Update local media state
-        const updatedMedia = media.map(m =>
-          m.id === mediaId ? { ...m, ...updates } : m
-        );
-        onMediaUpdate(updatedMedia);
-
-        // Track in changes
-        setMediaChanges(prev => ({
-          ...prev,
-          toUpdate: [
-            ...(prev.toUpdate || []),
-            { mediaId, ...updates },
-          ],
-        }));
-      } else {
+      if (!result.success) {
+        // Rollback on error
         setErrors([result.message || 'Failed to update media']);
+        // Revert to original state
+        const revertedMedia = media.map(m =>
+          m.id === mediaId ? m : m
+        );
+        onMediaUpdate(revertedMedia);
       }
     } catch (error) {
       setErrors(['Failed to update media. Please try again.']);
-    } finally {
-      setUploadProgress(100);
-      setIsSaving(false);
+      // Revert to original state
+      onMediaUpdate(media);
     }
   }, [media, onMediaUpdate]);
+
+  // Debounced caption update handler
+  const handleCaptionChange = useCallback((mediaId: number, newCaption: string) => {
+    // Clear existing timeout for this media item
+    if (debounceTimeoutsRef.current[mediaId]) {
+      clearTimeout(debounceTimeoutsRef.current[mediaId]);
+    }
+
+    // Optimistic update - update UI immediately
+    const updatedMedia = media.map(m =>
+      m.id === mediaId ? { ...m, caption: newCaption } : m
+    );
+    onMediaUpdate(updatedMedia);
+
+    // Set new timeout to call API after 500ms of no typing
+    debounceTimeoutsRef.current[mediaId] = setTimeout(async () => {
+      try {
+        const result = await updateMedia(mediaId, { caption: newCaption });
+        if (!result.success) {
+          setErrors([result.message || 'Failed to update caption']);
+          // Revert on error
+          const revertedMedia = media.map(m =>
+            m.id === mediaId ? m : m
+          );
+          onMediaUpdate(revertedMedia);
+        }
+      } catch (error) {
+        setErrors(['Failed to update caption. Please try again.']);
+        onMediaUpdate(media);
+      }
+    }, 500);
+  }, [media, onMediaUpdate]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(debounceTimeoutsRef.current).forEach(timeout => {
+        clearTimeout(timeout);
+      });
+    };
+  }, []);
 
   const handleSaveAllChanges = useCallback(async () => {
     setIsSaving(true);
@@ -277,7 +318,6 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
                     onVisibilityChange={(newVisibility) =>
                       handleUpdateMedia(item.id, { visibility: newVisibility })
                     }
-                    disabled={isSaving}
                   />
 
                   {/* Caption Edit */}
@@ -287,10 +327,9 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
                       type="text"
                       value={item.caption || ''}
                       onChange={(e) =>
-                        handleUpdateMedia(item.id, { caption: e.target.value })
+                        handleCaptionChange(item.id, e.target.value)
                       }
                       className="w-full px-3 py-2 border rounded-lg text-sm"
-                      disabled={isSaving}
                       placeholder="Add a caption..."
                     />
                   </div>
@@ -304,7 +343,6 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
                       onChange={(e) =>
                         handleUpdateMedia(item.id, { evidenceMarked: e.target.checked })
                       }
-                      disabled={isSaving}
                       className="rounded"
                     />
                     <label htmlFor={`evidence-${item.id}`} className="text-sm text-gray-700">
