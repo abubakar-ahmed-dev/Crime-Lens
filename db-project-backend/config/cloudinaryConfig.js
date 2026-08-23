@@ -173,11 +173,11 @@ export const getImageThumbnail = (publicId) => {
   // Remove file extension if present
   const publicIdClean = publicId.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '');
 
-  // Construct transformation: 200x200 fill, auto quality, auto format
+  // Construct transformation: 200x200 fill, auto quality
   const transformation = 'c_fill,g_auto,h_200,q_auto,w_200';
 
-  // Build the URL
-  return `https://res.cloudinary.com/${cloudName}/image/upload/${transformation}/${publicIdClean}`;
+  // Build the URL with .jpg extension for explicit format
+  return `https://res.cloudinary.com/${cloudName}/image/upload/${transformation}/${publicIdClean}.jpg`;
 };
 
 /**
@@ -190,13 +190,14 @@ export const getVideoThumbnail = (publicId) => {
   // Format: https://res.cloudinary.com/{cloud_name}/video/upload/{transformations}/{public_id}.jpg
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
 
-  // Remove file extension if present
+  // Remove file extension if present (handle folder paths with slashes)
   const publicIdClean = publicId.replace(/\.(mp4|mov|webm|avi)$/i, '');
 
   // Construct transformation: 200x200 fill, auto quality
   const transformation = 'c_fill,g_auto,h_200,q_auto,w_200';
 
-  // Build the URL
+  // Build the URL - publicIdClean already contains folder path (e.g., crimes/123/filename)
+  // Add .jpg extension to trigger first frame extraction
   return `https://res.cloudinary.com/${cloudName}/video/upload/${transformation}/${publicIdClean}.jpg`;
 };
 
