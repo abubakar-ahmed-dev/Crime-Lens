@@ -34,7 +34,7 @@ export default (sequelize) => {
     },
     CrimeId: {
       type: DataTypes.BIGINT,
-      allowNull: true, // Allow null for uploads before crime is created
+      allowNull: false,
       field: "CrimeId",
     },
     publicId: {
