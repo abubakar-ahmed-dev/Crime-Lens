@@ -3,13 +3,18 @@
  * Handles fallback logic for thumbnail URLs that may be missing .jpg extension
  */
 
+// Debug mode for thumbnail troubleshooting
+const DEBUG_THUMBNAILS = true;
+
 /**
  * Checks if a URL is a Cloudinary URL
  * @param url - URL to check
  * @returns true if Cloudinary URL
  */
 const isCloudinaryUrl = (url: string): boolean => {
-  return url.includes('cloudinary.com') && (url.includes('/image/upload/') || url.includes('/video/upload/'));
+  const result = url.includes('cloudinary.com') && (url.includes('/image/upload/') || url.includes('/video/upload/'));
+  if (DEBUG_THUMBNAILS) console.log('[Thumbnail] isCloudinaryUrl:', url, '→', result);
+  return result;
 };
 
 /**
@@ -19,15 +24,22 @@ const isCloudinaryUrl = (url: string): boolean => {
  * @returns URL with guaranteed .jpg extension
  */
 export const normalizeThumbnailUrl = (thumbnailUrl: string | null | undefined): string | null => {
-  if (!thumbnailUrl) return null;
+  if (DEBUG_THUMBNAILS) console.log('[Thumbnail] normalizeThumbnailUrl INPUT:', thumbnailUrl);
+
+  if (!thumbnailUrl) {
+    if (DEBUG_THUMBNAILS) console.log('[Thumbnail] normalizeThumbnailUrl: null/undefined input');
+    return null;
+  }
 
   // If URL already ends with .jpg, return as is
   if (thumbnailUrl.endsWith('.jpg')) {
+    if (DEBUG_THUMBNAILS) console.log('[Thumbnail] normalizeThumbnailUrl: already has .jpg');
     return thumbnailUrl;
   }
 
   // If not a Cloudinary URL, return as is
   if (!isCloudinaryUrl(thumbnailUrl)) {
+    if (DEBUG_THUMBNAILS) console.log('[Thumbnail] normalizeThumbnailUrl: not Cloudinary URL');
     return thumbnailUrl;
   }
 
@@ -45,10 +57,13 @@ export const normalizeThumbnailUrl = (thumbnailUrl: string | null | undefined): 
 
     if (!hasExtension) {
       // Add .jpg extension for proper Cloudinary transformation
-      return `${thumbnailUrl}.jpg`;
+      const result = `${thumbnailUrl}.jpg`;
+      if (DEBUG_THUMBNAILS) console.log('[Thumbnail] normalizeThumbnailUrl: added .jpg →', result);
+      return result;
     }
   }
 
+  if (DEBUG_THUMBNAILS) console.log('[Thumbnail] normalizeThumbnailUrl: returning original →', thumbnailUrl);
   return thumbnailUrl;
 };
 
@@ -59,7 +74,10 @@ export const normalizeThumbnailUrl = (thumbnailUrl: string | null | undefined): 
  * @returns Thumbnail URL with proper transformations, or null if failed
  */
 const constructThumbnailFromFullUrl = (fullUrl: string, fileType?: string): string | null => {
+  if (DEBUG_THUMBNAILS) console.log('[Thumbnail] constructThumbnailFromFullUrl INPUT:', { fullUrl, fileType });
+
   if (!fullUrl || !isCloudinaryUrl(fullUrl)) {
+    if (DEBUG_THUMBNAILS) console.log('[Thumbnail] constructThumbnailFromFullUrl: invalid input');
     return null;
   }
 
@@ -72,6 +90,7 @@ const constructThumbnailFromFullUrl = (fullUrl: string, fileType?: string): stri
     const uploadIndex = pathParts.findIndex(part => part === 'upload');
 
     if (uploadIndex === -1 || uploadIndex + 1 >= pathParts.length) {
+      if (DEBUG_THUMBNAILS) console.log('[Thumbnail] constructThumbnailFromFullUrl: could not find upload in path');
       return null; // Can't parse
     }
 
@@ -88,8 +107,10 @@ const constructThumbnailFromFullUrl = (fullUrl: string, fileType?: string): stri
     // Build new URL: https://cloudinary.com/cloud_name/resource_type/upload/transformations/path.jpg
     const newUrl = `${url.protocol}//${url.host}/${resourceType}/upload/${thumbnailTransformations}/${pathWithoutExtension}.jpg`;
 
+    if (DEBUG_THUMBNAILS) console.log('[Thumbnail] constructThumbnailFromFullUrl SUCCESS →', newUrl);
     return newUrl;
   } catch (error) {
+    if (DEBUG_THUMBNAILS) console.log('[Thumbnail] constructThumbnailFromFullUrl ERROR:', error);
     // Silently fail - this is a fallback function
     return null;
   }
@@ -105,9 +126,12 @@ export const getWorkingThumbnailUrl = (media: {
   url?: string;
   fileType?: string;
 }): string => {
+  if (DEBUG_THUMBNAILS) console.log('[Thumbnail] getWorkingThumbnailUrl INPUT:', JSON.stringify(media));
+
   // Try normalized thumbnail URL first
   const normalizedThumbnail = normalizeThumbnailUrl(media.thumbnailUrl || null);
   if (normalizedThumbnail) {
+    if (DEBUG_THUMBNAILS) console.log('[Thumbnail] getWorkingThumbnailUrl → using normalized thumbnail');
     return normalizedThumbnail;
   }
 
@@ -115,12 +139,15 @@ export const getWorkingThumbnailUrl = (media: {
   if (media.url) {
     const constructedThumbnail = constructThumbnailFromFullUrl(media.url, media.fileType);
     if (constructedThumbnail) {
+      if (DEBUG_THUMBNAILS) console.log('[Thumbnail] getWorkingThumbnailUrl → using constructed thumbnail');
       return constructedThumbnail;
     }
     // If construction failed, use the original URL
+    if (DEBUG_THUMBNAILS) console.log('[Thumbnail] getWorkingThumbnailUrl → using original URL as fallback');
     return media.url;
   }
 
   // Final fallback - empty string (component will show placeholder)
+  if (DEBUG_THUMBNAILS) console.warn('[Thumbnail] getWorkingThumbnailUrl → NO URL AVAILABLE, returning empty string');
   return '';
 };

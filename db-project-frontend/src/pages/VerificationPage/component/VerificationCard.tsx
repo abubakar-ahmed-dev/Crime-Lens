@@ -66,6 +66,20 @@ export default function VerificationCard(props: VerificationCardProps) {
   // Get media for police version
   const crimeMedia = props.version === "police" ? (props as any).media || [] : [];
 
+  // Debug: Log media data received
+  console.log('[VerificationCard] Media Data:', {
+    version: props.version,
+    crimeMedia,
+    mediaLength: crimeMedia.length,
+    sampleMedia: crimeMedia[0] ? {
+      id: crimeMedia[0].id,
+      fileType: crimeMedia[0].fileType,
+      thumbnailUrl: crimeMedia[0].thumbnailUrl,
+      url: crimeMedia[0].url,
+      visibility: crimeMedia[0].visibility
+    } : 'No media'
+  });
+
   // Sync displayedMedia with crimeMedia when props change
   useEffect(() => {
     setDisplayedMedia(crimeMedia);

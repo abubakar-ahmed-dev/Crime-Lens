@@ -18,8 +18,13 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
   const [selectedMediaIndex, setSelectedMediaIndex] = useState<number | null>(null);
   const [showLightbox, setShowLightbox] = useState(false);
 
+  // Debug: Log incoming media data
+  console.log('[MediaGallery] PROPS:', { media, userRole, editable });
+
   // Filter media based on user role
   const visibleMedia = media.filter(m => m.visibility === 'public' || userRole !== 'citizen');
+
+  console.log('[MediaGallery] visibleMedia:', visibleMedia);
 
   const handleMediaClick = (index: number) => {
     setSelectedMediaIndex(index);
@@ -52,6 +57,18 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
 
   const handleImageError = (mediaId: number, itemType: 'thumbnail' | 'full') => {
     console.warn(`Failed to load ${itemType} for media ID: ${mediaId}`);
+    // Find the media item for debugging
+    const mediaItem = visibleMedia.find(m => m.id === mediaId);
+    if (mediaItem) {
+      console.error('[MediaGallery] Image Error Details:', {
+        mediaId,
+        itemType,
+        mediaItem,
+        thumbnailUrl: mediaItem.thumbnailUrl,
+        url: mediaItem.url,
+        computedSrc: getWorkingThumbnailUrl(mediaItem)
+      });
+    }
   };
 
   if (visibleMedia.length === 0) {
@@ -68,7 +85,16 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
     <>
       {/* Media Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {visibleMedia.map((item, index) => (
+        {visibleMedia.map((item, index) => {
+          const thumbnailSrc = getWorkingThumbnailUrl(item);
+          console.log(`[MediaGallery] Rendering media ${item.id}:`, {
+            fileType: item.fileType,
+            thumbnailSrc,
+            originalThumbnailUrl: item.thumbnailUrl,
+            originalUrl: item.url
+          });
+
+          return (
           <div
             key={item.id}
             className="relative group cursor-pointer"
@@ -77,7 +103,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
             {/* Thumbnail */}
             {item.fileType === 'image' ? (
               <img
-                src={getWorkingThumbnailUrl(item)}
+                src={thumbnailSrc}
                 alt={item.caption || item.originalName}
                 className="w-full h-32 object-cover rounded-lg"
                 onError={() => handleImageError(item.id, 'thumbnail')}
@@ -86,7 +112,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
               <div className="relative w-full h-32">
                 {/* For videos, use img tag with thumbnailUrl (should be JPG of first frame) */}
                 <img
-                  src={getWorkingThumbnailUrl(item)}
+                  src={thumbnailSrc}
                   alt={item.caption || item.originalName}
                   className="w-full h-full object-cover rounded-lg"
                   onError={() => handleImageError(item.id, 'thumbnail')}
@@ -134,7 +160,8 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
               </button>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Lightbox */}
