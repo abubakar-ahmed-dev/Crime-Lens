@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { createFilePreview, getFileCategory, validateMediaFiles } from '../services/api';
+import { createFilePreview, getFileCategory } from '../services/api';
 
 interface FileWithCaption {
   file: File;
@@ -32,23 +32,6 @@ const MediaUploader: React.FC<MediaUploaderProps> = ({
 
   const imageCount = files.filter(f => f.fileType === 'image').length;
   const videoCount = files.filter(f => f.fileType === 'video').length;
-
-  const validateFiles = useCallback((newFiles: File[]): string[] => {
-    const validation = validateMediaFiles([...files, ...newFiles].map(f => ({
-      file: f.fileType ? f : { ...f, fileType: getFileCategory(f.file) },
-      caption: '',
-      preview: ''
-    })), {
-      maxImages,
-      maxVideos,
-      maxFileSize
-    });
-
-    if (!validation.valid) {
-      return [validation.error || 'Validation failed'];
-    }
-    return [];
-  }, [files, maxImages, maxVideos, maxFileSize]);
 
   const processFiles = useCallback(async (fileList: FileList) => {
     const newErrors: string[] = [];
@@ -83,8 +66,14 @@ const MediaUploader: React.FC<MediaUploaderProps> = ({
         continue;
       }
 
-      const fileType = getFileCategory(file) as 'image' | 'video';
+      const fileType = getFileCategory(file);
       if (fileType === 'unknown') {
+        newErrors.push(`File type "${file.type}" not supported.`);
+        continue;
+      }
+
+      // TypeScript narrowing - fileType is now 'image' | 'video'
+      if (fileType !== 'image' && fileType !== 'video') {
         newErrors.push(`File type "${file.type}" not supported.`);
         continue;
       }
@@ -95,7 +84,7 @@ const MediaUploader: React.FC<MediaUploaderProps> = ({
           file,
           caption: '',
           preview,
-          fileType
+          fileType: fileType as 'image' | 'video'
         });
       } catch (error) {
         newErrors.push(`Failed to process file "${file.name}".`);

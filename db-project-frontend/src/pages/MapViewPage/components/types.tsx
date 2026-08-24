@@ -61,9 +61,9 @@ export interface MediaUploadFile {
 
 /**
  * Media Update Types (for police editing)
+ * Note: mediaId is passed separately to updateMedia function, not part of MediaUpdate
  */
 export interface MediaUpdate {
-  mediaId: number;
   visibility?: 'public' | 'police_only';
   caption?: string;
   evidenceMarked?: boolean;

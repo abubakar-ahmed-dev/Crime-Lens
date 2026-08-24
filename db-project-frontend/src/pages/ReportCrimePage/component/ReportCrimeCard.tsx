@@ -189,12 +189,12 @@ export default function ReportCrimeCard() {
             return;
           }
 
-          const uploadResult = await uploadMedia(
-            mediaFiles.map(f => f.file),
-            mediaFiles.map(f => f.caption),
-            undefined,
-            token
-          ) as UploadMediaResponse;
+          const uploadResult = await uploadMedia({
+            files: mediaFiles.map(f => f.file),
+            captions: mediaFiles.map(f => f.caption),
+            crimeId: undefined,
+            authToken: token
+          }) as UploadMediaResponse;
 
           setUploadProgress(70);
 

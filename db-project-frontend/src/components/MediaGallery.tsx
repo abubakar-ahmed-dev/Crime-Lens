@@ -9,21 +9,14 @@ interface MediaGalleryProps {
   editable?: boolean;
 }
 
-interface MediaError {
-  mediaId: number;
-  type: 'thumbnail' | 'full' | 'load';
-}
-
 const MediaGallery: React.FC<MediaGalleryProps> = ({
   media,
   userRole = 'citizen',
-  onMediaUpdate,
   onMediaDelete,
   editable = false,
 }) => {
   const [selectedMediaIndex, setSelectedMediaIndex] = useState<number | null>(null);
   const [showLightbox, setShowLightbox] = useState(false);
-  const [mediaErrors, setMediaErrors] = useState<Set<number>>(new Set());
 
   // Filter media based on user role
   const visibleMedia = media.filter(m => m.visibility === 'public' || userRole !== 'citizen');

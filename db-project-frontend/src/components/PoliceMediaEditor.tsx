@@ -1,15 +1,16 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import type { CrimeMedia, MediaUpdate, MediaOperations } from '../pages/MapViewPage/components/types';
+import type { CrimeMedia, MediaUpdate } from '../pages/MapViewPage/components/types';
 import MediaUploader from './MediaUploader';
 import MediaGallery from './MediaGallery';
 import MediaVisibilityToggle from './MediaVisibilityToggle';
-import { addMediaToCrime, removeMediaFromCrime, updateMedia, buildMediaFormData, validateMediaFiles } from '../services/api';
+import { addMediaToCrime, removeMediaFromCrime, updateMedia, validateMediaFiles } from '../services/api';
 
 interface PoliceMediaEditorProps {
   crimeId: number;
   media: CrimeMedia[];
   onMediaUpdate?: (mediaId: number, updates: MediaUpdate) => void;
   onMediaAdd?: (files: Array<{ file: File; caption: string }>) => void;
+  onMediaDelete?: (mediaId: number) => void;
   onCancel: () => void;
 }
 
@@ -27,18 +28,15 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
   media,
   onMediaUpdate,
   onMediaAdd,
+  onMediaDelete,
   onCancel,
 }) => {
   const [editMode, setEditMode] = useState<EditMode>('view');
-  const [mediaChanges, setMediaChanges] = useState<MediaOperations>({
-    toUpdate: [],
-    toRemove: [],
-  });
   const [newFiles, setNewFiles] = useState<FileWithCaption[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
-  const debounceTimeoutsRef = useRef<Record<number, NodeJS.Timeout>>({});
+  const debounceTimeoutsRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
   const handleAddMedia = useCallback(async () => {
     if (newFiles.length === 0) return;
@@ -47,13 +45,13 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
     setErrors([]);
 
     try {
-      // Validate current media + new files
-      const validation = validateMediaFiles(
-        [...media, ...newFiles].map(m => m.fileType === 'image' || m.fileType === 'video'
-          ? { ...m, file: m.file || new Blob(), caption: m.caption || '', preview: m.preview || '' }
-          : m
-        )
-      );
+      // Validate new files only (File array)
+      const files = newFiles.map(f => f.file);
+      const validation = validateMediaFiles(files, {
+        maxImages: 5,
+        maxVideos: 2,
+        maxFileSize: 5242880
+      });
 
       if (!validation.valid) {
         setErrors([validation.error || 'Validation failed']);
@@ -76,16 +74,15 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
         setEditMode('view');
       } else {
         // Direct upload for AllRecordsPage
-        const files = newFiles.map(f => f.file);
+        const filesArray = newFiles.map(f => f.file);
         const captions = newFiles.map(f => f.caption);
 
-        const result = await addMediaToCrime(crimeId, files, captions);
+        const result = await addMediaToCrime(crimeId, filesArray, captions);
 
         setUploadProgress(90);
 
         if (result.success) {
-          // Update media state with new items - won't work with new signature
-          setErrors(['Note: Media added, but display may need refresh']);
+          setErrors(['Media added successfully']);
           setNewFiles([]);
           setEditMode('view');
         } else {
@@ -98,7 +95,7 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
       setUploadProgress(100);
       setIsSaving(false);
     }
-  }, [crimeId, media, newFiles, onMediaUpdate, onMediaAdd]);
+  }, [crimeId, newFiles, onMediaAdd]);
 
   const handleRemoveMedia = useCallback(async (mediaId: number) => {
     setIsSaving(true);
@@ -112,14 +109,15 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
       setUploadProgress(90);
 
       if (result.success) {
-        const updatedMedia = media.filter(m => m.id !== mediaId);
-        onMediaUpdate(updatedMedia);
+        // Call both callbacks if provided
+        if (onMediaUpdate) {
+          onMediaUpdate(mediaId, { visibility: 'removed' } as any);
+        }
+        if (onMediaDelete) {
+          onMediaDelete(mediaId);
+        }
 
-        // Track in changes
-        setMediaChanges(prev => ({
-          ...prev,
-          toRemove: [...(prev.toRemove || []), mediaId],
-        }));
+        setErrors(['Media removed successfully']);
       } else {
         setErrors([result.message || 'Failed to remove media']);
       }
@@ -129,26 +127,13 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
       setUploadProgress(100);
       setIsSaving(false);
     }
-  }, [crimeId, media, onMediaUpdate]);
+  }, [crimeId, onMediaUpdate, onMediaDelete]);
 
   const handleUpdateMedia = useCallback(async (mediaId: number, updates: MediaUpdate) => {
-    // Optimistic update - update UI immediately
-    const updatedMedia = media.map(m =>
-      m.id === mediaId ? { ...m, ...updates } : m
-    );
-    // Call parent's onMediaUpdate with mediaId and updates if provided
+    // Optimistic update - call parent immediately
     if (onMediaUpdate) {
       onMediaUpdate(mediaId, updates);
     }
-
-    // Track in changes
-    setMediaChanges(prev => ({
-      ...prev,
-      toUpdate: [
-        ...(prev.toUpdate || []),
-        { mediaId, ...updates },
-      ],
-    }));
 
     // Then make API call silently
     try {
