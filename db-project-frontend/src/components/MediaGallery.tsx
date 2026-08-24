@@ -118,7 +118,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                   src={thumbnailSrc}
                   alt={item.caption || item.originalName}
                   className="w-full h-full object-cover rounded-lg"
-                  onError={() => handleImageError(item.id, 'thumbnail')}
+                  onError={() => handleImageError(item.id)}
                 />
                 <div className="absolute inset-0 flex items-center justify-center bg-grey bg-opacity-30 rounded-lg">
                   <svg className="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 20 20">

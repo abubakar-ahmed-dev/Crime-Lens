@@ -167,17 +167,15 @@ export const uploadMultipleFiles = async (files, crimeId) => {
  * @returns {string} Thumbnail URL
  */
 export const getImageThumbnail = (publicId) => {
-  // Manually construct the image thumbnail URL for consistency
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-
-  // Remove file extension if present
-  const publicIdClean = publicId.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '');
-
-  // Construct transformation: 200x200 fill, auto quality
-  const transformation = 'c_fill,g_auto,h_200,q_auto,w_200';
-
-  // Build the URL with .jpg extension for explicit format
-  return `https://res.cloudinary.com/${cloudName}/image/upload/${transformation}/${publicIdClean}.jpg`;
+  // Use Cloudinary SDK to generate proper URL with version and transformations
+  return cloudinary.url(publicId, {
+    transformation: [
+      { width: 200, height: 200, crop: 'fill', gravity: 'auto' },
+      { quality: 'auto', fetch_format: 'auto' },
+    ],
+    format: 'jpg', // Ensure JPG output
+    secure: true, // Use HTTPS
+  });
 };
 
 /**
@@ -186,19 +184,17 @@ export const getImageThumbnail = (publicId) => {
  * @returns {string} Thumbnail URL (image)
  */
 export const getVideoThumbnail = (publicId) => {
-  // Manually construct the video thumbnail URL
-  // Format: https://res.cloudinary.com/{cloud_name}/video/upload/{transformations}/{public_id}.jpg
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-
-  // Remove file extension if present (handle folder paths with slashes)
-  const publicIdClean = publicId.replace(/\.(mp4|mov|webm|avi)$/i, '');
-
-  // Construct transformation: 200x200 fill, auto quality
-  const transformation = 'c_fill,g_auto,h_200,q_auto,w_200';
-
-  // Build the URL - publicIdClean already contains folder path (e.g., crimes/123/filename)
-  // Add .jpg extension to trigger first frame extraction
-  return `https://res.cloudinary.com/${cloudName}/video/upload/${transformation}/${publicIdClean}.jpg`;
+  // Use Cloudinary SDK to generate proper URL with version and transformations
+  // For video thumbnails, we use video resource type with .jpg format to extract first frame
+  return cloudinary.url(publicId, {
+    resource_type: 'video',
+    transformation: [
+      { width: 200, height: 200, crop: 'fill', gravity: 'auto' },
+      { quality: 'auto', fetch_format: 'auto' },
+    ],
+    format: 'jpg', // Convert video first frame to JPG
+    secure: true, // Use HTTPS
+  });
 };
 
 /**
