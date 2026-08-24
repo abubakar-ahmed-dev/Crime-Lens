@@ -1,11 +1,13 @@
 // MapViewPage/index.tsx
 import { useEffect, useContext } from "react";
+import { useSelector } from "react-redux";
 import MapContainer from "./components/MapContainer";
 import CrimeMarkersClusters from "./components/CrimeMarkerCluster";
 import { MapProvider, MapContext } from "./components/MapContext";
 import SearchBar from "./components/SearchBar";
 import { API_BASE_URL } from "../../config/constants";
 import { getJwtAuthHeaders } from "../../utils/authHeaders";
+import { type RootState } from "../../store";
 
 import "leaflet/dist/leaflet.css";
 import "../../assets/leaflet/MarkerCluster.Default.css";
@@ -78,8 +80,11 @@ const MapContent = () => {
           if (filters.dateRange.end) params.set("endDate", filters.dateRange.end);
         }
 
+        const headers = getJwtAuthHeaders();
+        console.log('[MapView] Fetching crimes with headers:', { Authorization: headers.Authorization });
+
         const res = await fetch(`${API_BASE_URL}/crimes?${params.toString()}`, {
-          headers: getJwtAuthHeaders(),
+          headers,
         });
         if (!res.ok) throw new Error("Network response was not ok");
 
