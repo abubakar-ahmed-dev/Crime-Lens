@@ -18,10 +18,11 @@ const isCloudinaryUrl = (url: string): boolean => {
 };
 
 /**
- * Ensures a thumbnail URL has proper .jpg extension for Cloudinary
- * Handles folder paths and various URL formats
+ * Ensures a thumbnail URL is properly formatted
+ * For Cloudinary URLs, we trust the backend SDK to generate correct URLs
+ * For old-format URLs, use them as-is - they will work even without version
  * @param thumbnailUrl - The original thumbnail URL from database
- * @returns URL with guaranteed .jpg extension
+ * @returns URL as-is if properly formatted, otherwise with minimal fixes
  */
 export const normalizeThumbnailUrl = (thumbnailUrl: string | null | undefined): string | null => {
   if (DEBUG_THUMBNAILS) console.log('[Thumbnail] normalizeThumbnailUrl INPUT:', thumbnailUrl);
@@ -31,39 +32,29 @@ export const normalizeThumbnailUrl = (thumbnailUrl: string | null | undefined): 
     return null;
   }
 
-  // If URL already ends with .jpg, return as is
-  if (thumbnailUrl.endsWith('.jpg')) {
-    if (DEBUG_THUMBNAILS) console.log('[Thumbnail] normalizeThumbnailUrl: already has .jpg');
-    return thumbnailUrl;
-  }
-
   // If not a Cloudinary URL, return as is
   if (!isCloudinaryUrl(thumbnailUrl)) {
-    if (DEBUG_THUMBNAILS) console.log('[Thumbnail] normalizeThumbnailUrl: not Cloudinary URL');
+    if (DEBUG_THUMBNAILS) console.log('[Thumbnail] normalizeThumbnailUrl: not Cloudinary URL, returning as-is');
     return thumbnailUrl;
   }
 
-  // For Cloudinary URLs, ensure .jpg extension
-  // Handle URLs with folder paths like: crimes/123/filename
-  const cloudinaryPattern = /\/(image|video)\/upload\/(.*)$/;
-  const match = thumbnailUrl.match(cloudinaryPattern);
+  // For Cloudinary URLs, check if they already have a file extension
+  // If they do, trust the backend and return as-is (even old formats work)
+  const urlParts = thumbnailUrl.split('?');
+  const baseUrl = urlParts[0];
 
-  if (match) {
-    const transformationsAndPath = match[2];
+  const lastSegment = baseUrl.split('/').pop() || '';
+  const cleanLastSegment = lastSegment.split('?')[0];
+  const hasExtension = /\.(jpg|jpeg|png|gif|webp|mp4|mov|webm|svg)$/i.test(cleanLastSegment);
 
-    // Check if the last segment already has a file extension
-    const lastSegment = transformationsAndPath.split('/').pop() || '';
-    const hasExtension = /\.(jpg|jpeg|png|gif|webp|mp4|mov|webm)$/i.test(lastSegment);
-
-    if (!hasExtension) {
-      // Add .jpg extension for proper Cloudinary transformation
-      const result = `${thumbnailUrl}.jpg`;
-      if (DEBUG_THUMBNAILS) console.log('[Thumbnail] normalizeThumbnailUrl: added .jpg →', result);
-      return result;
-    }
+  if (hasExtension) {
+    // URL has file extension - return as-is regardless of format
+    // Old Cloudinary URLs without version component still work!
+    if (DEBUG_THUMBNAILS) console.log('[Thumbnail] normalizeThumbnailUrl: has extension, returning as-is');
+    return thumbnailUrl;
   }
 
-  if (DEBUG_THUMBNAILS) console.log('[Thumbnail] normalizeThumbnailUrl: returning original →', thumbnailUrl);
+  if (DEBUG_THUMBNAILS) console.log('[Thumbnail] normalizeThumbnailUrl: no extension, returning original');
   return thumbnailUrl;
 };
 
@@ -86,6 +77,17 @@ const constructThumbnailFromFullUrl = (fullUrl: string, fileType?: string): stri
     const url = new URL(fullUrl);
     const pathParts = url.pathname.split('/');
 
+    // Cloudinary URL structure: ["", "cloud_name", "resource_type", "upload", "version", "path", "file.ext"]
+    // Example: ["", "abubakar-ahmed-dev", "image", "upload", "v12345", "crimes", "temp", "image.jpg"]
+
+    if (pathParts.length < 4) {
+      if (DEBUG_THUMBNAILS) console.log('[Thumbnail] constructThumbnailFromFullUrl: path too short');
+      return null;
+    }
+
+    // Extract components
+    const cloudName = pathParts[1]; // e.g., "abubakar-ahmed-dev"
+
     // Find the index of 'upload' in the path
     const uploadIndex = pathParts.findIndex(part => part === 'upload');
 
@@ -104,8 +106,8 @@ const constructThumbnailFromFullUrl = (fullUrl: string, fileType?: string): stri
     const thumbnailTransformations = 'c_fill,g_auto,h_200,q_auto,w_200';
     const resourceType = fileType === 'video' ? 'video' : 'image';
 
-    // Build new URL: https://cloudinary.com/cloud_name/resource_type/upload/transformations/path.jpg
-    const newUrl = `${url.protocol}//${url.host}/${resourceType}/upload/${thumbnailTransformations}/${pathWithoutExtension}.jpg`;
+    // Build new URL with proper cloud_name: https://res.cloudinary.com/cloud_name/resource_type/upload/transformations/path
+    const newUrl = `${url.protocol}//${url.host}/${cloudName}/${resourceType}/upload/${thumbnailTransformations}/${pathWithoutExtension}`;
 
     if (DEBUG_THUMBNAILS) console.log('[Thumbnail] constructThumbnailFromFullUrl SUCCESS →', newUrl);
     return newUrl;
