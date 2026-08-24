@@ -67,9 +67,6 @@ export const getCrimesForMap = async (req, res) => {
     // Determine user role for visibility filtering
     const userRole = req.user?.role || 'citizen'; // Default to citizen if no user
 
-    // Debug logging
-    console.log('[getCrimesForMap] User Role:', userRole, 'req.user:', req.user);
-
     // Base SQL (JOINs first) - Now includes thumbnailUrl and mediaCount
     let sql = `
       SELECT

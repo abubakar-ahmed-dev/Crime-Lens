@@ -3,7 +3,6 @@ import React from "react";
 import { Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import type { Crime, CrimeMedia } from "./types";
-import { useAuth } from "../../../context/AuthContext";
 
 import markerIcon2x from "../../../assets/leaflet/marker-icon-2x.png";
 import markerIcon from "../../../assets/leaflet/marker-icon.png";
@@ -19,20 +18,18 @@ export const DefaultIcon = new L.Icon({
   shadowSize: [41, 41],
 });
 
-const CrimeMarker: React.FC<{ crime: Crime }> = ({ crime }) => {
-  const { user, isAuthenticated: isStaffAuth } = useAuth();
-
+const CrimeMarker: React.FC<{ crime: Crime; userRole?: "admin" | "police" | "user" | null }> = ({ crime, userRole }) => {
   // Defensive check
   if (!crime.latitude || !crime.longitude) return null;
 
-  // Determine user role for visibility filtering
-  const userRole = isStaffAuth && user ? (user.role === 'admin' || user.role === 'police' ? 'staff' : 'citizen') : 'citizen';
+  // Determine user role for visibility filtering - use passed userRole prop
+  const effectiveUserRole = userRole === 'admin' || userRole === 'police' ? 'staff' : 'citizen';
 
   // Filter media by visibility
   const getFilteredMedia = (): CrimeMedia[] => {
     if (!crime.media || crime.media.length === 0) return [];
 
-    if (userRole === 'staff') {
+    if (effectiveUserRole === 'staff') {
       // Police/admin see all media
       return crime.media;
     } else {
@@ -58,7 +55,7 @@ const CrimeMarker: React.FC<{ crime: Crime }> = ({ crime }) => {
                 <span className="font-semibold text-gray-700">
                   📎 {filteredMedia.length} media item{filteredMedia.length !== 1 ? 's' : ''}
                 </span>
-                {userRole === 'staff' && policeOnlyMediaCount > 0 && (
+                {effectiveUserRole === 'staff' && policeOnlyMediaCount > 0 && (
                   <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
                     🔒 {policeOnlyMediaCount} police only
                   </span>

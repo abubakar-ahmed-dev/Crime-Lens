@@ -1,0 +1,28 @@
+[MapView] Fetching crimes with headers: {Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZC…wOTl9.UXozVPxMYvDQU6EKCr4RIEFIIjO5jG9qKHHXSrCvjWI'}Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NSwidXNlcm5hbWUiOiJhYnV1dXUiLCJyb2xlIjoicG9saWNlIiwiaWF0IjoxNzg3NTk1NDk5LCJleHAiOjE3ODc2MTcwOTl9.UXozVPxMYvDQU6EKCr4RIEFIIjO5jG9qKHHXSrCvjWI"[[Prototype]]: Object
+index.tsx:84 [MapView] Fetching crimes with headers: {Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZC…wOTl9.UXozVPxMYvDQU6EKCr4RIEFIIjO5jG9qKHHXSrCvjWI'}Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NSwidXNlcm5hbWUiOiJhYnV1dXUiLCJyb2xlIjoicG9saWNlIiwiaWF0IjoxNzg3NTk1NDk5LCJleHAiOjE3ODc2MTcwOTl9.UXozVPxMYvDQU6EKCr4RIEFIIjO5jG9qKHHXSrCvjWI"[[Prototype]]: Object
+index.tsx:84 [MapView] Fetching crimes with headers: 
+
+
+---
+
+[getCrimesForMap] User Role: police req.user: {
+  id: 5,
+  username: 'abuuuu',
+  role: 'police',
+  iat: 1787595499,
+  exp: 1787617099
+}
+[getCrimesForMap] User Role: police req.user: {
+  id: 5,
+  username: 'abuuuu',
+  role: 'police',
+  iat: 1787595499,
+  exp: 1787617099
+}
+[getCrimesForMap] User Role: police req.user: {
+  id: 5,
+  username: 'abuuuu',
+  role: 'police',
+  iat: 1787595499,
+  exp: 1787617099
+}

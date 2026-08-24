@@ -13,7 +13,12 @@ import "leaflet/dist/leaflet.css";
 import "../../assets/leaflet/MarkerCluster.Default.css";
 import "../../assets/leaflet/MarkerCluster.css";
 
-const MapContent = () => {
+interface MapPageProps {
+  embedded?: boolean;
+  role?: "admin" | "police" | "user" | null;
+}
+
+const MapContent = ({ role }: { role?: "admin" | "police" | "user" | null }) => {
   const {
     filters,
     setFilters,
@@ -81,8 +86,6 @@ const MapContent = () => {
         }
 
         const headers = getJwtAuthHeaders();
-        console.log('[MapView] Fetching crimes with headers:', { Authorization: headers.Authorization });
-
         const res = await fetch(`${API_BASE_URL}/crimes?${params.toString()}`, {
           headers,
         });
@@ -124,21 +127,20 @@ const MapContent = () => {
     loadZoneSeverity();
   }, [highlightZoneLayer, filters, searchVersion]);
 
-  return <CrimeMarkersClusters crimes={crimeData} />;
+  return <CrimeMarkersClusters crimes={crimeData} userRole={role} />;
 };
 
-interface MapPageProps {
-  embedded?: boolean;
-}
-
 const MapPage = ({ embedded = false }: MapPageProps) => {
+  // Get role from Redux (same pattern as AllRecordsPage)
+  const role = useSelector((state: RootState) => state.currentRole.role);
+
   return (
     <MapProvider>
       <MapContainer embedded={embedded}>
-        
+
         {!embedded && <SearchBar />}
 
-        <MapContent />
+        <MapContent role={role} />
       </MapContainer>
     </MapProvider>
   );
