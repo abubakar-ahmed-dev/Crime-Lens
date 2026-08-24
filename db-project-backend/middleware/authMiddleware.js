@@ -131,3 +131,41 @@ export const authorizeAny = (req, res, next) => {
     return next();
   }
 };
+
+/**
+ * Optional Authentication
+ * If token is provided, verify and set req.user
+ * If no token, continue without req.user (defaults to citizen access)
+ */
+export const optionalAuth = async (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+
+  if (!token) {
+    // No token provided - continue as unauthenticated citizen
+    return next();
+  }
+
+  // Try JWT verification (Admin/Police)
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    req.authType = "jwt";
+    return next();
+  } catch {
+    // JWT failed - might be Supabase token, try Supabase verification
+    try {
+      const { data, error } = await supabase.auth.getUser(token);
+      if (!error && data.user) {
+        req.user = {
+          id: data.user.id,
+          role: 'citizen',
+          email: data.user.email,
+        };
+        req.authType = "supabase";
+      }
+    } catch {
+      // Both auth methods failed - continue without req.user (citizen default)
+    }
+    return next();
+  }
+};
