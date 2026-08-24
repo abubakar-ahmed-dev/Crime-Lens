@@ -3,6 +3,7 @@ import React from "react";
 import { Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import type { Crime, CrimeMedia } from "./types";
+import MediaGallery from "../../../components/MediaGallery";
 
 import markerIcon2x from "../../../assets/leaflet/marker-icon-2x.png";
 import markerIcon from "../../../assets/leaflet/marker-icon.png";
@@ -49,58 +50,25 @@ const CrimeMarker: React.FC<{ crime: Crime; userRole?: "admin" | "police" | "use
           <h3 className="font-bold text-base mb-2">{crime.title || "No title"}</h3>
 
           {/* Media Section */}
-          {(crime.mediaCount ?? 0) > 0 && (
-            <div className="mb-3 p-2 bg-gray-50 rounded-lg">
+          {filteredMedia.length > 0 && (
+            <div className="mb-3">
               <div className="flex items-center justify-between mb-2">
                 <span className="font-semibold text-gray-700">
-                  📎 {filteredMedia.length} media item{filteredMedia.length !== 1 ? 's' : ''}
+                  {filteredMedia.length} media item{filteredMedia.length !== 1 ? 's' : ''}
                 </span>
                 {effectiveUserRole === 'staff' && policeOnlyMediaCount > 0 && (
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 ml-2 rounded-full">
                     🔒 {policeOnlyMediaCount} police only
                   </span>
                 )}
               </div>
 
-              {/* Thumbnail Preview */}
-              {crime.thumbnailUrl && filteredMedia.length > 0 && (
-                <div className="mb-2">
-                  <img
-                    src={crime.thumbnailUrl}
-                    alt="Crime thumbnail"
-                    className="w-full h-32 object-cover rounded"
-                    loading="lazy"
-                  />
-                </div>
-              )}
-
-              {/* Caption Display */}
-              {filteredMedia.length > 0 && filteredMedia[0]?.caption && (
-                <p className="text-xs text-gray-600 italic mb-2">
-                  "{filteredMedia[0].caption}"
-                  {filteredMedia.length > 1 && ` +${filteredMedia.length - 1} more`}
-                </p>
-              )}
-
-              {/* Police-only visibility indicators */}
-              {userRole === 'staff' && crime.media && crime.media.length > 0 && (
-                <div className="flex gap-1 flex-wrap mt-2">
-                  {crime.media.slice(0, 3).map((media) => (
-                    <span
-                      key={media.id}
-                      className={`text-xs px-2 py-1 rounded ${media.visibility === 'public'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-blue-100 text-blue-700'
-                        }`}
-                    >
-                      {media.visibility === 'public' ? '🌐' : '🔒'}
-                    </span>
-                  ))}
-                  {crime.media.length > 3 && (
-                    <span className="text-xs text-gray-500">+{crime.media.length - 3} more</span>
-                  )}
-                </div>
-              )}
+              {/* Media Gallery with full functionality */}
+              <MediaGallery
+                media={filteredMedia}
+                userRole={effectiveUserRole === 'staff' ? 'police' : 'citizen'}
+                editable={false}
+              />
             </div>
           )}
 

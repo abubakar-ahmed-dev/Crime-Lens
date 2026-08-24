@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { CrimeMedia } from '../pages/MapViewPage/components/types.tsx';
 import { getWorkingThumbnailUrl } from '../utils/thumbnailUtils';
 
@@ -17,6 +18,21 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
 }) => {
   const [selectedMediaIndex, setSelectedMediaIndex] = useState<number | null>(null);
   const [showLightbox, setShowLightbox] = useState(false);
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
+
+  // Create or get portal root for lightbox
+  React.useEffect(() => {
+    let root = document.getElementById('media-gallery-portal');
+    if (!root) {
+      root = document.createElement('div');
+      root.id = 'media-gallery-portal';
+      document.body.appendChild(root);
+    }
+    setPortalRoot(root);
+    return () => {
+      // Don't remove root on unmount as other instances might need it
+    };
+  }, []);
 
   // Filter media based on user role
   const visibleMedia = media.filter(m => m.visibility === 'public' || userRole !== 'citizen');
@@ -74,14 +90,14 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
   return (
     <>
       {/* Media Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
         {visibleMedia.map((item, index) => {
           const thumbnailSrc = getWorkingThumbnailUrl(item);
 
           return (
           <div
             key={item.id}
-            className="relative group cursor-pointer"
+            className="relative group cursor-pointer aspect-square"
             onClick={() => handleMediaClick(index)}
           >
             {/* Thumbnail */}
@@ -90,7 +106,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                 <img
                   src={fallbackUrls[item.id] || getWorkingThumbnailUrl(item)}
                   alt={item.caption || item.originalName}
-                  className="w-full h-32 object-cover rounded-lg"
+                  className="w-full h-full object-cover rounded-lg"
                   onError={() => {
                     handleImageError(item.id);
                     setFailedImages(prev => new Set(prev).add(item.id));
@@ -102,7 +118,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                 />
               ) : (
                 // Fallback placeholder when image fails to load
-                <div className="w-full h-32 bg-gray-200 rounded-lg flex items-center justify-center">
+                <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
                   <div className="text-center text-gray-400">
                     <svg className="h-8 w-8 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -112,7 +128,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                 </div>
               )
             ) : (
-              <div className="relative w-full h-32">
+              <div className="relative w-full h-full">
                 {/* For videos, use img tag with thumbnailUrl (should be JPG of first frame) */}
                 <img
                   src={thumbnailSrc}
@@ -120,25 +136,11 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                   className="w-full h-full object-cover rounded-lg"
                   onError={() => handleImageError(item.id)}
                 />
-                <div className="absolute inset-0 flex items-center justify-center bg-grey bg-opacity-30 rounded-lg">
+                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg">
                   <svg className="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                   </svg>
                 </div>
-              </div>
-            )}
-
-            {/* Visibility Badge (police/admin only) */}
-            {userRole !== 'citizen' && item.visibility === 'police_only' && (
-              <div className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
-                Police Only
-              </div>
-            )}
-
-            {/* Evidence Badge */}
-            {item.evidenceMarked && (
-              <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded">
-                Evidence
               </div>
             )}
 
@@ -155,7 +157,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
             {editable && onMediaDelete && (
               <button
                 onClick={(e) => handleDelete(item.id, e)}
-                className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -167,13 +169,13 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
         })}
       </div>
 
-      {/* Lightbox */}
-      {showLightbox && selectedMedia && (
-        <div className="fixed inset-0 z-[9999] bg-black bg-opacity-90 flex items-center justify-center">
+      {/* Lightbox with Portal to break out of Leaflet popup */}
+      {showLightbox && selectedMedia && portalRoot && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black bg-opacity-95 flex items-center justify-center">
           {/* Close Button */}
           <button
             onClick={handleCloseLightbox}
-            className="absolute top-4 right-4 text-white hover:text-gray-300"
+            className="absolute top-4 right-4 z-[100001] text-white hover:text-gray-300 bg-black/50 rounded-full p-2 transition-colors"
           >
             <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -185,7 +187,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
             <>
               <button
                 onClick={handlePrevious}
-                className="absolute left-4 text-white hover:text-gray-300"
+                className="absolute left-4 z-[100001] text-white hover:text-gray-300 bg-black/50 rounded-full p-3 transition-colors"
               >
                 <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -193,7 +195,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
               </button>
               <button
                 onClick={handleNext}
-                className="absolute right-4 text-white hover:text-gray-300"
+                className="absolute right-4 z-[100001] text-white hover:text-gray-300 bg-black/50 rounded-full p-3 transition-colors"
               >
                 <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -203,18 +205,18 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
           )}
 
           {/* Media Content */}
-          <div className="max-w-4xl max-h-[90vh] w-full p-4">
+          <div className="w-full h-full flex flex-col items-center justify-center p-4 md:p-8">
             {selectedMedia.fileType === 'image' ? (
               <img
                 src={selectedMedia.url}
                 alt={selectedMedia.caption || selectedMedia.originalName}
-                className="max-w-full max-h-[85vh] object-contain mx-auto rounded-lg"
+                className="max-w-full max-h-[80vh] object-contain mx-auto rounded-lg shadow-2xl"
               />
             ) : (
               <video
                 src={selectedMedia.url}
                 controls
-                className="max-w-full max-h-[85vh] mx-auto rounded-lg"
+                className="max-w-full max-h-[80vh] mx-auto rounded-lg shadow-2xl"
               />
             )}
 
@@ -238,11 +240,12 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
 
           {/* Counter */}
           {visibleMedia.length > 1 && (
-            <div className="absolute bottom-4 text-white text-sm">
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-[100001] text-white text-sm bg-black/70 px-4 py-2 rounded-full">
               {selectedMediaIndex! + 1} / {visibleMedia.length}
             </div>
           )}
-        </div>
+        </div>,
+        portalRoot
       )}
     </>
   );
