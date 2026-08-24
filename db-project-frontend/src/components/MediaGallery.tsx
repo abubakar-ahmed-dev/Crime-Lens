@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import type { CrimeMedia } from '../pages/MapViewPage/components/types.tsx';
+import { getWorkingThumbnailUrl } from '../utils/thumbnailUtils';
 
 interface MediaGalleryProps {
   media: CrimeMedia[];
   userRole?: 'citizen' | 'police' | 'admin';
-  onMediaUpdate?: (mediaId: number, updates: any) => void;
   onMediaDelete?: (mediaId: number) => void;
   editable?: boolean;
 }
@@ -77,7 +77,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
             {/* Thumbnail */}
             {item.fileType === 'image' ? (
               <img
-                src={item.thumbnailUrl || item.url}
+                src={getWorkingThumbnailUrl(item)}
                 alt={item.caption || item.originalName}
                 className="w-full h-32 object-cover rounded-lg"
                 onError={() => handleImageError(item.id, 'thumbnail')}
@@ -86,7 +86,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
               <div className="relative w-full h-32">
                 {/* For videos, use img tag with thumbnailUrl (should be JPG of first frame) */}
                 <img
-                  src={item.thumbnailUrl || item.url}
+                  src={getWorkingThumbnailUrl(item)}
                   alt={item.caption || item.originalName}
                   className="w-full h-full object-cover rounded-lg"
                   onError={() => handleImageError(item.id, 'thumbnail')}

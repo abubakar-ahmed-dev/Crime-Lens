@@ -141,11 +141,35 @@ export const getCrimesForMap = async (req, res) => {
       replacements,
     });
 
-    // Format output - Now includes thumbnailUrl and mediaCount
-    const formatted = crimes
-      .map((c) => {
+    // Fetch media for each crime and format output
+    const crimesWithMedia = await Promise.all(
+      crimes.map(async (c) => {
         if (!c.geom) return null;
+
         const loc = typeof c.geom === "string" ? JSON.parse(c.geom) : c.geom;
+
+        // Fetch media for this crime
+        let media = [];
+        if (c.mediaCount > 0) {
+          const mediaQuery = userRole === 'citizen'
+            ? `SELECT id, "fileType", "url", "thumbnailUrl", "caption",
+                      "visibility", "evidenceMarked", "originalName", "fileSize"
+               FROM "CrimeMedia"
+               WHERE "CrimeId" = :crimeId AND "visibility" = 'public'
+               ORDER BY id ASC;`
+            : `SELECT id, "fileType", "url", "thumbnailUrl", "caption",
+                      "visibility", "evidenceMarked", "originalName", "fileSize"
+               FROM "CrimeMedia"
+               WHERE "CrimeId" = :crimeId
+               ORDER BY id ASC;`;
+
+          const mediaRows = await db.sequelize.query(mediaQuery, {
+            replacements: { crimeId: c.id },
+            type: db.sequelize.QueryTypes.SELECT,
+          });
+          media = mediaRows;
+        }
+
         return {
           id: c.id,
           crimeTypeId: c.crimeTypeId,
@@ -161,10 +185,12 @@ export const getCrimesForMap = async (req, res) => {
           zoneName: c.zoneName,
           thumbnailUrl: c.thumbnailUrl,
           mediaCount: c.mediaCount || 0,
+          media: media, // Include media array for popup display
         };
       })
-      .filter(Boolean);
+    );
 
+    const formatted = crimesWithMedia.filter(Boolean);
     return res.json(formatted);
 
   } catch (err) {
