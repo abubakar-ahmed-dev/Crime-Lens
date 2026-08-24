@@ -312,7 +312,7 @@ export const approveCrimeReport = async (req, res) => {
       crimeTypeId,
       incidentDate,
       date,
-      mediaUpdates,
+      mediaChanges, // Changed from mediaUpdates to match frontend structure
     } = req.body;
 
     // ---------------------------
@@ -441,33 +441,66 @@ export const approveCrimeReport = async (req, res) => {
       }
     );
 
-    // Handle media updates if provided (visibility changes, caption updates, etc.)
-    if (mediaUpdates && Array.isArray(mediaUpdates)) {
-      for (const mediaUpdate of mediaUpdates) {
-        const { mediaId, visibility, caption, evidenceMarked } = mediaUpdate;
-        if (mediaId && (visibility !== undefined || caption !== undefined || evidenceMarked !== undefined)) {
+    // Handle media changes if provided
+    if (mediaChanges) {
+      // Handle visibility changes
+      if (mediaChanges.visibilityChanges && typeof mediaChanges.visibilityChanges === 'object') {
+        for (const [mediaId, visibility] of Object.entries(mediaChanges.visibilityChanges)) {
           await sequelize.query(
-            `
-            UPDATE "CrimeMedia"
-            SET "visibility" = COALESCE(:visibility, "visibility"),
-                "caption" = COALESCE(:caption, "caption"),
-                "evidenceMarked" = COALESCE(:evidenceMarked, "evidenceMarked")
-            WHERE id = :mediaId AND "CrimeId" = :crimeId;
-            `,
+            `UPDATE "CrimeMedia" SET "visibility" = :visibility WHERE id = :mediaId AND "CrimeId" = :crimeId;`,
             {
-              replacements: {
-                mediaId,
-                crimeId: crime.id,
-                visibility: visibility || null,
-                caption: caption !== undefined ? caption : null,
-                evidenceMarked: evidenceMarked !== undefined ? evidenceMarked : null,
-              },
+              replacements: { mediaId, visibility, crimeId: crime.id },
               type: QueryTypes.UPDATE,
               transaction: t,
             }
           );
         }
       }
+
+      // Handle caption updates
+      if (mediaChanges.captionUpdates && typeof mediaChanges.captionUpdates === 'object') {
+        for (const [mediaId, caption] of Object.entries(mediaChanges.captionUpdates)) {
+          await sequelize.query(
+            `UPDATE "CrimeMedia" SET "caption" = :caption WHERE id = :mediaId AND "CrimeId" = :crimeId;`,
+            {
+              replacements: { mediaId, caption, crimeId: crime.id },
+              type: QueryTypes.UPDATE,
+              transaction: t,
+            }
+          );
+        }
+      }
+
+      // Handle evidence marked changes
+      if (mediaChanges.evidenceMarkedChanges && typeof mediaChanges.evidenceMarkedChanges === 'object') {
+        for (const [mediaId, evidenceMarked] of Object.entries(mediaChanges.evidenceMarkedChanges)) {
+          await sequelize.query(
+            `UPDATE "CrimeMedia" SET "evidenceMarked" = :evidenceMarked WHERE id = :mediaId AND "CrimeId" = :crimeId;`,
+            {
+              replacements: { mediaId, evidenceMarked, crimeId: crime.id },
+              type: QueryTypes.UPDATE,
+              transaction: t,
+            }
+          );
+        }
+      }
+
+      // Handle media removal
+      if (mediaChanges.toRemove && Array.isArray(mediaChanges.toRemove)) {
+        for (const mediaId of mediaChanges.toRemove) {
+          await sequelize.query(
+            `DELETE FROM "CrimeMedia" WHERE id = :mediaId AND "CrimeId" = :crimeId;`,
+            {
+              replacements: { mediaId, crimeId: crime.id },
+              type: QueryTypes.DELETE,
+              transaction: t,
+            }
+          );
+        }
+      }
+
+      // Note: toAdd handling is removed because File objects can't be sent via JSON
+      // Files should be uploaded immediately using POST /api/crimes/:crimeId/media
     }
 
     const updatedCrime = updatedCrimeRows[0][0];
