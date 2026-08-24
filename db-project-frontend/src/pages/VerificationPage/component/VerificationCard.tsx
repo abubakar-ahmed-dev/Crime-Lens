@@ -6,6 +6,7 @@ import MediaGallery from "../../../components/MediaGallery";
 import PoliceMediaEditor from "../../../components/PoliceMediaEditor";
 import { API_BASE_URL } from "../../../config/constants";
 import { getJwtAuthHeaders } from "../../../utils/authHeaders";
+import { addMediaToCrime } from "../../../services/api";
 import type { CrimeMedia } from "../../../pages/MapViewPage/components/types";
 
 type VerificationCardProps =
@@ -48,7 +49,6 @@ interface MediaChanges {
   visibilityChanges?: Record<number, 'public' | 'police_only'>;
   captionUpdates?: Record<number, string>;
   evidenceMarkedChanges?: Record<number, boolean>;
-  toAdd?: Array<{ file: File; caption: string }>;
 }
 
 export default function VerificationCard(props: VerificationCardProps) {
@@ -63,21 +63,28 @@ export default function VerificationCard(props: VerificationCardProps) {
   // Get media for police version - computed from props
   const crimeMedia = props.version === "police" ? (props as any).media || [] : [];
 
+  // Local state for newly uploaded media items
+  const [newlyAddedMedia, setNewlyAddedMedia] = useState<CrimeMedia[]>([]);
+
   // Local state ONLY for optimistic updates during edit mode - starts empty
   const [optimisticMediaChanges, setOptimisticMediaChanges] = useState<Record<number, Partial<CrimeMedia>>>({});
   const [editModeActive, setEditModeActive] = useState(false);
 
-  // Combine crimeMedia with optimistic changes when in edit mode
+  // Combine crimeMedia with newly added media and optimistic changes
   const displayedMedia = useMemo(() => {
-    if (!editModeActive || Object.keys(optimisticMediaChanges).length === 0) {
-      return crimeMedia;
+    // Start with existing media and newly added media
+    let combinedMedia = [...crimeMedia, ...newlyAddedMedia];
+
+    // Apply optimistic changes when in edit mode
+    if (editModeActive && Object.keys(optimisticMediaChanges).length > 0) {
+      combinedMedia = combinedMedia.map((m: CrimeMedia) => {
+        const changes = optimisticMediaChanges[m.id];
+        return changes ? { ...m, ...changes } : m;
+      });
     }
-    // Apply optimistic changes to crimeMedia
-    return crimeMedia.map((m: CrimeMedia) => {
-      const changes = optimisticMediaChanges[m.id];
-      return changes ? { ...m, ...changes } : m;
-    });
-  }, [crimeMedia, optimisticMediaChanges, editModeActive]);
+
+    return combinedMedia;
+  }, [crimeMedia, newlyAddedMedia, optimisticMediaChanges, editModeActive]);
 
   // Copy contact number to clipboard and show snackbar
   const handleContactCopy = async () => {
@@ -164,24 +171,54 @@ export default function VerificationCard(props: VerificationCardProps) {
     }));
   };
 
-  const handleMediaAdd = (files: Array<{ file: File; caption: string }>) => {
-    setMediaChanges(prev => ({
-      ...prev,
-      toAdd: [...(prev.toAdd || []), ...files]
-    }));
+  const handleMediaAdd = async (files: Array<{ file: File; caption: string }>) => {
+    if (files.length === 0) return;
+
+    const submissionId = (props as any).submissionId;
+    if (!submissionId) {
+      console.error('Cannot upload media: submissionId not found');
+      return;
+    }
+
+    try {
+      // Extract files and captions
+      const filesArray = files.map(f => f.file);
+      const captions = files.map(f => f.caption);
+
+      // Upload immediately to Cloudinary and database
+      const result = await addMediaToCrime(Number(submissionId), filesArray, captions);
+
+      if (result.success && result.data?.media) {
+        // Create new CrimeMedia items from response
+        const newMediaItems: CrimeMedia[] = result.data.media.map((m: any) => ({
+          id: m.id,
+          url: m.url,
+          thumbnailUrl: m.thumbnailUrl,
+          fileType: m.fileType,
+          caption: m.caption,
+          originalName: m.originalName,
+          visibility: m.visibility,
+          evidenceMarked: m.evidenceMarked,
+        }));
+
+        // Add to newlyAddedMedia state so they show in Quick Edit section
+        setNewlyAddedMedia(prev => [...prev, ...newMediaItems]);
+      } else {
+        console.error('Failed to upload media:', result.message);
+      }
+    } catch (error) {
+      console.error('Error uploading media:', error);
+    }
   };
 
   const hasMediaChanges = () => {
-    return Object.keys(mediaChanges).some(key => {
-      const value = mediaChanges[key as keyof MediaChanges];
-      if (Array.isArray(value)) {
-        return value.length > 0;
-      }
-      if (value && typeof value === 'object') {
-        return Object.keys(value).length > 0;
-      }
-      return false;
-    });
+    // Check if any media changes exist (excluding toAdd since we upload immediately)
+    return (
+      (mediaChanges.toRemove && mediaChanges.toRemove.length > 0) ||
+      (mediaChanges.visibilityChanges && Object.keys(mediaChanges.visibilityChanges).length > 0) ||
+      (mediaChanges.captionUpdates && Object.keys(mediaChanges.captionUpdates).length > 0) ||
+      (mediaChanges.evidenceMarkedChanges && Object.keys(mediaChanges.evidenceMarkedChanges).length > 0)
+    );
   };
 
   // Handle Approve
@@ -365,9 +402,10 @@ export default function VerificationCard(props: VerificationCardProps) {
                     const newEditMode = !editMediaMode;
                     setEditMediaMode(newEditMode);
                     setEditModeActive(newEditMode);
-                    // Clear optimistic changes when exiting edit mode
+                    // Clear optimistic changes and newly added media when exiting edit mode
                     if (!newEditMode) {
                       setOptimisticMediaChanges({});
+                      setNewlyAddedMedia([]);
                     }
                   }}
                   className="text-xs px-3 py-1 rounded-full border border-[#237E54] text-[#237E54] hover:bg-green-50 transition-colors"
