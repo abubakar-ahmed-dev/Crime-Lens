@@ -18,13 +18,8 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
   const [selectedMediaIndex, setSelectedMediaIndex] = useState<number | null>(null);
   const [showLightbox, setShowLightbox] = useState(false);
 
-  // Debug: Log incoming media data
-  console.log('[MediaGallery] PROPS:', { media, userRole, editable });
-
   // Filter media based on user role
   const visibleMedia = media.filter(m => m.visibility === 'public' || userRole !== 'citizen');
-
-  console.log('[MediaGallery] visibleMedia:', visibleMedia);
 
   const handleMediaClick = (index: number) => {
     setSelectedMediaIndex(index);
@@ -55,21 +50,16 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
     }
   };
 
-  const handleImageError = (mediaId: number, itemType: 'thumbnail' | 'full') => {
-    console.warn(`Failed to load ${itemType} for media ID: ${mediaId}`);
-    // Find the media item for debugging
+  const handleImageError = (mediaId: number) => {
+    // Silently handle image load errors
     const mediaItem = visibleMedia.find(m => m.id === mediaId);
     if (mediaItem) {
-      console.error('[MediaGallery] Image Error Details:', {
-        mediaId,
-        itemType,
-        mediaItem,
-        thumbnailUrl: mediaItem.thumbnailUrl,
-        url: mediaItem.url,
-        computedSrc: getWorkingThumbnailUrl(mediaItem)
-      });
+      // Could log to error tracking service in production
     }
   };
+
+  const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
+  const [fallbackUrls, setFallbackUrls] = useState<Record<number, string>>({});
 
   if (visibleMedia.length === 0) {
     return (
@@ -87,12 +77,6 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {visibleMedia.map((item, index) => {
           const thumbnailSrc = getWorkingThumbnailUrl(item);
-          console.log(`[MediaGallery] Rendering media ${item.id}:`, {
-            fileType: item.fileType,
-            thumbnailSrc,
-            originalThumbnailUrl: item.thumbnailUrl,
-            originalUrl: item.url
-          });
 
           return (
           <div
@@ -102,12 +86,31 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
           >
             {/* Thumbnail */}
             {item.fileType === 'image' ? (
-              <img
-                src={thumbnailSrc}
-                alt={item.caption || item.originalName}
-                className="w-full h-32 object-cover rounded-lg"
-                onError={() => handleImageError(item.id, 'thumbnail')}
-              />
+              !failedImages.has(item.id) ? (
+                <img
+                  src={fallbackUrls[item.id] || getWorkingThumbnailUrl(item)}
+                  alt={item.caption || item.originalName}
+                  className="w-full h-32 object-cover rounded-lg"
+                  onError={() => {
+                    handleImageError(item.id);
+                    setFailedImages(prev => new Set(prev).add(item.id));
+                    // Fallback to full URL if thumbnail fails
+                    if (!fallbackUrls[item.id] && item.url) {
+                      setFallbackUrls(prev => ({ ...prev, [item.id]: item.url }));
+                    }
+                  }}
+                />
+              ) : (
+                // Fallback placeholder when image fails to load
+                <div className="w-full h-32 bg-gray-200 rounded-lg flex items-center justify-center">
+                  <div className="text-center text-gray-400">
+                    <svg className="h-8 w-8 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p className="text-xs">Image unavailable</p>
+                  </div>
+                </div>
+              )
             ) : (
               <div className="relative w-full h-32">
                 {/* For videos, use img tag with thumbnailUrl (should be JPG of first frame) */}
@@ -117,7 +120,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                   className="w-full h-full object-cover rounded-lg"
                   onError={() => handleImageError(item.id, 'thumbnail')}
                 />
-                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg">
+                <div className="absolute inset-0 flex items-center justify-center bg-grey bg-opacity-30 rounded-lg">
                   <svg className="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                   </svg>
@@ -140,7 +143,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
             )}
 
             {/* Hover Overlay */}
-            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity rounded-lg">
+            <div className="absolute inset-0 bg-grey bg-opacity-0 group-hover:bg-opacity-30 transition-opacity rounded-lg">
               <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 <svg className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
@@ -166,7 +169,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
 
       {/* Lightbox */}
       {showLightbox && selectedMedia && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center">
+        <div className="fixed inset-0 z-[9999] bg-black bg-opacity-90 flex items-center justify-center">
           {/* Close Button */}
           <button
             onClick={handleCloseLightbox}
