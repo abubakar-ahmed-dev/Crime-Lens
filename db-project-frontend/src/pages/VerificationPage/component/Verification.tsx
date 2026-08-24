@@ -100,8 +100,7 @@ export default function AllRecords({ version }: AllRecordsProps) {
   };
 
   // Handle successful approval/rejection
-  const handleRecordProcessed = (mediaChanges?: any) => {
-    console.log("Record processed with media changes:", mediaChanges);
+  const handleRecordProcessed = () => {
     fetchRecords(); // Refresh the list
   };
 
@@ -185,21 +184,24 @@ export default function AllRecords({ version }: AllRecordsProps) {
                 ))
               ) : (
                 /* POLICE VERSION - Crime Reports */
-                records.map((record) => (
+                records.map((record) => {
+                  const media = record.media || record.CrimeMedia || [];
+
+                  return (
                   <VerificationCard
                     key={record.id}
                     version="police"
 
-                    submissionId={record.submissionId}   
+                    submissionId={record.submissionId}
 
-                    title={record.title || "No Title"}   
+                    title={record.title || "No Title"}
 
-                    fullName={record.fullName || "Unknown"}   
-                    contact={record.contact || "N/A"}     
-                    cnic={record.submitterCnic || "N/A"}           
+                    fullName={record.fullName || "Unknown"}
+                    contact={record.contact || "A/A"}
+                    cnic={record.submitterCnic || "N/A"}
 
-                    crimeTypeId={record.crimeTypeId || record.CrimeType?.id || ""}   
-                    crimeType={record.CrimeType?.name || "Unknown"}   
+                    crimeTypeId={record.crimeTypeId || record.CrimeType?.id || ""}
+                    crimeType={record.CrimeType?.name || "Unknown"}
                     date={formatDateForInput(record.incidentDate)}
 
                     address={record.address || ""}
@@ -210,12 +212,13 @@ export default function AllRecords({ version }: AllRecordsProps) {
                     zone={record.Zone?.id || record.zoneId}
                     zoneName={record.Zone?.name || record.zoneName || ""}
 
-                    media={record.media || record.CrimeMedia || []}
+                    media={media}
 
                     onApprove={handleRecordProcessed}
                     onReject={handleRecordProcessed}
                   />
-                ))
+                  );
+                })
               )}
             </div>
           )}

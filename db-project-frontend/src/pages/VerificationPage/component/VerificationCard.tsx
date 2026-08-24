@@ -1,5 +1,5 @@
 //VerificationPage/components/VerificationCard.tsx
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import WhiteButton from "../../../components/WhiteButton";
 import ConfirmationPopup from "./ConfirmationPopup";
 import MediaGallery from "../../../components/MediaGallery";
@@ -60,30 +60,24 @@ export default function VerificationCard(props: VerificationCardProps) {
   const [mediaChanges, setMediaChanges] = useState<MediaChanges>({});
   const [editMediaMode, setEditMediaMode] = useState(false);
 
-  // Local state for displayed media (with optimistic updates)
-  const [displayedMedia, setDisplayedMedia] = useState<CrimeMedia[]>([]);
-
-  // Get media for police version
+  // Get media for police version - computed from props
   const crimeMedia = props.version === "police" ? (props as any).media || [] : [];
 
-  // Debug: Log media data received
-  console.log('[VerificationCard] Media Data:', {
-    version: props.version,
-    crimeMedia,
-    mediaLength: crimeMedia.length,
-    sampleMedia: crimeMedia[0] ? {
-      id: crimeMedia[0].id,
-      fileType: crimeMedia[0].fileType,
-      thumbnailUrl: crimeMedia[0].thumbnailUrl,
-      url: crimeMedia[0].url,
-      visibility: crimeMedia[0].visibility
-    } : 'No media'
-  });
+  // Local state ONLY for optimistic updates during edit mode - starts empty
+  const [optimisticMediaChanges, setOptimisticMediaChanges] = useState<Record<number, Partial<CrimeMedia>>>({});
+  const [editModeActive, setEditModeActive] = useState(false);
 
-  // Sync displayedMedia with crimeMedia when props change
-  useEffect(() => {
-    setDisplayedMedia(crimeMedia);
-  }, [crimeMedia]);
+  // Combine crimeMedia with optimistic changes when in edit mode
+  const displayedMedia = useMemo(() => {
+    if (!editModeActive || Object.keys(optimisticMediaChanges).length === 0) {
+      return crimeMedia;
+    }
+    // Apply optimistic changes to crimeMedia
+    return crimeMedia.map((m: CrimeMedia) => {
+      const changes = optimisticMediaChanges[m.id];
+      return changes ? { ...m, ...changes } : m;
+    });
+  }, [crimeMedia, optimisticMediaChanges, editModeActive]);
 
   // Copy contact number to clipboard and show snackbar
   const handleContactCopy = async () => {
@@ -132,9 +126,10 @@ export default function VerificationCard(props: VerificationCardProps) {
     }));
 
     // Optimistic update - update displayed media immediately
-    setDisplayedMedia(prev => prev.map(m =>
-      m.id === mediaId ? { ...m, visibility: newVisibility } : m
-    ));
+    setOptimisticMediaChanges(prev => ({
+      ...prev,
+      [mediaId]: { ...(prev[mediaId] || {}), visibility: newVisibility }
+    }));
   };
 
   const handleCaptionChange = (mediaId: number, newCaption: string) => {
@@ -147,9 +142,10 @@ export default function VerificationCard(props: VerificationCardProps) {
     }));
 
     // Optimistic update - update displayed media immediately
-    setDisplayedMedia(prev => prev.map(m =>
-      m.id === mediaId ? { ...m, caption: newCaption } : m
-    ));
+    setOptimisticMediaChanges(prev => ({
+      ...prev,
+      [mediaId]: { ...(prev[mediaId] || {}), caption: newCaption }
+    }));
   };
 
   const handleEvidenceMarkChange = (mediaId: number, marked: boolean) => {
@@ -162,9 +158,10 @@ export default function VerificationCard(props: VerificationCardProps) {
     }));
 
     // Optimistic update - update displayed media immediately
-    setDisplayedMedia(prev => prev.map(m =>
-      m.id === mediaId ? { ...m, evidenceMarked: marked } : m
-    ));
+    setOptimisticMediaChanges(prev => ({
+      ...prev,
+      [mediaId]: { ...(prev[mediaId] || {}), evidenceMarked: marked }
+    }));
   };
 
   const handleMediaAdd = (files: Array<{ file: File; caption: string }>) => {
@@ -364,7 +361,15 @@ export default function VerificationCard(props: VerificationCardProps) {
               <div className="flex justify-between items-center mb-3">
                 <h3 className="font-semibold text-[#7d7d7d]">Attached Evidence:</h3>
                 <button
-                  onClick={() => setEditMediaMode(!editMediaMode)}
+                  onClick={() => {
+                    const newEditMode = !editMediaMode;
+                    setEditMediaMode(newEditMode);
+                    setEditModeActive(newEditMode);
+                    // Clear optimistic changes when exiting edit mode
+                    if (!newEditMode) {
+                      setOptimisticMediaChanges({});
+                    }
+                  }}
                   className="text-xs px-3 py-1 rounded-full border border-[#237E54] text-[#237E54] hover:bg-green-50 transition-colors"
                 >
                   {editMediaMode ? 'View Mode' : 'Edit Media'}
