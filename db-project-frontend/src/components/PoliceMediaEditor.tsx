@@ -11,7 +11,8 @@ interface PoliceMediaEditorProps {
   onMediaUpdate?: (mediaId: number, updates: MediaUpdate) => void;
   onMediaAdd?: (files: Array<{ file: File; caption: string }>) => void;
   onMediaDelete?: (mediaId: number) => void;
-  onCancel: () => void;
+  onCancel?: () => void;
+  disabled?: boolean;
 }
 
 type EditMode = 'view' | 'add' | 'edit';

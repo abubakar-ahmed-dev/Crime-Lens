@@ -9,7 +9,6 @@ import PoliceMediaEditor from "../../../components/PoliceMediaEditor";
 import { API_BASE_URL } from "../../../config/constants";
 import { checkLocationInsideZone } from "../../../utils/zoneValidation";
 import { getJwtAuthHeaders } from "../../../utils/authHeaders";
-import type { CrimeMediaItem } from "./AllRecords";
 
 type ZoneOption = {
   id: number;

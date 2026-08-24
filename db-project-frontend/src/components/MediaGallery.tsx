@@ -52,7 +52,6 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
 
   const handleImageError = (mediaId: number, itemType: 'thumbnail' | 'full') => {
     console.warn(`Failed to load ${itemType} for media ID: ${mediaId}`);
-    setMediaErrors(prev => new Set([...prev, mediaId]));
   };
 
   if (visibleMedia.length === 0) {
