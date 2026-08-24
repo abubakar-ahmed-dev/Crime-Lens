@@ -9,6 +9,11 @@ interface MediaGalleryProps {
   editable?: boolean;
 }
 
+interface MediaError {
+  mediaId: number;
+  type: 'thumbnail' | 'full' | 'load';
+}
+
 const MediaGallery: React.FC<MediaGalleryProps> = ({
   media,
   userRole = 'citizen',
@@ -18,6 +23,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
 }) => {
   const [selectedMediaIndex, setSelectedMediaIndex] = useState<number | null>(null);
   const [showLightbox, setShowLightbox] = useState(false);
+  const [mediaErrors, setMediaErrors] = useState<Set<number>>(new Set());
 
   // Filter media based on user role
   const visibleMedia = media.filter(m => m.visibility === 'public' || userRole !== 'citizen');
@@ -51,6 +57,11 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
     }
   };
 
+  const handleImageError = (mediaId: number, itemType: 'thumbnail' | 'full') => {
+    console.warn(`Failed to load ${itemType} for media ID: ${mediaId}`);
+    setMediaErrors(prev => new Set([...prev, mediaId]));
+  };
+
   if (visibleMedia.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
@@ -77,10 +88,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                 src={item.thumbnailUrl || item.url}
                 alt={item.caption || item.originalName}
                 className="w-full h-32 object-cover rounded-lg"
-                onError={(e) => {
-                  // Fallback to full URL if thumbnail fails
-                  (e.target as HTMLImageElement).src = item.url;
-                }}
+                onError={() => handleImageError(item.id, 'thumbnail')}
               />
             ) : (
               <div className="relative w-full h-32">
@@ -89,11 +97,7 @@ const MediaGallery: React.FC<MediaGalleryProps> = ({
                   src={item.thumbnailUrl || item.url}
                   alt={item.caption || item.originalName}
                   className="w-full h-full object-cover rounded-lg"
-                  onError={(e) => {
-                    // Fallback placeholder if thumbnail fails
-                    const target = e.target as HTMLImageElement;
-                    target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23d1d5db"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%236b7280" font-size="24"%3E🎥%3C/text%3E%3C/svg%3E';
-                  }}
+                  onError={() => handleImageError(item.id, 'thumbnail')}
                 />
                 <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg">
                   <svg className="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 20 20">

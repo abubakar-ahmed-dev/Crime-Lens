@@ -278,8 +278,9 @@ The code returns uploaded media data without creating CrimeMedia records, expect
 
 | ID | Severity | Issue | Root Cause | Affected Area | Status |
 |----|----------|-------|------------|---------------|--------|
-| BUG-001 | HIGH | Image thumbnails missing format extension | URL construction missing file extension | All thumbnail displays | Confirmed |
-| BUG-002 | MEDIUM | PublicId folder path handling | Slashes in publicId may cause URL issues | Thumbnail generation for folders | Confirmed |
+| BUG-001 | HIGH | Image thumbnails missing format extension | URL construction missing file extension | All thumbnail displays | ✅ FIXED (bf8112b) |
+
+| BUG-002 | MEDIUM | PublicId folder path handling | Slashes in publicId may cause URL issues | Thumbnail generation for folders | ✅ FIXED (bf8112b) |
 | BUG-003 | MEDIUM | TypeScript/JavaScript inconsistency | .js file with TypeScript syntax | Type safety in API layer | Confirmed |
 | BUG-004 | MEDIUM | Missing error boundaries | Minimal error handling in MediaGallery | Component reliability | Confirmed |
 | ISSUE-001 | HIGH | Video thumbnail URL format uncertain | Manual URL construction may be invalid | Video thumbnails | Needs Verification |

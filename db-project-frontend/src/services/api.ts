@@ -1,39 +1,113 @@
-// src/services/api.js
-import axios from "axios";
-import { API_BASE_URL } from "../config/constants"; // make sure this exists
+// src/services/api.ts
+import axios, { AxiosInstance } from "axios";
+import { API_BASE_URL } from "../config/constants";
 
-// Example: API_BASE_URL = `${API_BASE_URL}`
-const api = axios.create({
+// ===================================================
+// TYPE DEFINITIONS
+// ===================================================
+
+interface MediaUploadOptions {
+  files: File[];
+  captions?: string[];
+  crimeId?: number | null;
+  authToken?: string | null;
+}
+
+interface MediaUpdate {
+  visibility?: 'public' | 'police_only';
+  caption?: string;
+  evidenceMarked?: boolean;
+}
+
+interface MediaValidationOptions {
+  maxImages?: number;
+  maxVideos?: number;
+  maxFileSize?: number;
+}
+
+interface ValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+interface FileWithCaption {
+  file: File;
+  caption: string;
+  preview?: string;
+  fileType?: 'image' | 'video';
+}
+
+interface UploadedMedia {
+  id: number;
+  publicId: string;
+  originalName: string;
+  mimeType: string;
+  fileSize: number;
+  fileType: 'image' | 'video';
+  url: string;
+  thumbnailUrl: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+  uploadedBy: 'citizen' | 'police';
+  uploadedAt: string;
+  visibility: 'public' | 'police_only';
+  caption?: string;
+  evidenceMarked: boolean;
+}
+
+interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  message?: string;
+}
+
+// ===================================================
+// AXIOS INSTANCE
+// ===================================================
+
+const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// helper to attach token for future requests
-export const setAuthToken = (token) => {
-  if (token) api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-  else delete api.defaults.headers.common["Authorization"];
-};
-
-export const loginUser = async (username, password, verify_role) => {
-  const res = await api.post("/auth/login", { username, password, verify_role });
-  return res.data; // { success, token, user, ... }
+// Helper to attach token for future requests
+export const setAuthToken = (token: string | null): void => {
+  if (token) {
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  } else {
+    delete api.defaults.headers.common["Authorization"];
+  }
 };
 
 // ===================================================
-// 📱 MEDIA API FUNCTIONS
+// AUTH API
+// ===================================================
+
+export const loginUser = async (
+  username: string,
+  password: string,
+  verify_role: string
+): Promise<any> => {
+  const res = await api.post("/auth/login", { username, password, verify_role });
+  return res.data;
+};
+
+// ===================================================
+// MEDIA API FUNCTIONS
 // ===================================================
 
 /**
  * Upload media files with optional captions
- * @param {File[]} files - Array of files to upload
- * @param {string[]} captions - Array of captions (same length as files)
- * @param {number} [crimeId] - Optional crime ID for existing crimes
- * @param {string} [authToken] - Optional authorization token (for citizen auth)
- * @returns {Promise<Object>} Response with created media array
  */
-export const uploadMedia = async (files, captions = [], crimeId = null, authToken = null) => {
+export const uploadMedia = async ({
+  files,
+  captions = [],
+  crimeId = null,
+  authToken = null,
+}: MediaUploadOptions): Promise<ApiResponse<{ media: UploadedMedia[]; crimeId: number | null; count: number }>> => {
   const formData = new FormData();
 
   // Append files
@@ -54,7 +128,7 @@ export const uploadMedia = async (files, captions = [], crimeId = null, authToke
   }
 
   // Build headers
-  const headers = {
+  const headers: Record<string, string> = {
     "Content-Type": "multipart/form-data",
   };
 
@@ -63,55 +137,49 @@ export const uploadMedia = async (files, captions = [], crimeId = null, authToke
     headers["Authorization"] = `Bearer ${authToken}`;
   }
 
-  const res = await api.post("/media/upload", formData, {
-    headers,
-  });
-
-  return res.data; // { success, data: { media, crimeId, count } }
+  const res = await api.post("/media/upload", formData, { headers });
+  return res.data;
 };
 
 /**
  * Get media for a specific crime (filtered by user role)
- * @param {number} crimeId - Crime ID
- * @returns {Promise<Object>} Response with media array
  */
-export const getCrimeMedia = async (crimeId) => {
+export const getCrimeMedia = async (
+  crimeId: number
+): Promise<ApiResponse<{ crimeId: number; media: UploadedMedia[]; count: number; filtered: boolean }>> => {
   const res = await api.get(`/media/crime/${crimeId}`);
-  return res.data; // { success, data: { crimeId, media, count, filtered } }
+  return res.data;
 };
 
 /**
  * Update media metadata (visibility, caption, evidenceMarked)
- * @param {number} mediaId - Media ID to update
- * @param {Object} updates - Updates to apply
- * @param {string} [updates.visibility] - 'public' or 'police_only'
- * @param {string} [updates.caption] - New caption
- * @param {boolean} [updates.evidenceMarked] - Evidence flag
- * @returns {Promise<Object>} Response with updated media
  */
-export const updateMedia = async (mediaId, updates) => {
+export const updateMedia = async (
+  mediaId: number,
+  updates: MediaUpdate
+): Promise<ApiResponse<{ updated_media: UploadedMedia }>> => {
   const res = await api.put(`/media/${mediaId}`, updates);
-  return res.data; // { success, data: { updated_media } }
+  return res.data;
 };
 
 /**
  * Delete media item
- * @param {number} mediaId - Media ID to delete
- * @returns {Promise<Object>} Response confirming deletion
  */
-export const deleteMedia = async (mediaId) => {
+export const deleteMedia = async (
+  mediaId: number
+): Promise<ApiResponse<{ deletedMediaId: number; crimeId: number }>> => {
   const res = await api.delete(`/media/${mediaId}`);
-  return res.data; // { success, data: { deletedMediaId, crimeId } }
+  return res.data;
 };
 
 /**
  * Add media to existing crime report
- * @param {number} crimeId - Crime ID
- * @param {File[]} files - Array of files to add
- * @param {string[]} captions - Array of captions
- * @returns {Promise<Object>} Response with created media
  */
-export const addMediaToCrime = async (crimeId, files, captions = []) => {
+export const addMediaToCrime = async (
+  crimeId: number,
+  files: File[],
+  captions: string[] = []
+): Promise<ApiResponse<{ media: UploadedMedia[]; count: number }>> => {
   const formData = new FormData();
 
   files.forEach((file) => {
@@ -130,40 +198,38 @@ export const addMediaToCrime = async (crimeId, files, captions = []) => {
     },
   });
 
-  return res.data; // { success, data: { media, count } }
+  return res.data;
 };
 
 /**
  * Remove media from crime report
- * @param {number} crimeId - Crime ID
- * @param {number} mediaId - Media ID to remove
- * @returns {Promise<Object>} Response confirming removal
  */
-export const removeMediaFromCrime = async (crimeId, mediaId) => {
+export const removeMediaFromCrime = async (
+  crimeId: number,
+  mediaId: number
+): Promise<ApiResponse<{ removedMediaId: number; crimeId: number }>> => {
   const res = await api.delete(`/crimes/${crimeId}/media/${mediaId}`);
-  return res.data; // { success, data: { removedMediaId, crimeId } }
+  return res.data;
 };
 
 /**
  * Get thumbnail URL for media item (public endpoint)
- * @param {number} mediaId - Media ID
- * @returns {string} Thumbnail URL or placeholder
  */
-export const getMediaThumbnail = (mediaId) => {
+export const getMediaThumbnail = (mediaId: number): string => {
   return `${API_BASE_URL}/media/${mediaId}/thumbnail`;
 };
 
 // ===================================================
-// 📋 HELPER FUNCTIONS
+// HELPER FUNCTIONS
 // ===================================================
 
 /**
  * Build FormData for media upload
- * @param {FileWithCaption[]} filesWithCaptions - Array of {file, caption} objects
- * @param {number} [crimeId] - Optional crime ID
- * @returns {FormData} FormData object ready for upload
  */
-export const buildMediaFormData = (filesWithCaptions, crimeId = null) => {
+export const buildMediaFormData = (
+  filesWithCaptions: FileWithCaption[],
+  crimeId?: number
+): FormData => {
   const formData = new FormData();
 
   filesWithCaptions.forEach(({ file, caption }) => {
@@ -180,17 +246,11 @@ export const buildMediaFormData = (filesWithCaptions, crimeId = null) => {
 
 /**
  * Validate media files before upload
- * @param {File[]} files - Files to validate
- * @param {Object} limits - Upload limits
- * @param {number} [limits.maxImages=5] - Max image count
- * @param {number} [limits.maxVideos=2] - Max video count
- * @param {number} [limits.maxFileSize=5242880] - Max file size (5MB)
- * @returns {Object} Validation result
  */
 export const validateMediaFiles = (
-  files,
-  { maxImages = 5, maxVideos = 2, maxFileSize = 5242880 } = {}
-) => {
+  files: File[],
+  { maxImages = 5, maxVideos = 2, maxFileSize = 5242880 }: MediaValidationOptions = {}
+): ValidationResult => {
   const images = files.filter((file) => file.type.startsWith("image/"));
   const videos = files.filter((file) => file.type.startsWith("video/"));
 
@@ -245,10 +305,8 @@ export const validateMediaFiles = (
 
 /**
  * Categorize file as image or video
- * @param {File} file - File to categorize
- * @returns {string} 'image', 'video', or 'unknown'
  */
-export const getFileCategory = (file) => {
+export const getFileCategory = (file: File): 'image' | 'video' | 'unknown' => {
   if (file.type.startsWith("image/")) return "image";
   if (file.type.startsWith("video/")) return "video";
   return "unknown";
@@ -256,19 +314,14 @@ export const getFileCategory = (file) => {
 
 /**
  * Create preview URL for file
- * @param {File} file - File to create preview for
- * @returns {Promise<string>} Preview URL
  */
-export const createFilePreview = (file) => {
+export const createFilePreview = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
+    reader.onload = () => resolve(reader.result as string);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
 };
-
-// add other API helpers as needed, example:
-// export const fetchCrimes = () => api.get("/crimes");
 
 export default api;
