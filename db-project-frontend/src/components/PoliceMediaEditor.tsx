@@ -90,7 +90,7 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
           setErrors([result.message || 'Failed to upload media']);
         }
       }
-    } catch (error) {
+    } catch {
       setErrors(['Failed to upload media. Please try again.']);
     } finally {
       setUploadProgress(100);
@@ -122,7 +122,7 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
       } else {
         setErrors([result.message || 'Failed to remove media']);
       }
-    } catch (error) {
+    } catch {
       setErrors(['Failed to remove media. Please try again.']);
     } finally {
       setUploadProgress(100);
@@ -159,7 +159,7 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
           }
         }
       }
-    } catch (error) {
+    } catch {
       setErrors(['Failed to update media. Please try again.']);
       // Revert on error
       if (onMediaUpdate) {
@@ -203,7 +203,7 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
             onMediaUpdate(mediaId, { caption: originalMedia.caption });
           }
         }
-      } catch (error) {
+      } catch {
         setErrors(['Failed to update caption. Please try again.']);
         const originalMedia = media.find(m => m.id === mediaId);
         if (originalMedia && onMediaUpdate) {
@@ -230,7 +230,7 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
       // All individual changes already applied
       // This function can be used for batch operations if needed
       setEditMode('view');
-    } catch (error) {
+    } catch {
       setErrors(['Failed to save changes. Please try again.']);
     } finally {
       setIsSaving(false);
