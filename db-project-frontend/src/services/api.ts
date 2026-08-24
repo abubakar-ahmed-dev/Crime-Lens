@@ -192,7 +192,7 @@ export const addMediaToCrime = async (
     });
   }
 
-  const res = await api.post(`/crimes/${crimeId}/media`, formData, {
+  const res = await api.post(`/media/crimes/${crimeId}/media`, formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -208,7 +208,7 @@ export const removeMediaFromCrime = async (
   crimeId: number,
   mediaId: number
 ): Promise<ApiResponse<{ removedMediaId: number; crimeId: number }>> => {
-  const res = await api.delete(`/crimes/${crimeId}/media/${mediaId}`);
+  const res = await api.delete(`/media/crimes/${crimeId}/media/${mediaId}`);
   return res.data;
 };
 
