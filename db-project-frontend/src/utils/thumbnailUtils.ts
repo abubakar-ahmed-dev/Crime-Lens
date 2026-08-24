@@ -3,9 +3,6 @@
  * Handles fallback logic for thumbnail URLs that may be missing .jpg extension
  */
 
-// Debug flag for thumbnail logging - set to true only during development
-const DEBUG_THUMBNAILS = false;
-
 /**
  * Checks if a URL is a Cloudinary URL
  * @param url - URL to check
@@ -93,7 +90,7 @@ const constructThumbnailFromFullUrl = (fullUrl: string, fileType?: string): stri
 
     return newUrl;
   } catch (error) {
-    console.warn('Failed to construct thumbnail from URL:', fullUrl, error);
+    // Silently fail - this is a fallback function
     return null;
   }
 };
@@ -111,8 +108,6 @@ export const getWorkingThumbnailUrl = (media: {
   // Try normalized thumbnail URL first
   const normalizedThumbnail = normalizeThumbnailUrl(media.thumbnailUrl || null);
   if (normalizedThumbnail) {
-    // Debug: log what we're using
-    if (DEBUG_THUMBNAILS) console.log('Using thumbnail URL:', normalizedThumbnail);
     return normalizedThumbnail;
   }
 
@@ -120,15 +115,12 @@ export const getWorkingThumbnailUrl = (media: {
   if (media.url) {
     const constructedThumbnail = constructThumbnailFromFullUrl(media.url, media.fileType);
     if (constructedThumbnail) {
-      if (DEBUG_THUMBNAILS) console.log('Constructed thumbnail from URL:', constructedThumbnail);
       return constructedThumbnail;
     }
     // If construction failed, use the original URL
-    if (DEBUG_THUMBNAILS) console.log('Using original URL as fallback:', media.url);
     return media.url;
   }
 
   // Final fallback - empty string (component will show placeholder)
-  if (DEBUG_THUMBNAILS) console.warn('No thumbnail URL available for media');
   return '';
 };
