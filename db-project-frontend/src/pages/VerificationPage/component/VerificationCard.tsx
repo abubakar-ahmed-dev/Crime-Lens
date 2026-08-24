@@ -189,15 +189,24 @@ export default function VerificationCard(props: VerificationCardProps) {
       const result = await addMediaToCrime(Number(submissionId), filesArray, captions);
 
       if (result.success && result.data?.media) {
-        // Create new CrimeMedia items from response
+        // Create new CrimeMedia items from response - include all required fields
         const newMediaItems: CrimeMedia[] = result.data.media.map((m: any) => ({
           id: m.id,
+          CrimeId: m.CrimeId || Number(submissionId),
+          publicId: m.publicId,
+          originalName: m.originalName,
+          mimeType: m.mimeType,
+          fileSize: m.fileSize,
+          fileType: m.fileType,
           url: m.url,
           thumbnailUrl: m.thumbnailUrl,
-          fileType: m.fileType,
-          caption: m.caption,
-          originalName: m.originalName,
+          width: m.width,
+          height: m.height,
+          duration: m.duration,
+          uploadedBy: m.uploadedBy || 'police',
+          uploadedAt: m.uploadedAt || new Date().toISOString(),
           visibility: m.visibility,
+          caption: m.caption,
           evidenceMarked: m.evidenceMarked,
         }));
 
