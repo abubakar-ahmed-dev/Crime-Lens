@@ -8,6 +8,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import UploadFile from "./component/UploadFile";
 import { toast, Toaster } from "react-hot-toast";
+import { getJwtAuthHeaders } from "../../utils/authHeaders";
 
 const UploadPage: React.FC<{ }> = ({ }) => {
 
@@ -72,7 +73,7 @@ const UploadPage: React.FC<{ }> = ({ }) => {
 
     try {
       const response = await axios.post(`${API_BASE_URL}/admin/upload-crimes`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: getJwtAuthHeaders({ "Content-Type": "multipart/form-data" }),
       });
 
       const stats = response.data.stats;

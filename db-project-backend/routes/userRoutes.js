@@ -5,17 +5,20 @@ import {
   getPendingSubmissions,
   approveCrimeReport,
   rejectCrimeReport,
-} from "../controllers/CrimeControllers2.js";
+} from "../controllers/CrimeControllers.js";
+import { authorizeCitizen, verifyToken, authorizeRoles } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Crime Reporting (Public)
-router.post("/report-crime", reportCrime);
+const policeOnly = [verifyToken, authorizeRoles("police")];
+
+// Crime Reporting (Citizen)
+router.post("/report-crime", authorizeCitizen, reportCrime);
 
 // Crime Verification (Police Officer)
-router.get("/pending", getPendingSubmissions);
-router.post("/approve/:submissionId", approveCrimeReport);
-router.post("/reject/:submissionId", rejectCrimeReport);
+router.get("/pending", policeOnly, getPendingSubmissions);
+router.post("/approve/:submissionId", policeOnly, approveCrimeReport);
+router.post("/reject/:submissionId", policeOnly, rejectCrimeReport);
 
 
 export default router;

@@ -1,16 +1,22 @@
 //VerificationPage/components/VerificationCard.tsx
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import WhiteButton from "../../../components/WhiteButton";
 import ConfirmationPopup from "./ConfirmationPopup";
+import MediaGallery from "../../../components/MediaGallery";
+import PoliceMediaEditor from "../../../components/PoliceMediaEditor";
+import { API_BASE_URL } from "../../../config/constants";
+import { getJwtAuthHeaders } from "../../../utils/authHeaders";
+import { addMediaToCrime } from "../../../services/api";
+import type { CrimeMedia } from "../../../pages/MapViewPage/components/types";
 
 type VerificationCardProps =
   | {
     version: "admin";
     requestId: string | number;
     branchId: string;
+    branchZoneName?: string;
     branchContact: string;
     username: string;
-    password: string;
     requestDate: string;
     onContact?: () => void;
     onReject?: (reason?: string) => void;
@@ -23,15 +29,27 @@ type VerificationCardProps =
     fullName: string;
     contact: string;
     cnic: string;
+    crimeTypeId: number | string;
     crimeType: string;
     description: string;
     date: string;
     zone: number;
+    zoneName?: string;
     address: string;
+    latitude: number | string;
+    longitude: number | string;
+    media?: CrimeMedia[];
     onContact?: () => void;
     onReject?: (reason?: string) => void;
-    onApprove?: () => void;
+    onApprove?: (mediaChanges?: MediaChanges) => void;
   };
+
+interface MediaChanges {
+  toRemove?: number[];
+  visibilityChanges?: Record<number, 'public' | 'police_only'>;
+  captionUpdates?: Record<number, string>;
+  evidenceMarkedChanges?: Record<number, boolean>;
+}
 
 export default function VerificationCard(props: VerificationCardProps) {
   const [openConfirm, setOpenConfirm] = useState(false);
@@ -39,6 +57,34 @@ export default function VerificationCard(props: VerificationCardProps) {
   const [showSnackbar, setShowSnackbar] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [mediaChanges, setMediaChanges] = useState<MediaChanges>({});
+  const [editMediaMode, setEditMediaMode] = useState(false);
+
+  // Get media for police version - computed from props
+  const crimeMedia = props.version === "police" ? (props as any).media || [] : [];
+
+  // Local state for newly uploaded media items
+  const [newlyAddedMedia, setNewlyAddedMedia] = useState<CrimeMedia[]>([]);
+
+  // Local state ONLY for optimistic updates during edit mode - starts empty
+  const [optimisticMediaChanges, setOptimisticMediaChanges] = useState<Record<number, Partial<CrimeMedia>>>({});
+  const [editModeActive, setEditModeActive] = useState(false);
+
+  // Combine crimeMedia with newly added media and optimistic changes
+  const displayedMedia = useMemo(() => {
+    // Start with existing media and newly added media
+    let combinedMedia = [...crimeMedia, ...newlyAddedMedia];
+
+    // Apply optimistic changes when in edit mode
+    if (editModeActive && Object.keys(optimisticMediaChanges).length > 0) {
+      combinedMedia = combinedMedia.map((m: CrimeMedia) => {
+        const changes = optimisticMediaChanges[m.id];
+        return changes ? { ...m, ...changes } : m;
+      });
+    }
+
+    return combinedMedia;
+  }, [crimeMedia, newlyAddedMedia, optimisticMediaChanges, editModeActive]);
 
   // Copy contact number to clipboard and show snackbar
   const handleContactCopy = async () => {
@@ -69,6 +115,121 @@ export default function VerificationCard(props: VerificationCardProps) {
     props.onContact?.();
   };
 
+  // Media change handlers for police version
+  const handleMediaRemove = (mediaId: number) => {
+    setMediaChanges(prev => ({
+      ...prev,
+      toRemove: [...(prev.toRemove || []), mediaId]
+    }));
+  };
+
+  const handleVisibilityChange = (mediaId: number, newVisibility: 'public' | 'police_only') => {
+    setMediaChanges(prev => ({
+      ...prev,
+      visibilityChanges: {
+        ...(prev.visibilityChanges || {}),
+        [mediaId]: newVisibility
+      }
+    }));
+
+    // Optimistic update - update displayed media immediately
+    setOptimisticMediaChanges(prev => ({
+      ...prev,
+      [mediaId]: { ...(prev[mediaId] || {}), visibility: newVisibility }
+    }));
+  };
+
+  const handleCaptionChange = (mediaId: number, newCaption: string) => {
+    setMediaChanges(prev => ({
+      ...prev,
+      captionUpdates: {
+        ...(prev.captionUpdates || {}),
+        [mediaId]: newCaption
+      }
+    }));
+
+    // Optimistic update - update displayed media immediately
+    setOptimisticMediaChanges(prev => ({
+      ...prev,
+      [mediaId]: { ...(prev[mediaId] || {}), caption: newCaption }
+    }));
+  };
+
+  const handleEvidenceMarkChange = (mediaId: number, marked: boolean) => {
+    setMediaChanges(prev => ({
+      ...prev,
+      evidenceMarkedChanges: {
+        ...(prev.evidenceMarkedChanges || {}),
+        [mediaId]: marked
+      }
+    }));
+
+    // Optimistic update - update displayed media immediately
+    setOptimisticMediaChanges(prev => ({
+      ...prev,
+      [mediaId]: { ...(prev[mediaId] || {}), evidenceMarked: marked }
+    }));
+  };
+
+  const handleMediaAdd = async (files: Array<{ file: File; caption: string }>) => {
+    if (files.length === 0) return;
+
+    const submissionId = (props as any).submissionId;
+    if (!submissionId) {
+      console.error('Cannot upload media: submissionId not found');
+      return;
+    }
+
+    try {
+      // Extract files and captions
+      const filesArray = files.map(f => f.file);
+      const captions = files.map(f => f.caption);
+
+      // Upload immediately to Cloudinary and database
+      const result = await addMediaToCrime(Number(submissionId), filesArray, captions);
+
+      if (result.success && result.data?.media) {
+        // Create new CrimeMedia items from response - include all required fields
+        const newMediaItems: CrimeMedia[] = result.data.media.map((m: any) => ({
+          id: m.id,
+          CrimeId: m.CrimeId || Number(submissionId),
+          publicId: m.publicId,
+          originalName: m.originalName,
+          mimeType: m.mimeType,
+          fileSize: m.fileSize,
+          fileType: m.fileType,
+          url: m.url,
+          thumbnailUrl: m.thumbnailUrl,
+          width: m.width,
+          height: m.height,
+          duration: m.duration,
+          uploadedBy: m.uploadedBy || 'police',
+          uploadedAt: m.uploadedAt || new Date().toISOString(),
+          visibility: m.visibility,
+          caption: m.caption,
+          evidenceMarked: m.evidenceMarked,
+        }));
+
+        // Add to newlyAddedMedia state so they show in Quick Edit section
+        setNewlyAddedMedia(prev => [...prev, ...newMediaItems]);
+      } else {
+        console.error('Failed to upload media:', result.message);
+      }
+    } catch (error) {
+      console.error('Error uploading media:', error);
+    }
+  };
+
+  const hasMediaChanges = () => {
+    // Check if any media changes exist (excluding toAdd since we upload immediately)
+    return (
+      (mediaChanges.toRemove && mediaChanges.toRemove.length > 0) ||
+      (mediaChanges.visibilityChanges && Object.keys(mediaChanges.visibilityChanges).length > 0) ||
+      (mediaChanges.captionUpdates && Object.keys(mediaChanges.captionUpdates).length > 0) ||
+      (mediaChanges.evidenceMarkedChanges && Object.keys(mediaChanges.evidenceMarkedChanges).length > 0)
+    );
+  };
+
   // Handle Approve
   const handleApproveSubmit = async (updatedValues: any) => {
     setLoading(true);
@@ -81,24 +242,32 @@ export default function VerificationCard(props: VerificationCardProps) {
       if (props.version === "admin") {
         // @ts-ignore
         endpoint = `${API_BASE_URL}/agent/verify/${props.requestId}`;
-        body = { roleId: 2 }; // Default to police officer role
+        body = {
+          roleId: 2,
+          username: updatedValues.username,
+          branchId: Number(updatedValues.branchId),
+        }; // Default to police officer role
       } else {
         // @ts-ignore
         endpoint = `${API_BASE_URL}/user/approve/${props.submissionId}`;
         body = {
           address: updatedValues.address || "",
+          zoneId: Number(updatedValues.zone),
           latitude: Number(updatedValues.latitude),
           longitude: Number(updatedValues.longitude),
+          crimeTypeId: Number(updatedValues.crimeTypeId),
+          incidentDate: updatedValues.date,
           title: updatedValues.title || "",
           description: updatedValues.description || "",
+          mediaChanges: hasMediaChanges() ? mediaChanges : undefined,
         };
       }
 
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: {
+        headers: getJwtAuthHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify(body),
       });
 
@@ -106,7 +275,8 @@ export default function VerificationCard(props: VerificationCardProps) {
 
       if (response.ok && result.success) {
         setOpenConfirm(false);
-        props.onApprove?.();
+        // Pass media changes to parent component
+        props.onApprove?.(hasMediaChanges() ? mediaChanges : undefined);
       } else {
         setError(result.message || "Failed to approve");
       }
@@ -138,9 +308,9 @@ export default function VerificationCard(props: VerificationCardProps) {
 
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: {
+        headers: getJwtAuthHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({ reason }),
       });
 
@@ -169,7 +339,8 @@ export default function VerificationCard(props: VerificationCardProps) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 text-sm text-gray-800">
             <p>
-              <span className="font-semibold">Branch ID:</span> {props.branchId}
+              <span className="font-semibold">Branch:</span>{" "}
+              {props.branchZoneName ? `${props.branchId} - ${props.branchZoneName}` : props.branchId}
             </p>
             <p>
               <span className="font-semibold">Branch Contact #:</span>{" "}
@@ -177,9 +348,6 @@ export default function VerificationCard(props: VerificationCardProps) {
             </p>
             <p>
               <span className="font-semibold">Username:</span> {props.username}
-            </p>
-            <p>
-              <span className="font-semibold">Password:</span> {props.password}
             </p>
             <p>
               <span className="font-semibold">Request Date:</span>{" "}
@@ -219,7 +387,8 @@ export default function VerificationCard(props: VerificationCardProps) {
               <span className="font-semibold">Date:</span> {props.date}
             </p>
             <p>
-              <span className="font-semibold">Zone #:</span> {props.zone}
+              <span className="font-semibold">Zone:</span>{" "}
+              {props.zoneName ? `${props.zone} - ${props.zoneName}` : props.zone}
             </p>
             <p>
               <span className="font-semibold">Address:</span>{" "}
@@ -230,6 +399,61 @@ export default function VerificationCard(props: VerificationCardProps) {
               {props.description || "--"}
             </p>
           </div>
+
+          {/* Media Section for Police Version */}
+          {crimeMedia.length > 0 && (
+            <>
+              <hr className="my-4 border-t-2 border-[#d9d9d9]" />
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-semibold text-[#7d7d7d]">Attached Evidence:</h3>
+                <button
+                  onClick={() => {
+                    const newEditMode = !editMediaMode;
+                    setEditMediaMode(newEditMode);
+                    setEditModeActive(newEditMode);
+                    // Clear optimistic changes and newly added media when exiting edit mode
+                    if (!newEditMode) {
+                      setOptimisticMediaChanges({});
+                      setNewlyAddedMedia([]);
+                    }
+                  }}
+                  className="text-xs px-3 py-1 rounded-full border border-[#237E54] text-[#237E54] hover:bg-green-50 transition-colors"
+                >
+                  {editMediaMode ? 'View Mode' : 'Edit Media'}
+                </button>
+              </div>
+
+              {editMediaMode ? (
+                <PoliceMediaEditor
+                  crimeId={Number(props.submissionId)}
+                  media={displayedMedia}
+                  onMediaUpdate={(mediaId, updates) => {
+                    if (updates.visibility) handleVisibilityChange(mediaId, updates.visibility);
+                    if (updates.caption !== undefined) handleCaptionChange(mediaId, updates.caption);
+                    if (updates.evidenceMarked !== undefined) handleEvidenceMarkChange(mediaId, updates.evidenceMarked);
+                  }}
+                  onMediaDelete={(mediaId) => handleMediaRemove(mediaId)}
+                  onMediaAdd={(files) => handleMediaAdd(files)}
+                  disabled={loading}
+                />
+              ) : (
+                <MediaGallery
+                  media={displayedMedia}
+                  userRole="police"
+                  editable={false}
+                />
+              )}
+
+              {/* Media Changes Indicator */}
+              {hasMediaChanges() && (
+                <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-700">
+                    ⚠️ You have pending media changes that will be applied on approval.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
         </>
       )}
 
@@ -241,27 +465,29 @@ export default function VerificationCard(props: VerificationCardProps) {
       )}
 
       {/* Footer Buttons */}
-      <div className="border-t-2 border-[#d9d9d9] mt-4 pt-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <WhiteButton
-          label="Contact for Verification"
-          width={300}
-          height={40}
-          onClick={handleContactCopy}
-        />
-        <div className="flex flex-wrap gap-2">
+      <div className="border-t-2 border-[#d9d9d9] mt-4 pt-6 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+        <div className="w-full lg:w-[240px] xl:w-[280px] shrink-0">
+          <WhiteButton
+            label="Contact for Verification"
+            height={40}
+            fullWidth
+            onClick={handleContactCopy}
+          />
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto lg:justify-end">
           <button
             onClick={() => setShowRejectConfirm(true)}
             disabled={loading}
-            className="px-6 py-1 bg-[#b80404] hover:bg-red-900 border-2 border-[#b80404] disabled:bg-gray-400 text-white text-sm rounded-full font-normal transition-colors"
-            style={{ width: 200, height: 40 }}
+            className="w-full sm:flex-1 lg:w-[160px] xl:w-[190px] px-6 py-1 bg-[#b80404] hover:bg-red-900 border-2 border-[#b80404] disabled:bg-gray-400 text-white text-sm rounded-full font-normal transition-colors"
+            style={{ height: 40 }}
           >
             {loading ? "Processing..." : "Reject"}
           </button>
           <button
             onClick={() => setOpenConfirm(true)}
             disabled={loading}
-            className="px-6 py-1 bg-linear-to-r from-[#145332] to-[#237E54] border-2 border-[#237E54] hover:from-[#145332] hover:to-[#145332] disabled:bg-gray-400 text-white text-sm rounded-full font-normal transition-colors"
-            style={{ width: 200, height: 40 }}
+            className="w-full sm:flex-1 lg:w-[160px] xl:w-[190px] px-6 py-1 bg-linear-to-r from-[#145332] to-[#237E54] border-2 border-[#237E54] hover:from-[#145332] hover:to-[#145332] disabled:bg-gray-400 text-white text-sm rounded-full font-normal transition-colors"
+            style={{ height: 40 }}
           >
             {loading ? "Processing..." : "Approve"}
           </button>

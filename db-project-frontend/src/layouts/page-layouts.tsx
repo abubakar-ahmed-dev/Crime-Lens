@@ -11,21 +11,45 @@ const PageLayout = () => {
   const { role, roleLoaded } = useSelector((state: any) => state.currentRole);
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const authMode = localStorage.getItem("authMode");
+  const staffRole = localStorage.getItem("staffRole");
+  const citizenActive =
+    authMode === "citizen" &&
+    localStorage.getItem("citizen") !== null &&
+    localStorage.getItem("citizen_token") !== null;
+  const storedRole =
+    authMode === "staff"
+      ? staffRole
+      : citizenActive
+        ? "user"
+        : localStorage.getItem("userRole");
+  const validStoredRole =
+    storedRole === "admin" || storedRole === "police" || storedRole === "user"
+      ? storedRole
+      : null;
+  const layoutRole = validStoredRole || role;
+  const roleReady = !!layoutRole;
+  const publicNavigationRoutes = ["/dashboard", "/statistics"];
+  const isPublicNavigationRoute = publicNavigationRoutes.some((route) =>
+    location.pathname.startsWith(route)
+  );
 
   useEffect(() => {
-    const storedRole = localStorage.getItem("userRole");
-
-    if (
-      storedRole &&
-      (storedRole === "admin" ||
-        storedRole === "police" ||
-        storedRole === "user")
-    ) {
-      if (!roleLoaded) {
-        dispatch(setRole(storedRole));
-      }
+    if (validStoredRole && (!roleLoaded || role !== validStoredRole)) {
+      dispatch(setRole(validStoredRole));
     }
-  }, [dispatch, roleLoaded]);
+  }, [dispatch, role, roleLoaded, validStoredRole]);
+
+  useEffect(() => {
+    if (
+      !validStoredRole &&
+      !role &&
+      !authMode &&
+      isPublicNavigationRoute
+    ) {
+      dispatch(setRole("user"));
+    }
+  }, [authMode, dispatch, isPublicNavigationRoute, role, validStoredRole]);
 
   const handleNavigation = (path: string) => {
     navigate(path);
@@ -37,8 +61,11 @@ const PageLayout = () => {
     "/",
     "/login",
     "/login-admin",
+    "/login-citizen",
+    "/register",
     "/map",
     "/request-agent",
+    "/complete-profile",
   ];
 
   // Routes that should take full width (no padding)
@@ -56,13 +83,13 @@ const PageLayout = () => {
     location.pathname.startsWith(route)
   );
 
-  const showHeaderBar = !hideSidebar && roleLoaded;
+  const showNavigation = !hideSidebar && roleReady;
 
   return (
     <div className="flex w-full min-h-screen">
       {/* Header bar (mobile only) */}
-      {showHeaderBar && (
-        <header className="lg:hidden fixed top-0 left-0 right-0 z-999 h-14 flex items-center justify-between bg-[#fefefe] shadow-[0_0_5px_rgba(0,0,0,0.1)] px-4">
+      {showNavigation && (
+        <header className="lg:hidden fixed top-0 left-0 right-0 z-[999] h-14 flex items-center justify-between bg-[#fefefe] shadow-[0_0_5px_rgba(0,0,0,0.1)] px-4">
           <button
             type="button"
             onClick={() => setMobileMenuOpen(true)}
@@ -95,7 +122,7 @@ const PageLayout = () => {
       )}
 
       {/* Backdrop (mobile sidebar) */}
-      {showHeaderBar && (
+      {showNavigation && (
         <div
           className="lg:hidden fixed inset-0 bg-black/40 z-[1000] transition-opacity duration-200"
           style={{
@@ -109,20 +136,20 @@ const PageLayout = () => {
       )}
 
       {/* Sidebar */}
-      {!hideSidebar && roleLoaded && (
+      {showNavigation && (
         <div
           className={`
-            z-1001 transition-transform duration-200 ease-out
+            z-[1001] transition-transform duration-200 ease-out
             ${
               mobileMenuOpen
                 ? "translate-x-0 fixed inset-y-0 left-0"
                 : "fixed -translate-x-full inset-y-0 left-0"
             }
-            lg:translate-x-0 lg:fixed lg:top-0 lg:left-0 lg:h-screen lg:w-72
+            lg:translate-x-0 lg:fixed lg:top-4 lg:left-4 lg:h-[calc(100vh-2rem)] lg:w-72
           `}
         >
           <Sidebar
-            version={role}
+            version={layoutRole}
             setPath={handleNavigation}
             onCloseMobile={() => setMobileMenuOpen(false)}
             isDrawer={mobileMenuOpen}
@@ -134,8 +161,8 @@ const PageLayout = () => {
       <div
         className={`
           flex-1 min-w-0
-          ${noPadding ? "" : showHeaderBar ? "pt-14 lg:pt-0 p-4" : "p-4"}
-          ${hideSidebar ? "lg:ml-0" : "lg:ml-72"}
+          ${noPadding ? "" : showNavigation ? "pt-14 lg:pt-0 p-4" : "p-4"}
+          ${showNavigation ? "lg:ml-72" : "lg:ml-0"}
         `}
       >
         <Outlet />

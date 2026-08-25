@@ -5,6 +5,7 @@ import AllRecordsSearch from "./AllRecordsSearch";
 import DetailsPopup from "./DetailsPopup"
 import { downloadCSV } from "./downloadCSV";
 import { API_BASE_URL } from "../../../config/constants";
+import { getJwtAuthHeaders } from "../../../utils/authHeaders";
 
 interface AllRecordsProps {
   version: "admin" | "police" | "user" | null;
@@ -15,7 +16,7 @@ export interface AgentRecord {
   agentId: number;
   branchId: number | null;
   username: string;
-  password: string;
+  zoneName: string | null;
   branchContact: string | null;
   createdAt: string; // YYYY-MM-DD
 }
@@ -26,7 +27,71 @@ export interface CrimeRecord {
   submitterCnic: string | null;
   crimeTypeName: string;
   incidentDate: string; // YYYY-MM-DD
+  title?: string;
+  description?: string;
+  address?: string;
+  thumbnailUrl?: string;
+  mediaCount?: number;
+  media?: CrimeMediaItem[];
 }
+
+export interface CrimeMediaItem {
+  id: number;
+  fileType: 'image' | 'video';
+  url: string;
+  thumbnailUrl: string;
+  caption?: string;
+  visibility: 'public' | 'police_only';
+  evidenceMarked: boolean;
+  originalName: string;
+  fileSize: number;
+  uploadedBy: 'citizen' | 'police';
+  uploadedAt: string;
+}
+
+const isValidStoredCoordinate = (
+  value: unknown,
+  field: "latitude" | "longitude"
+) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return false;
+
+  return field === "latitude"
+    ? numericValue >= 23 && numericValue <= 26
+    : numericValue >= 65 && numericValue <= 68;
+};
+
+const getCrimeCoordinate = (
+  crime: any,
+  field: "latitude" | "longitude"
+) => {
+  const explicitValue = crime[field];
+  if (
+    explicitValue !== null &&
+    explicitValue !== undefined &&
+    explicitValue !== "" &&
+    isValidStoredCoordinate(explicitValue, field)
+  ) {
+    return explicitValue.toString();
+  }
+
+  let location = crime.location;
+  if (typeof location === "string") {
+    try {
+      location = JSON.parse(location);
+    } catch {
+      location = null;
+    }
+  }
+  const coordinateIndex = field === "latitude" ? 1 : 0;
+  const coordinateValue = location?.coordinates?.[coordinateIndex];
+
+  return coordinateValue !== null &&
+    coordinateValue !== undefined &&
+    isValidStoredCoordinate(coordinateValue, field)
+    ? coordinateValue.toString()
+    : "";
+};
 
 export default function AllRecords({ version }: AllRecordsProps) {
 
@@ -44,12 +109,42 @@ export default function AllRecords({ version }: AllRecordsProps) {
     title: string;
     description: string;
     address: string;
+    crimeTypeId: number | string;
+    incidentDate: string;
     zoneId: number;
-    latitude: number;
-    longitude: number;
+    latitude: string;
+    longitude: string;
+    media?: CrimeMediaItem[];
   }
 
   const [fullCrime, setFullCrime] = useState<FullCrimeDetails | null>(null);
+
+  const fetchPoliceRecords = async () => {
+    const res = await fetch(`${API_BASE_URL}/crimes/all`, {
+      headers: getJwtAuthHeaders(),
+    });
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || !data?.success) {
+      throw new Error(data?.message || "Failed to fetch crimes");
+    }
+
+    return data.data;
+  };
+
+  const fetchAdminRecords = async () => {
+    const res = await fetch(`${API_BASE_URL}/agent/all`, {
+      headers: getJwtAuthHeaders(),
+    });
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || !data?.success) {
+      throw new Error(data?.message || "Failed to fetch agents");
+    }
+
+    return data.data;
+  };
+
   // ---------------------------
   // FETCH DATA
   // ---------------------------
@@ -58,32 +153,20 @@ export default function AllRecords({ version }: AllRecordsProps) {
 
     const fetchData = async () => {
       try {
-        let res, data;
+        let data;
 
         if (version === "police") {
-          res = await fetch(`${API_BASE_URL}/crimes/all`);
-          if (!res.ok) throw new Error("Network response was not ok");
-          data = await res.json();
+          data = await fetchPoliceRecords();
           if (!mounted) return;
 
-          if (data.success) {
-            setRecords(data.data);
-            setBackupRecords(data.data);
-          } else {
-            console.error("Error fetching crimes:", data.message);
-          }
+          setRecords(data);
+          setBackupRecords(data);
         } else if (version === "admin") {
-          res = await fetch(`${API_BASE_URL}/agent/all`);
-          if (!res.ok) throw new Error("Network response was not ok");
-          data = await res.json();
+          data = await fetchAdminRecords();
           if (!mounted) return;
 
-          if (data.success) {
-            setRecords(data.data);
-            setBackupRecords(data.data);
-          } else {
-            console.error("Error fetching agents:", data.message);
-          }
+          setRecords(data);
+          setBackupRecords(data);
         }
       } catch (err) {
         console.error("Fetch Request Error:", err);
@@ -156,7 +239,10 @@ export default function AllRecords({ version }: AllRecordsProps) {
             version === "admin"
               ? `${API_BASE_URL}/agent/delete/${id}`
               : `${API_BASE_URL}/crimes/delete/${id}`;
-          return fetch(url, { method: "DELETE" });
+          return fetch(url, {
+            method: "DELETE",
+            headers: getJwtAuthHeaders(),
+          });
         })
       );
 
@@ -193,7 +279,9 @@ export default function AllRecords({ version }: AllRecordsProps) {
       setIsUpdateModalOpen(true);
     } else {
       try {
-        const res = await fetch(`${API_BASE_URL}/crimes/get-crime/${recordId}`);
+        const res = await fetch(`${API_BASE_URL}/crimes/get-crime/${recordId}`, {
+          headers: getJwtAuthHeaders(),
+        });
         const data = await res.json();
         if (!data.success) {
           alert("Failed to load crime details.");
@@ -205,9 +293,12 @@ export default function AllRecords({ version }: AllRecordsProps) {
           title: c.title,
           description: c.description,
           address: c.address,
+          crimeTypeId: c.crimeTypeId,
+          incidentDate: c.incidentDate ? new Date(c.incidentDate).toISOString().slice(0, 10) : "",
           zoneId: c.zoneId,
-          latitude: c.location?.coordinates?.[1] ?? 0,
-          longitude: c.location?.coordinates?.[0] ?? 0,
+          latitude: getCrimeCoordinate(c, "latitude"),
+          longitude: getCrimeCoordinate(c, "longitude"),
+          media: c.media || c.CrimeMedia || [],
         });
         setIsUpdateModalOpen(true);
       } catch (err) {
@@ -227,38 +318,41 @@ export default function AllRecords({ version }: AllRecordsProps) {
           `${API_BASE_URL}/agent/update/${selectedAgent.agentId}`,
           {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: getJwtAuthHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify(updatedData),
           }
         );
         const data = await res.json();
         if (!data.success) {
-          alert("Update failed: " + data.message);
-          return;
+          const message = data.message || "Unable to update agent.";
+          alert("Update failed: " + message);
+          return message;
         }
-        const newList = records.map((r: any) =>
-          r.agentId === selectedAgent.agentId ? updatedData : r
-        );
-        setRecords(newList);
-        setBackupRecords(newList);
+        const refreshedRecords = await fetchAdminRecords();
+        setRecords(refreshedRecords);
+        setBackupRecords(refreshedRecords);
         setSelectedRecords([]);
         setSelectedAgent(null);
       } else if (version === "police" && fullCrime) {
         const res = await fetch(`${API_BASE_URL}/crimes/update/${fullCrime.id}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: getJwtAuthHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(updatedData),
         });
-        const data = await res.json();
-        if (!data.success) {
-          alert("Update failed: " + data.message);
-          return;
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.success) {
+          const message = data?.message || "Unable to update crime.";
+          return message;
         }
-        const newList = records.map((r: any) =>
-          r.id === fullCrime.id ? { ...r, zoneId: fullCrime.zoneId } : r
-        );
-        setRecords(newList);
-        setBackupRecords(newList);
+
+        // Log media operations for Crime.latestUpdatedBy tracking verification
+        if (updatedData.mediaOperations) {
+          console.log("Crime updated with media operations:", updatedData.mediaOperations);
+        }
+
+        const refreshedRecords = await fetchPoliceRecords();
+        setRecords(refreshedRecords);
+        setBackupRecords(refreshedRecords);
         setSelectedRecords([]);
         setFullCrime(null);
       }

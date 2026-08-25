@@ -3,6 +3,7 @@
 import { QueryTypes, Op, fn, col, literal } from "sequelize";
 import sequelize from "../config/db.js";
 import db from "../models/index.js";
+import bcrypt from "bcryptjs";
 const { Crime, User, Criminal , CrimeSubmission, PoliceAgentRequestsTemp, CrimeReportsSubmitter, PoliceAgentRequest, CrimeType, Zone, PoliceBranch } = db;
 
 // ===================================================
@@ -11,9 +12,7 @@ const { Crime, User, Criminal , CrimeSubmission, PoliceAgentRequestsTemp, CrimeR
 
 export const agentRequest = async (req, res) => {
 
-  const t = await sequelize.transaction();
-  console.log('controller', req.body)
-
+  let t;
   try {
     const { branchId, username, password } = req.body;
 
@@ -23,6 +22,8 @@ export const agentRequest = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Missing required fields" });
     }
+
+    t = await sequelize.transaction();
 
     // 1️⃣ Validate branch exists (PoliceBranch)
     // Assuming table name = "PoliceBranch" and PK = "id"  ⚠ verify
@@ -38,6 +39,7 @@ export const agentRequest = async (req, res) => {
     );
 
     if (branch.length === 0) {
+      await t.rollback();
       return res
         .status(404)
         .json({ success: false, message: "Branch not found" });
@@ -56,6 +58,7 @@ export const agentRequest = async (req, res) => {
     );
 
     if (existingUser.length > 0) {
+      await t.rollback();
       return res
         .status(409)
         .json({ success: false, message: "Username already exists" });
@@ -119,7 +122,7 @@ export const agentRequest = async (req, res) => {
       },
     });
   } catch (error) {
-    if (t) await t.rollback();
+    if (t && !t.finished) await t.rollback();
     console.error("Agent Request Error:", error);
     res
       .status(500)
@@ -138,7 +141,7 @@ export const verifyAgentRequest = async (req, res) => {
 
   try {
     const { requestId } = req.params;
-    const { roleId } = req.body; // roleId for the new agent
+    const { roleId, username, branchId } = req.body; // roleId for the new agent
 
     // ---------------------------
     // 1️⃣ Fetch pending agent request + temp data
@@ -175,6 +178,7 @@ export const verifyAgentRequest = async (req, res) => {
     }
 
     if (agentRequest.status !== "pending") {
+      await t.rollback();
       return res.status(400).json({
         success: false,
         message: "Request has already been processed",
@@ -185,6 +189,37 @@ export const verifyAgentRequest = async (req, res) => {
     // 2️⃣ Create new user in User table
     // ---------------------------
     const now = new Date();
+    const finalUsername = username || agentRequest.username;
+    const finalBranchId = branchId || agentRequest.branchId;
+
+    const branchRows = await sequelize.query(
+      `SELECT id FROM "PoliceBranch" WHERE id = :branchId LIMIT 1;`,
+      {
+        replacements: { branchId: finalBranchId },
+        type: QueryTypes.SELECT,
+        transaction: t,
+      }
+    );
+    if (!branchRows[0]) {
+      await t.rollback();
+      return res.status(404).json({ success: false, message: "Branch not found" });
+    }
+
+    const existingUserRows = await sequelize.query(
+      `SELECT id FROM "User" WHERE username = :username LIMIT 1;`,
+      {
+        replacements: { username: finalUsername },
+        type: QueryTypes.SELECT,
+        transaction: t,
+      }
+    );
+    if (existingUserRows[0]) {
+      await t.rollback();
+      return res.status(409).json({ success: false, message: "Username already exists" });
+    }
+
+    // Hash the password before storing
+    const hashedPassword = await bcrypt.hash(agentRequest.password, 10);
 
     const newUserResult = await sequelize.query(
       `
@@ -194,8 +229,8 @@ export const verifyAgentRequest = async (req, res) => {
       `,
       {
         replacements: {
-          username: agentRequest.username,
-          passwordHash: agentRequest.password, // ⚠ in production, hash password
+          username: finalUsername,
+          passwordHash: hashedPassword, // Hashed password
           roleId: roleId || 2,
           createdAt: now,
           updatedAt: now,
@@ -214,12 +249,14 @@ export const verifyAgentRequest = async (req, res) => {
       `
       UPDATE "PoliceAgentRequest"
       SET "userId" = :userId,
+          "branchId" = :branchId,
           status = 'approved'
       WHERE id = :requestId
       `,
       {
         replacements: {
           userId: newUser.id,
+          branchId: finalBranchId,
           verifiedAt: now,
           requestId,
         },
@@ -252,12 +289,12 @@ export const verifyAgentRequest = async (req, res) => {
       data: {
         userId: newUser.id,
         username: newUser.username,
-        branchId: agentRequest.branchId,
+        branchId: finalBranchId,
         status: "approved",
       },
     });
   } catch (error) {
-    if (t) await t.rollback();
+    if (t && !t.finished) await t.rollback();
     console.error("Verify Agent Error:", error);
     res
       .status(500)
@@ -275,7 +312,6 @@ export const rejectAgentRequest = async (req, res) => {
 
   try {
     const { requestId } = req.params;
-    // const { reason } = req.body;
 
     // ---------------------------
     // 1️⃣ Fetch agent request + temp entry
@@ -297,7 +333,6 @@ export const rejectAgentRequest = async (req, res) => {
         transaction: t,
       }
     );
-    await t.commit();
     const agentRequest = agentRequestRows[0];
 
     if (!agentRequest) {
@@ -307,10 +342,17 @@ export const rejectAgentRequest = async (req, res) => {
         .json({ success: false, message: "Request not found" });
     }
 
+    if (agentRequest.status !== "pending") {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Request has already been processed",
+      });
+    }
+
     // ---------------------------
-    // 2️⃣ Update status and add rejection reason
+    // 2️⃣ Update status
     // ---------------------------
-    const now = new Date();
     await sequelize.query(
       `
       UPDATE "PoliceAgentRequest"
@@ -319,8 +361,6 @@ export const rejectAgentRequest = async (req, res) => {
       `,
       {
         replacements: {
-          reason,
-          verifiedAt: now,
           requestId,
         },
         type: QueryTypes.UPDATE,
@@ -343,6 +383,8 @@ export const rejectAgentRequest = async (req, res) => {
       }
     );
 
+    await t.commit();
+
     // ---------------------------
     // 4️⃣ Response (frontend format unchanged)
     // ---------------------------
@@ -352,7 +394,7 @@ export const rejectAgentRequest = async (req, res) => {
       data: { requestId: agentRequest.agentRequestId, status: "rejected" },
     });
   } catch (error) {
-    if (t) await t.rollback();
+    if (t && !t.finished) await t.rollback();
     console.error("Reject Agent Error:", error);
     res
       .status(500)
@@ -376,17 +418,19 @@ export const getPendingRequests = async (req, res) => {
 
         t.id AS "tempId",
         t.username AS "tempUsername",
-        t.password AS "tempPassword",
         t."createdAt" AS "tempCreatedAt",
 
         b.id AS "branchId",
         b.name AS "branchName",
-        b."contactNumber" AS "branchContactNumber"
+        b."contactNumber" AS "branchContactNumber",
+        z.name AS "zoneName"
       FROM "PoliceAgentRequest" ar
       JOIN "PoliceAgentRequestsTemp" t
         ON t.id = ar."policeAgentRequestsTempId"
       JOIN "PoliceBranch" b
         ON b.id = ar."branchId"
+      LEFT JOIN "Zone" z
+        ON z.id = b."zoneId"
       WHERE ar.status = 'pending'
       ORDER BY ar.id ASC;
       `,
@@ -405,13 +449,13 @@ export const getPendingRequests = async (req, res) => {
       PoliceAgentRequestsTemp: {
         id: r.tempId,
         username: r.tempUsername,
-        password: r.tempPassword,
         createdAt: r.tempCreatedAt,
       },
       PoliceBranch: {
         id: r.branchId,
         name: r.branchName,
         contactNumber: r.branchContactNumber,
+        zoneName: r.zoneName,
       },
     }));
 
@@ -441,17 +485,19 @@ export const getRequestById = async (req, res) => {
 
         t.id AS "tempId",
         t.username AS "tempUsername",
-        t.password AS "tempPassword",
         t."createdAt" AS "tempCreatedAt",
 
         b.id AS "branchId",
         b.name AS "branchName",
-        b."contactNumber" AS "branchContactNumber"
+        b."contactNumber" AS "branchContactNumber",
+        z.name AS "zoneName"
       FROM "PoliceAgentRequest" ar
       JOIN "PoliceAgentRequestsTemp" t
         ON t.id = ar."policeAgentRequestsTempId"
       JOIN "PoliceBranch" b
         ON b.id = ar."branchId"
+      LEFT JOIN "Zone" z
+        ON z.id = b."zoneId"
       WHERE ar.id = :requestId
       LIMIT 1;
       `,
@@ -478,13 +524,13 @@ export const getRequestById = async (req, res) => {
       PoliceAgentRequestsTemp: {
         id: r.tempId,
         username: r.tempUsername,
-        password: r.tempPassword,
         createdAt: r.tempCreatedAt,
       },
       PoliceBranch: {
         id: r.branchId,
         name: r.branchName,
         contactNumber: r.branchContactNumber,
+        zoneName: r.zoneName,
       },
     };
 
@@ -501,7 +547,21 @@ export const getRequestById = async (req, res) => {
 export const getAllAgents = async (req, res) => {
   try {
     const agents = await sequelize.query(
-      `SELECT * FROM "viewAllAgents";`,
+      `
+      SELECT 
+        par.id AS "agentId",
+        u.username AS "username",
+        z.name AS "zoneName",
+        par."branchId" AS "branchId",
+        pb."contactNumber" AS "branchContact",
+        par."createdAt" AS "createdAt"
+      FROM "PoliceAgentRequest" par
+      LEFT JOIN "User" u ON u.id = par."userId"
+      LEFT JOIN "PoliceBranch" pb ON pb.id = par."branchId"
+      LEFT JOIN "Zone" z ON z.id = pb."zoneId"
+      WHERE par.status = 'approved'
+      ORDER BY par.id ASC;
+      `,
       { type: QueryTypes.SELECT }
     );
 
@@ -519,7 +579,7 @@ export const getAllAgents = async (req, res) => {
 
 export const updateAgent = async (req, res) => {
   const agentId = req.params.id;
-  const { username, password, branchId } = req.body;
+  const { username, branchId } = req.body;
 
   const t = await sequelize.transaction();
 
@@ -551,6 +611,21 @@ export const updateAgent = async (req, res) => {
         .json({ success: false, message: "Agent not found" });
     }
 
+    if (branchId !== undefined && branchId !== null && branchId !== "") {
+      const branchRows = await sequelize.query(
+        `SELECT id FROM "PoliceBranch" WHERE id = :branchId LIMIT 1;`,
+        {
+          replacements: { branchId },
+          type: QueryTypes.SELECT,
+          transaction: t,
+        }
+      );
+      if (!branchRows[0]) {
+        await t.rollback();
+        return res.status(404).json({ success: false, message: "Branch not found" });
+      }
+    }
+
     // ---------------------------
     // 2️⃣ Update branchId in PoliceAgentRequest
     // ---------------------------
@@ -575,7 +650,7 @@ export const updateAgent = async (req, res) => {
     // ---------------------------
     const userRows = await sequelize.query(
       `
-      SELECT id, username, "passwordHash"
+      SELECT id, username
       FROM "User"
       WHERE id = :userId
       LIMIT 1
@@ -598,22 +673,34 @@ export const updateAgent = async (req, res) => {
     }
 
     // ---------------------------
-    // 4️⃣ Update username/password in User
+    // 4️⃣ Update username in User
     // ---------------------------
     const updatedUsername = username ?? user.username;
-    const updatedPassword = password ?? user.passwordHash;
+
+    if (updatedUsername !== user.username) {
+      const existingUserRows = await sequelize.query(
+        `SELECT id FROM "User" WHERE username = :username AND id <> :userId LIMIT 1;`,
+        {
+          replacements: { username: updatedUsername, userId: user.id },
+          type: QueryTypes.SELECT,
+          transaction: t,
+        }
+      );
+      if (existingUserRows[0]) {
+        await t.rollback();
+        return res.status(409).json({ success: false, message: "Username already exists" });
+      }
+    }
 
     await sequelize.query(
       `
       UPDATE "User"
-      SET username = :username,
-          "passwordHash" = :passwordHash
+      SET username = :username
       WHERE id = :userId
       `,
       {
         replacements: {
           username: updatedUsername,
-          passwordHash: updatedPassword,
           userId: user.id,
         },
         type: QueryTypes.UPDATE,
@@ -628,7 +715,7 @@ export const updateAgent = async (req, res) => {
 
     return res.json({ success: true, message: "Agent updated successfully" });
   } catch (err) {
-    await t.rollback();
+    if (!t.finished) await t.rollback();
     console.error("Error updating agent:", err);
     return res.status(500).json({ success: false, message: "Server error" });
   }
@@ -710,7 +797,7 @@ export const deleteAgent = async (req, res) => {
       message: "Agent and associated user deleted successfully",
     });
   } catch (err) {
-    await t.commit();
+    if (!t.finished) await t.rollback();
     console.error("Error deleting agent:", err);
     return res
       .status(500)

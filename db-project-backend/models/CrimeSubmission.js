@@ -1,65 +1,11 @@
-// import DataTypes from "sequelize";
-
-// export default (sequelize) => {
-//   const CrimeSubmission = sequelize.define("CrimeSubmission", {
-//     id: {
-//       type: DataTypes.BIGINT,
-//       autoIncrement: true,
-//       primaryKey: true,
-//     },
-//     submitterCnic: {
-//       type: DataTypes.TEXT,
-//       allowNull: true,
-//     },
-//     zoneId: {
-//       type: DataTypes.INTEGER,
-//       allowNull: true,
-//     },
-//     incidentDate: {
-//       type: DataTypes.DATE,
-//       allowNull: true,
-//     },
-//     description: {
-//       type: DataTypes.TEXT,
-//       allowNull: true,
-//     },
-//     submittedAt: {
-//       type: DataTypes.DATE,
-//       allowNull: true,
-//       defaultValue: DataTypes.NOW,
-//     },
-//     status: {
-//       type: DataTypes.ENUM("pending", "approved", "rejected"),
-//       allowNull: true,
-//       defaultValue: "pending",
-//     },
-//     CrimeId: {
-//       type: DataTypes.BIGINT,
-//       allowNull: true,
-//     },
-//     crimeTypeId: {
-//       type: DataTypes.BIGINT,
-//       allowNull: true,
-//     },
-//   }, {
-//     tableName: "CrimeSubmission",
-//     timestamps: false,
-//   });
-
-//   CrimeSubmission.associate = (models) => {
-//     CrimeSubmission.belongsTo(models.CrimeReportsSubmitter, { foreignKey: "submitterCnic", onDelete: "SET NULL", onUpdate: "CASCADE" });
-//     CrimeSubmission.belongsTo(models.Zone, { foreignKey: "zoneId", onDelete: "SET NULL", onUpdate: "CASCADE" });
-//     CrimeSubmission.belongsTo(models.Crime, { foreignKey: "CrimeId", onDelete: "SET NULL", onUpdate: "CASCADE" });
-//     CrimeSubmission.belongsTo(models.CrimeType, { foreignKey: "crimeTypeId", onDelete: "SET NULL", onUpdate: "CASCADE" });
-//   };
-
-//   return CrimeSubmission;
-// };
-
-
-
 import DataTypes from "sequelize";
 
+/**
+ * CrimeSubmission Model
+ *
+ * Links crimes to their submitters (citizens).
+ * Authenticated citizen ownership uses submitterId.
+ */
 export default (sequelize) => {
   const CrimeSubmission = sequelize.define("CrimeSubmission", {
     id: {
@@ -67,9 +13,11 @@ export default (sequelize) => {
       autoIncrement: true,
       primaryKey: true,
     },
-    submitterCnic: {
-      type: DataTypes.TEXT,
+
+    submitterId: {
+      type: DataTypes.UUID,
       allowNull: false,
+      comment: "Stable reference to CrimeReportsSubmitter.id",
     },
 
     submittedAt: {
@@ -81,18 +29,26 @@ export default (sequelize) => {
     CrimeId: {
       type: DataTypes.BIGINT,
       allowNull: false,
+      comment: "Reference to the Crime record",
     },
-
   }, {
     tableName: "CrimeSubmission",
     timestamps: false,
   });
 
   CrimeSubmission.associate = (models) => {
-    CrimeSubmission.belongsTo(models.CrimeReportsSubmitter, { foreignKey: "submitterCnic", onDelete: "SET NULL", onUpdate: "CASCADE" });
+    CrimeSubmission.belongsTo(models.CrimeReportsSubmitter, {
+      foreignKey: "submitterId",
+      onDelete: "RESTRICT",
+      onUpdate: "CASCADE",
+      as: "submitter",
+    });
 
-    CrimeSubmission.belongsTo(models.Crime, { foreignKey: "CrimeId", onDelete: "SET NULL", onUpdate: "CASCADE" });
-
+    CrimeSubmission.belongsTo(models.Crime, {
+      foreignKey: "CrimeId",
+      onDelete: "RESTRICT",
+      onUpdate: "CASCADE",
+    });
   };
 
   return CrimeSubmission;

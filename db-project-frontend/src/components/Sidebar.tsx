@@ -4,6 +4,9 @@ import GreenButton from "./GreenButton";
 import { ICONS } from "../assets/icons";
 import MeetCreatorsCard from "./MeetCreatorsCards";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { useAuth } from "../context/AuthContext";
+import { clearRole } from "../store/features/current_role";
 
 interface SidebarProps {
   version?: "admin" | "police" | "user";
@@ -29,6 +32,9 @@ const Sidebar = ({
   const [activeItem, setActiveItem] = useState<string>("");
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useDispatch();
+  const { logout, citizenLogout } = useAuth();
+  const isCitizenSession = localStorage.getItem("authMode") === "citizen";
 
   const allMenus: MenuItem[] = [
     { label: "Dashboard", icon: ICONS.DashboardIcon, activeIcon: ICONS.DashboardIcon_Active, route: "/dashboard" },
@@ -37,23 +43,24 @@ const Sidebar = ({
     { label: "Verify Report", icon: ICONS.VerifyReportIcon, activeIcon: ICONS.VerifyReportIcon_Active, route: "/verification?type=police" },
     { label: "Crime Records", icon: ICONS.CrimeRecordsIcon, activeIcon: ICONS.CrimeRecordsIcon_Active, route: "/all-records?type=police" },
     { label: "Report Crime", icon: ICONS.ReportCrimeIcon, activeIcon: ICONS.ReportCrimeIcon_Active, route: "/report-crime" },
+    { label: "Profile", icon: ICONS.DashboardIcon, activeIcon: ICONS.DashboardIcon_Active, route: "/citizen-dashboard" },
     { label: "Upload Data", icon: ICONS.UploadDataIcon, activeIcon: ICONS.UploadDataIcon_Active, route: "/upload-crimes" },
-    { label: "Give Feedback", icon: ICONS.GiveFeedbackIcon, activeIcon: ICONS.GiveFeedbackIcon_Active, route: "/feedback" },
+    { label: "Admin Controls", icon: ICONS.DashboardIcon, activeIcon: ICONS.DashboardIcon_Active, route: "/admin-controls" },
   ];
 
   let filteredMenus: MenuItem[] = allMenus;
 
   if (version === "admin") {
     filteredMenus = allMenus.filter((m) =>
-      ["Dashboard", "Verify Agent", "Agent Records", "Upload Data"].includes(m.label)
+      ["Dashboard", "Verify Agent", "Agent Records", "Upload Data", "Admin Controls"].includes(m.label)
     );
   } else if (version === "police") {
     filteredMenus = allMenus.filter((m) =>
-      ["Dashboard", "Verify Report", "Crime Records", "Upload Data"].includes(m.label)
+      ["Dashboard", "Verify Report", "Crime Records"].includes(m.label)
     );
   } else if (version === "user") {
     filteredMenus = allMenus.filter((m) =>
-      ["Dashboard", "Report Crime"].includes(m.label)
+      ["Dashboard", "Report Crime", "Profile"].includes(m.label)
     );
   }
 
@@ -64,7 +71,9 @@ const Sidebar = ({
   }, [location.pathname, location.search]);
 
   const buttonText =
-    version === "admin" || version === "police" ? "Logout" : "Back to Home";
+    version === "admin" || version === "police" || isCitizenSession
+      ? "Logout"
+      : "Back to Home";
 
   return (
     <div
@@ -72,7 +81,7 @@ const Sidebar = ({
         flex flex-col bg-[#fefefe] shadow-[0_0_5px_rgba(0,0,0,0.15)]
         ${asDrawer
           ? "h-full w-[min(320px,85vw)] rounded-none"
-          : "lg:fixed lg:top-4 lg:left-4 lg:h-[calc(100vh-2rem)] lg:w-72 rounded-2xl"}
+          : "h-full w-full rounded-2xl"}
         py-4 px-4 overflow-hidden
       `}
     >
@@ -129,8 +138,16 @@ const Sidebar = ({
           <GreenButton
             label={buttonText}
             width={220}
-            onClick={() => {
-              localStorage.removeItem("token");
+            onClick={async () => {
+              if (version === "admin" || version === "police") {
+                logout();
+                dispatch(clearRole());
+              } else if (isCitizenSession) {
+                await citizenLogout();
+                dispatch(clearRole());
+              } else {
+                dispatch(clearRole());
+              }
               navigate("/");
             }}
           />

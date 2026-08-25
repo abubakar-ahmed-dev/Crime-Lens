@@ -10,10 +10,17 @@ import MapViewPage from "../pages/MapViewPage";
 import MeetDevelopersPage from "../pages/MeetDevelopersPage";
 import StatisticsPage from "../pages/StatisticsPage";
 import ReportCrimePage from "../pages/ReportCrimePage";
+import RegisterPage from "../pages/RegisterPage";
+import CitizenLoginPage from "../pages/CitizenLoginPage";
+import CompleteProfilePage from "../pages/CompleteProfilePage";
+import CitizenDashboardPage from "../pages/CitizenDashboardPage";
+import AuthCallbackPage from "../pages/AuthCallback/AuthCallback";
+import AdminControlsPage from "../pages/AdminControlsPage";
 
 type TRoute = {
   path: string;
   element: React.ReactNode;
+  allowedRoles?: Array<"admin" | "police" | "user">;
 };
 
 export const PublicRoutes = () => {
@@ -29,6 +36,14 @@ export const PublicRoutes = () => {
     {
         path: "/login-admin",
         element: <LoginAdminPage/>
+    },
+    {
+      path: "/login-citizen",
+      element: <CitizenLoginPage/>
+    },
+    {
+      path: "/register",
+      element: <RegisterPage/>
     },
     {
         path: "/request-agent",
@@ -51,10 +66,32 @@ export const PublicRoutes = () => {
         element: <MeetDevelopersPage/>
     },
     {
-        path: "/report-crime",
-        element: <ReportCrimePage/>
+        path: "/auth/callback",
+        element: <AuthCallbackPage/>
     },
 
+  ];
+
+  return routes;
+};
+
+export const CitizenProtectedRoutes = () => {
+  const routes: TRoute[] = [
+    {
+      path: "/complete-profile",
+      element: <CompleteProfilePage/>,
+      allowedRoles: ["user"],
+    },
+    {
+      path: "/citizen-dashboard",
+      element: <CitizenDashboardPage/>,
+      allowedRoles: ["user"],
+    },
+    {
+      path: "/report-crime",
+      element: <ReportCrimePage/>,
+      allowedRoles: ["user"],
+    },
   ];
 
   return routes;
@@ -65,16 +102,24 @@ export const ProtectedRoutes = () => {
       {
         path: "/all-records",
         element: <AllRecordsPage/>,
+        allowedRoles: ["admin", "police"],
       },
       {
           path: "/verification",
-          element: <VerificationPage/>
+          element: <VerificationPage/>,
+          allowedRoles: ["admin", "police"],
       },
       {
         path: "/upload-crimes",
-        element: <UploadPage/>
+        element: <UploadPage/>,
+        allowedRoles: ["admin"],
+      },
+      {
+        path: "/admin-controls",
+        element: <AdminControlsPage/>,
+        allowedRoles: ["admin"],
       }
-  
+   
     ];
   
     return routes;

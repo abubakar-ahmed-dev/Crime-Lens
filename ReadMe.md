@@ -1,100 +1,160 @@
-# 🚔 Crime Mapping & Analytics System
+# CrimeLens
 
-A full-stack web application for crime reporting, verification, and geospatial analytics. The system enables role-based access for Admin, Police, and Public users, and provides powerful insights through maps, trends, and data-driven dashboards.
+CrimeLens is a crime mapping, reporting, verification, and analytics platform. It brings public crime visibility, citizen reporting, police verification, and administrative controls into one web application.
+
+The main idea behind CrimeLens is simple: citizens can report incidents, police can verify and manage those reports, and the public can explore approved crime data through maps and statistics.
+
 
 🔗 **Live Demo:** [https://crimelens-ten.vercel.app](https://crimelens-ten.vercel.app)
 
 ---
 
-## 📌 Overview
 
-The Crime Mapping & Analytics System is designed to streamline crime reporting and provide actionable insights using geospatial data. It allows users to report incidents, authorities to verify and manage them, and stakeholders to analyze crime patterns through interactive visualizations.
+## Overview
 
----
+CrimeLens is designed for a city-level crime reporting and monitoring workflow.
 
-## ✨ Features
+Public users can explore approved crime records through an interactive map and statistics dashboard. Citizens can create accounts, complete their profiles, submit crime reports with location details, and track the status of their submitted reports. Police users can verify pending reports, correct details, validate locations against zone boundaries, and maintain crime records. Admin users can manage branches, police agents, agent requests, branch heads, and CSV-based data imports.
 
-### 🔐 Authentication & Authorization
+The system uses role-based access so each user type only sees the features intended for them.
 
-* JWT-based authentication
-* Role-based access control (Admin, Police, Public)
-* Protected API routes and client-side routing
+## User Roles
 
-### 📝 Crime Reporting Workflow
+### Public Users
 
-* Submit crime reports with location data
-* Verification and approval system for authorities
-* Structured form handling with validation
-* Bulk dataset import via CSV with logging
+Public users can:
 
-### 🗺️ Geospatial Capabilities
+- View the homepage.
+- Open the live crime map.
+- View statistics and public dashboards.
+- Request a police agent account.
 
-* PostGIS-powered location-based data storage
-* Nearby crime detection
-* Area-based filtering and querying
-* Optimized spatial indexing for performance
+### Citizens
 
-### 📊 Analytics & Visualization
+Citizens can:
 
-* Crime trends and patterns
-* Hotspot detection
-* Zone-wise comparisons
-* Interactive dashboards with:
+- Register and log in.
+- Complete their profile.
+- Submit crime reports.
+- Select location manually, from current device location, or from a map.
+- Track pending, approved, and rejected reports from their dashboard.
 
-  * Maps
-  * Charts
-  * Data tables (search, filter, sort)
+### Police Users
 
-### ⚙️ System Reliability
+Police users can:
 
-* Centralized error handling
-* Audit logging for traceability
-* Scalable RESTful API architecture
+- View pending crime reports.
+- Approve or reject crime reports.
+- Update approved crime records.
+- Validate that crime locations are inside selected zone boundaries.
+- Soft-delete crime records.
 
----
+### Admin Users
 
-## 🛠️ Tech Stack
+Admins can:
+
+- Verify police agent requests.
+- View and manage police agent records.
+- Upload bulk crime data through CSV.
+- Create police branches.
+- Create police agents directly.
+- Assign or clear branch heads.
+
+## Core Features
+
+### Interactive Crime Map
+
+CrimeLens includes a public map that displays approved crime records. Users can filter map data by crime type, zone, date range, and radius-based location search.
+
+### Crime Statistics
+
+The statistics pages provide summaries and charts for approved crime records, including crime type distribution, zone-wise crime counts, and trend views.
+
+### Citizen Crime Reporting
+
+Citizens submit reports through a protected reporting form. Reports are created as pending records until reviewed by police.
+
+### Police Verification Workflow
+
+Police review pending reports, update important details, verify the selected location, and approve or reject the report. Approved records become part of public crime data.
+
+### Admin Management
+
+Admin controls support operational management, including branches, branch heads, direct agent creation, agent request approval, and bulk crime import.
+
+### CSV Import
+
+Admins can upload CSV files to insert multiple crime records. The current CSV import supports pending and approved statuses, validates required fields, detects duplicates, and logs upload results.
+
+## Technology Stack
 
 ### Frontend
 
-* React.js
-* State Management (Context API / Redux)
-* Responsive UI Design
+- React
+- TypeScript
+- Vite
+- React Router
+- Redux Toolkit
+- Supabase JavaScript client
+- Leaflet and React Leaflet
+- Recharts
+- Tailwind utility classes
+- Lucide React icons
 
 ### Backend
 
-* Node.js
-* Express.js
-* RESTful API Architecture
+- Node.js
+- Express
+- Sequelize
+- PostgreSQL
+- Supabase
+- PostGIS
+- JWT
+- bcrypt / bcryptjs
+- Multer
+- fast-csv
 
-### Database
+### Database And Auth
 
-* PostgreSQL
-* Supabase
-* Sequelize ORM
-* PostGIS (for geospatial data)
+- Supabase PostgreSQL stores application data.
+- PostGIS supports map coordinates, zone boundaries, and spatial validation.
+- Supabase Auth handles citizen authentication.
+- Backend JWT authentication handles admin and police users.
 
-### Other Tools & Concepts
+## Project Structure
 
-* JWT Authentication
-* Middleware-based request handling
-* CSV parsing and validation using Multer
-* Geospatial indexing and queries
-* Crime Analytics using Leaflet Js
+```text
+db-project-frontend/   React frontend application
+db-project-backend/    Express backend API and database models
+docs/                  Detailed documentation
+```
 
----
+## Documentation
 
-## 🔍 Key Highlights
+Detailed documentation is available in the `docs/` folder:
 
-* Designed scalable REST APIs for real-world workflows
-* Implemented geospatial queries using PostGIS
-* Built role-based secure system with JWT authentication
-* Developed interactive dashboards with real-time data
-* Optimized database with indexing for performance
-* Ensured reliability with logging and error handling
+- [Setup Guide](docs/SETUP.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [API Reference](docs/API.md)
+- [Database](docs/DATABASE.md)
+- [Authorization](docs/AUTHORIZATION.md)
+- [Frontend Routes](docs/FRONTEND_ROUTES.md)
+- [CSV Upload](docs/CSV_UPLOAD.md)
 
----
+## Local Setup
 
-## 📄 License
+Use the setup guide for detailed instructions:
 
-This project is for academic and demonstration purposes.
+- [docs/SETUP.md](docs/SETUP.md)
+
+At a high level:
+
+1. Configure the backend `.env`.
+2. Run the Supabase setup SQL.
+3. Start the backend server.
+4. Configure the frontend `.env`.
+5. Start the frontend development server.
+
+## Current Status
+
+CrimeLens is built as an academic and demonstration project. It currently includes public data views, citizen reporting, police verification, admin controls, CSV upload, role-based access, and Supabase-backed citizen authentication.

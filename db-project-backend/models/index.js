@@ -12,6 +12,7 @@ import CrimeSubmissionModel from "./CrimeSubmission.js";
 import PoliceAgentRequestsTempModel from "./PoliceAgentRequestsTemp.js";
 import PoliceAgentRequestModel from "./PoliceAgentRequest.js";
 import UploadLogModel from "./UploadLog.js";
+import CrimeMediaModel from "./CrimeMedia.js";
 
 // Initialize models
 const models = {
@@ -26,6 +27,7 @@ const models = {
   PoliceAgentRequestsTemp: PoliceAgentRequestsTempModel(sequelize),
   PoliceAgentRequest: PoliceAgentRequestModel(sequelize),
   UploadLog: UploadLogModel(sequelize),
+  CrimeMedia: CrimeMediaModel(sequelize),
 };
 
 // Run associations

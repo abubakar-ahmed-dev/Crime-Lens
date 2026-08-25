@@ -8,7 +8,7 @@ export default (sequelize) => {
       primaryKey: true,
     },
     branchHeadUserId: {
-      type: DataTypes.TEXT,
+      type: DataTypes.INTEGER,
       allowNull: true,
     },
     zoneId: {

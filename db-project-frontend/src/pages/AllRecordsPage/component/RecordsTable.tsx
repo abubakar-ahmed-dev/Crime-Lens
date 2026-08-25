@@ -16,7 +16,7 @@ function RecordsTable({
 }: RecordsTableProps) {
   const headers =
     version === "admin"
-      ? ["Agent ID", "Branch ID", "Username", "Password", "Branch Contact #", "Date of Creation"]
+      ? ["Agent ID", "Username", "Zone", "Branch ID", "Branch Contact #", "Date of Creation"]
       : ["Crime ID", "Zone Name", "Reg. Branch ID", "Reporter CNIC", "Crime Type", "Date"];
 
   const allSelected = selectedRecords.length === records.length && records.length > 0;
@@ -70,9 +70,9 @@ function RecordsTable({
                         )}
                       </td>
                       <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">{record.agentId}</td>
-                      <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">{record.branchId}</td>
                       <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">{record.username}</td>
-                      <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">{record.password}</td>
+                      <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">{record.zoneName ?? "-"}</td>
+                      <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">{record.branchId ?? "-"}</td>
                       <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">{record.branchContact ?? "-"}</td>
                       <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">
                         {new Date(record.createdAt).toLocaleDateString()}
