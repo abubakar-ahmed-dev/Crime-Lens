@@ -4,6 +4,8 @@ import { API_BASE_URL } from "../../../config/constants";
 import { supabase, useAuth } from "../../../context/AuthContext";
 import LocationPicker, { isValidLocation } from "../../../components/LocationPicker";
 import GreenButton from "../../../components/GreenButton";
+import MediaUploader from "../../../components/MediaUploader";
+import { uploadMedia } from "../../../services/api";
 
 type ZoneOption = {
   id: number;
@@ -13,6 +15,42 @@ type ZoneOption = {
 type CrimeTypeOption = {
   id: number;
   name: string;
+};
+
+type FileWithCaption = {
+  file: File;
+  caption: string;
+  preview: string;
+  fileType: 'image' | 'video';
+};
+
+type UploadedMediaItem = {
+  id: number;
+  publicId: string;
+  originalName: string;
+  mimeType: string;
+  fileSize: number;
+  fileType: 'image' | 'video';
+  url: string;
+  thumbnailUrl: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+  uploadedBy: 'citizen' | 'police';
+  uploadedAt: string;
+  visibility: 'public' | 'police_only';
+  caption?: string;
+  evidenceMarked: boolean;
+};
+
+type UploadMediaResponse = {
+  success: boolean;
+  data?: {
+    media: UploadedMediaItem[];
+    crimeId: number;
+    count: number;
+  };
+  message?: string;
 };
 
 export default function ReportCrimeCard() {
@@ -26,6 +64,8 @@ export default function ReportCrimeCard() {
   const [hideLocationPicker, setHideLocationPicker] = useState(false);
   const [zones, setZones] = useState<ZoneOption[]>([]);
   const [crimeTypes, setCrimeTypes] = useState<CrimeTypeOption[]>([]);
+  const [mediaFiles, setMediaFiles] = useState<FileWithCaption[]>([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -111,6 +151,7 @@ export default function ReportCrimeCard() {
     }
 
     setLoading(true);
+    setUploadProgress(0);
 
     try {
       let accessToken = citizenToken || localStorage.getItem("citizen_token");
@@ -127,6 +168,66 @@ export default function ReportCrimeCard() {
         return;
       }
 
+      // First, upload media if any files are selected
+      let mediaData: UploadedMediaItem[] = [];
+      if (mediaFiles.length > 0) {
+        setUploadProgress(10);
+
+        try {
+          setUploadProgress(30);
+          // Get fresh token from Supabase session
+          let token = citizenToken || localStorage.getItem("citizen_token");
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            token = session.access_token;
+          }
+
+          if (!token) {
+            setError("Your session has expired. Please login again.");
+            setLoading(false);
+            setUploadProgress(0);
+            return;
+          }
+
+          const uploadResult = await uploadMedia({
+            files: mediaFiles.map(f => f.file),
+            captions: mediaFiles.map(f => f.caption),
+            crimeId: undefined,
+            authToken: token
+          }) as UploadMediaResponse;
+
+          setUploadProgress(70);
+
+          // Handle the response from uploadMedia
+          if (uploadResult && uploadResult.success) {
+            mediaData = uploadResult.data?.media || [];
+          } else {
+            const errorMessage = uploadResult?.message || uploadResult?.message || "Failed to upload media. Please try again.";
+            setError(errorMessage);
+            setSuccessMsg("");
+            setLoading(false);
+            setUploadProgress(0);
+            return;
+          }
+        } catch (uploadError: any) {
+          console.error("Error uploading media:", uploadError);
+          const errorMessage = uploadError?.response?.data?.message || uploadError?.message || "Failed to upload media. Please try again.";
+          setError(errorMessage);
+          setSuccessMsg("");
+          setLoading(false);
+          setUploadProgress(0);
+          return;
+        }
+      }
+
+      setUploadProgress(90);
+
+      // Submit crime report with media data
+      const requestBody = {
+        ...formData,
+        mediaData: mediaData.length > 0 ? mediaData : undefined,
+      };
+
       let response = await fetch(
         `${API_BASE_URL}/user/report-crime`,
         {
@@ -135,7 +236,7 @@ export default function ReportCrimeCard() {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${accessToken}`,
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(requestBody),
         }
       );
 
@@ -157,7 +258,7 @@ export default function ReportCrimeCard() {
               "Content-Type": "application/json",
               "Authorization": `Bearer ${accessToken}`,
             },
-            body: JSON.stringify(formData),
+            body: JSON.stringify(requestBody),
           }
         );
       }
@@ -180,6 +281,8 @@ export default function ReportCrimeCard() {
           latitude: "",
           longitude: "",
         });
+        setMediaFiles([]);
+        setUploadProgress(0);
 
         // Redirect to dashboard after 2 seconds
         setTimeout(() => {
@@ -195,6 +298,7 @@ export default function ReportCrimeCard() {
       setSuccessMsg("");
     } finally {
       setLoading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -377,6 +481,21 @@ export default function ReportCrimeCard() {
               {formData.description.length}/300 characters
             </p>
           </div>
+
+          {/* Media Upload Section */}
+          <div className="mt-6">
+            <h3 className="font-medium text-gray-700 mb-2">Attach Evidence (Optional):</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              You can add up to 5 images and 2 videos (max 5MB each). All media will be visible to the public by default.
+            </p>
+            <MediaUploader
+              onFilesSelected={(files) => setMediaFiles(files)}
+              existingFiles={mediaFiles}
+              disabled={loading}
+              maxImages={5}
+              maxVideos={2}
+            />
+          </div>
         </div>
 
         <div>
@@ -402,6 +521,22 @@ export default function ReportCrimeCard() {
             <strong>Submitting as:</strong> {citizen?.fullName} ({citizen?.email})
           </p>
         </div>
+
+        {/* Upload Progress */}
+        {uploadProgress > 0 && uploadProgress < 100 && (
+          <div className="bg-blue-50 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-blue-600 font-medium">Uploading media...</p>
+              <p className="text-sm text-blue-600">{uploadProgress}%</p>
+            </div>
+            <div className="w-full bg-blue-200 rounded-full h-2">
+              <div
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* SUBMIT BUTTON */}
         <div className="flex justify-center pt-4">

@@ -1,16 +1,24 @@
 // MapViewPage/index.tsx
 import { useEffect, useContext } from "react";
+import { useSelector } from "react-redux";
 import MapContainer from "./components/MapContainer";
 import CrimeMarkersClusters from "./components/CrimeMarkerCluster";
 import { MapProvider, MapContext } from "./components/MapContext";
 import SearchBar from "./components/SearchBar";
 import { API_BASE_URL } from "../../config/constants";
+import { getJwtAuthHeaders } from "../../utils/authHeaders";
+import { type RootState } from "../../store";
 
 import "leaflet/dist/leaflet.css";
 import "../../assets/leaflet/MarkerCluster.Default.css";
 import "../../assets/leaflet/MarkerCluster.css";
 
-const MapContent = () => {
+interface MapPageProps {
+  embedded?: boolean;
+  role?: "admin" | "police" | "user" | null;
+}
+
+const MapContent = ({ role }: { role?: "admin" | "police" | "user" | null }) => {
   const {
     filters,
     setFilters,
@@ -77,7 +85,10 @@ const MapContent = () => {
           if (filters.dateRange.end) params.set("endDate", filters.dateRange.end);
         }
 
-        const res = await fetch(`${API_BASE_URL}/crimes?${params.toString()}`);
+        const headers = getJwtAuthHeaders();
+        const res = await fetch(`${API_BASE_URL}/crimes?${params.toString()}`, {
+          headers,
+        });
         if (!res.ok) throw new Error("Network response was not ok");
 
         const data = await res.json();
@@ -116,21 +127,20 @@ const MapContent = () => {
     loadZoneSeverity();
   }, [highlightZoneLayer, filters, searchVersion]);
 
-  return <CrimeMarkersClusters crimes={crimeData} />;
+  return <CrimeMarkersClusters crimes={crimeData} userRole={role} />;
 };
 
-interface MapPageProps {
-  embedded?: boolean;
-}
-
 const MapPage = ({ embedded = false }: MapPageProps) => {
+  // Get role from Redux (same pattern as AllRecordsPage)
+  const role = useSelector((state: RootState) => state.currentRole.role);
+
   return (
     <MapProvider>
       <MapContainer embedded={embedded}>
-        
+
         {!embedded && <SearchBar />}
 
-        <MapContent />
+        <MapContent role={role} />
       </MapContainer>
     </MapProvider>
   );

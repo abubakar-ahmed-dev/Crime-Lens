@@ -382,6 +382,7 @@ export default function CitizenDashboard() {
                       <th className="px-2 sm:px-4 py-3 font-medium border-b">Type</th>
                       <th className="px-2 sm:px-4 py-3 font-medium border-b">Date</th>
                       <th className="px-2 sm:px-4 py-3 font-medium border-b">Zone</th>
+                      <th className="px-2 sm:px-4 py-3 font-medium border-b">Evidence</th>
                       <th className="px-2 sm:px-4 py-3 font-medium border-b">Status</th>
                     </tr>
                   </thead>
@@ -394,12 +395,24 @@ export default function CitizenDashboard() {
                         }`}
                       >
                         <td className="px-2 sm:px-4 py-3 border-b min-w-[220px]">
-                          <p className="font-medium text-gray-800 truncate max-w-[240px]">{report.title}</p>
-                          {report.description && (
-                            <p className="text-gray-500 text-xs mt-1 truncate max-w-[260px]">
-                              {report.description}
-                            </p>
-                          )}
+                          <div className="flex items-start gap-3">
+                            {report.thumbnailUrl && (
+                              <img
+                                src={report.thumbnailUrl}
+                                alt="Evidence thumbnail"
+                                className="w-12 h-12 object-cover rounded flex-shrink-0"
+                                loading="lazy"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-800 truncate max-w-[240px]">{report.title}</p>
+                              {report.description && (
+                                <p className="text-gray-500 text-xs mt-1 truncate max-w-[260px]">
+                                  {report.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         </td>
                         <td className="px-2 sm:px-4 py-3 border-b text-gray-600 whitespace-nowrap">
                           {report.crimeType || report.crimetype || "N/A"}
@@ -409,6 +422,16 @@ export default function CitizenDashboard() {
                         </td>
                         <td className="px-2 sm:px-4 py-3 border-b text-gray-600 whitespace-nowrap">
                           {report.zoneName || report.zonename || report.zone || "N/A"}
+                        </td>
+                        <td className="px-2 sm:px-4 py-3 border-b text-gray-600 whitespace-nowrap">
+                          {report.mediaCount && report.mediaCount > 0 ? (
+                            <span className="flex items-center gap-1">
+                              📎 <span className="font-medium">{report.mediaCount}</span>
+                              {report.mediaCount === 1 ? 'item' : 'items'}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
                         </td>
                         <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(report.status)}`}>

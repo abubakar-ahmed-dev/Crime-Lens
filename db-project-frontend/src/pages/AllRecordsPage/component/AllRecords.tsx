@@ -27,6 +27,26 @@ export interface CrimeRecord {
   submitterCnic: string | null;
   crimeTypeName: string;
   incidentDate: string; // YYYY-MM-DD
+  title?: string;
+  description?: string;
+  address?: string;
+  thumbnailUrl?: string;
+  mediaCount?: number;
+  media?: CrimeMediaItem[];
+}
+
+export interface CrimeMediaItem {
+  id: number;
+  fileType: 'image' | 'video';
+  url: string;
+  thumbnailUrl: string;
+  caption?: string;
+  visibility: 'public' | 'police_only';
+  evidenceMarked: boolean;
+  originalName: string;
+  fileSize: number;
+  uploadedBy: 'citizen' | 'police';
+  uploadedAt: string;
 }
 
 const isValidStoredCoordinate = (
@@ -94,6 +114,7 @@ export default function AllRecords({ version }: AllRecordsProps) {
     zoneId: number;
     latitude: string;
     longitude: string;
+    media?: CrimeMediaItem[];
   }
 
   const [fullCrime, setFullCrime] = useState<FullCrimeDetails | null>(null);
@@ -277,6 +298,7 @@ export default function AllRecords({ version }: AllRecordsProps) {
           zoneId: c.zoneId,
           latitude: getCrimeCoordinate(c, "latitude"),
           longitude: getCrimeCoordinate(c, "longitude"),
+          media: c.media || c.CrimeMedia || [],
         });
         setIsUpdateModalOpen(true);
       } catch (err) {
@@ -321,6 +343,11 @@ export default function AllRecords({ version }: AllRecordsProps) {
         if (!res.ok || !data?.success) {
           const message = data?.message || "Unable to update crime.";
           return message;
+        }
+
+        // Log media operations for Crime.latestUpdatedBy tracking verification
+        if (updatedData.mediaOperations) {
+          console.log("Crime updated with media operations:", updatedData.mediaOperations);
         }
 
         const refreshedRecords = await fetchPoliceRecords();

@@ -1,13 +1,14 @@
 // routes/crimeRoutes.js
 import express from "express";
 import { getCrimeById, getAllCrimeTypes, getAllCrimes, getCrimesForMap, updateCrime, deleteCrime, } from "../controllers/CrimeControllers.js";
-import { verifyToken, authorizeRoles } from "../middleware/authMiddleware.js";
+import { verifyToken, authorizeRoles, optionalAuth } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 const policeOnly = [verifyToken, authorizeRoles("police")];
 
 router.get(
   "/",
+  optionalAuth,
   getCrimesForMap
 );
 

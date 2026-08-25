@@ -1,9 +1,13 @@
 //VerificationPage/components/VerificationCard.tsx
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import WhiteButton from "../../../components/WhiteButton";
 import ConfirmationPopup from "./ConfirmationPopup";
+import MediaGallery from "../../../components/MediaGallery";
+import PoliceMediaEditor from "../../../components/PoliceMediaEditor";
 import { API_BASE_URL } from "../../../config/constants";
 import { getJwtAuthHeaders } from "../../../utils/authHeaders";
+import { addMediaToCrime } from "../../../services/api";
+import type { CrimeMedia } from "../../../pages/MapViewPage/components/types";
 
 type VerificationCardProps =
   | {
@@ -34,10 +38,18 @@ type VerificationCardProps =
     address: string;
     latitude: number | string;
     longitude: number | string;
+    media?: CrimeMedia[];
     onContact?: () => void;
     onReject?: (reason?: string) => void;
-    onApprove?: () => void;
+    onApprove?: (mediaChanges?: MediaChanges) => void;
   };
+
+interface MediaChanges {
+  toRemove?: number[];
+  visibilityChanges?: Record<number, 'public' | 'police_only'>;
+  captionUpdates?: Record<number, string>;
+  evidenceMarkedChanges?: Record<number, boolean>;
+}
 
 export default function VerificationCard(props: VerificationCardProps) {
   const [openConfirm, setOpenConfirm] = useState(false);
@@ -45,6 +57,34 @@ export default function VerificationCard(props: VerificationCardProps) {
   const [showSnackbar, setShowSnackbar] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [mediaChanges, setMediaChanges] = useState<MediaChanges>({});
+  const [editMediaMode, setEditMediaMode] = useState(false);
+
+  // Get media for police version - computed from props
+  const crimeMedia = props.version === "police" ? (props as any).media || [] : [];
+
+  // Local state for newly uploaded media items
+  const [newlyAddedMedia, setNewlyAddedMedia] = useState<CrimeMedia[]>([]);
+
+  // Local state ONLY for optimistic updates during edit mode - starts empty
+  const [optimisticMediaChanges, setOptimisticMediaChanges] = useState<Record<number, Partial<CrimeMedia>>>({});
+  const [editModeActive, setEditModeActive] = useState(false);
+
+  // Combine crimeMedia with newly added media and optimistic changes
+  const displayedMedia = useMemo(() => {
+    // Start with existing media and newly added media
+    let combinedMedia = [...crimeMedia, ...newlyAddedMedia];
+
+    // Apply optimistic changes when in edit mode
+    if (editModeActive && Object.keys(optimisticMediaChanges).length > 0) {
+      combinedMedia = combinedMedia.map((m: CrimeMedia) => {
+        const changes = optimisticMediaChanges[m.id];
+        return changes ? { ...m, ...changes } : m;
+      });
+    }
+
+    return combinedMedia;
+  }, [crimeMedia, newlyAddedMedia, optimisticMediaChanges, editModeActive]);
 
   // Copy contact number to clipboard and show snackbar
   const handleContactCopy = async () => {
@@ -73,6 +113,121 @@ export default function VerificationCard(props: VerificationCardProps) {
     setTimeout(() => setShowSnackbar(false), 2500);
 
     props.onContact?.();
+  };
+
+  // Media change handlers for police version
+  const handleMediaRemove = (mediaId: number) => {
+    setMediaChanges(prev => ({
+      ...prev,
+      toRemove: [...(prev.toRemove || []), mediaId]
+    }));
+  };
+
+  const handleVisibilityChange = (mediaId: number, newVisibility: 'public' | 'police_only') => {
+    setMediaChanges(prev => ({
+      ...prev,
+      visibilityChanges: {
+        ...(prev.visibilityChanges || {}),
+        [mediaId]: newVisibility
+      }
+    }));
+
+    // Optimistic update - update displayed media immediately
+    setOptimisticMediaChanges(prev => ({
+      ...prev,
+      [mediaId]: { ...(prev[mediaId] || {}), visibility: newVisibility }
+    }));
+  };
+
+  const handleCaptionChange = (mediaId: number, newCaption: string) => {
+    setMediaChanges(prev => ({
+      ...prev,
+      captionUpdates: {
+        ...(prev.captionUpdates || {}),
+        [mediaId]: newCaption
+      }
+    }));
+
+    // Optimistic update - update displayed media immediately
+    setOptimisticMediaChanges(prev => ({
+      ...prev,
+      [mediaId]: { ...(prev[mediaId] || {}), caption: newCaption }
+    }));
+  };
+
+  const handleEvidenceMarkChange = (mediaId: number, marked: boolean) => {
+    setMediaChanges(prev => ({
+      ...prev,
+      evidenceMarkedChanges: {
+        ...(prev.evidenceMarkedChanges || {}),
+        [mediaId]: marked
+      }
+    }));
+
+    // Optimistic update - update displayed media immediately
+    setOptimisticMediaChanges(prev => ({
+      ...prev,
+      [mediaId]: { ...(prev[mediaId] || {}), evidenceMarked: marked }
+    }));
+  };
+
+  const handleMediaAdd = async (files: Array<{ file: File; caption: string }>) => {
+    if (files.length === 0) return;
+
+    const submissionId = (props as any).submissionId;
+    if (!submissionId) {
+      console.error('Cannot upload media: submissionId not found');
+      return;
+    }
+
+    try {
+      // Extract files and captions
+      const filesArray = files.map(f => f.file);
+      const captions = files.map(f => f.caption);
+
+      // Upload immediately to Cloudinary and database
+      const result = await addMediaToCrime(Number(submissionId), filesArray, captions);
+
+      if (result.success && result.data?.media) {
+        // Create new CrimeMedia items from response - include all required fields
+        const newMediaItems: CrimeMedia[] = result.data.media.map((m: any) => ({
+          id: m.id,
+          CrimeId: m.CrimeId || Number(submissionId),
+          publicId: m.publicId,
+          originalName: m.originalName,
+          mimeType: m.mimeType,
+          fileSize: m.fileSize,
+          fileType: m.fileType,
+          url: m.url,
+          thumbnailUrl: m.thumbnailUrl,
+          width: m.width,
+          height: m.height,
+          duration: m.duration,
+          uploadedBy: m.uploadedBy || 'police',
+          uploadedAt: m.uploadedAt || new Date().toISOString(),
+          visibility: m.visibility,
+          caption: m.caption,
+          evidenceMarked: m.evidenceMarked,
+        }));
+
+        // Add to newlyAddedMedia state so they show in Quick Edit section
+        setNewlyAddedMedia(prev => [...prev, ...newMediaItems]);
+      } else {
+        console.error('Failed to upload media:', result.message);
+      }
+    } catch (error) {
+      console.error('Error uploading media:', error);
+    }
+  };
+
+  const hasMediaChanges = () => {
+    // Check if any media changes exist (excluding toAdd since we upload immediately)
+    return (
+      (mediaChanges.toRemove && mediaChanges.toRemove.length > 0) ||
+      (mediaChanges.visibilityChanges && Object.keys(mediaChanges.visibilityChanges).length > 0) ||
+      (mediaChanges.captionUpdates && Object.keys(mediaChanges.captionUpdates).length > 0) ||
+      (mediaChanges.evidenceMarkedChanges && Object.keys(mediaChanges.evidenceMarkedChanges).length > 0)
+    );
   };
 
   // Handle Approve
@@ -104,6 +259,7 @@ export default function VerificationCard(props: VerificationCardProps) {
           incidentDate: updatedValues.date,
           title: updatedValues.title || "",
           description: updatedValues.description || "",
+          mediaChanges: hasMediaChanges() ? mediaChanges : undefined,
         };
       }
 
@@ -119,7 +275,8 @@ export default function VerificationCard(props: VerificationCardProps) {
 
       if (response.ok && result.success) {
         setOpenConfirm(false);
-        props.onApprove?.();
+        // Pass media changes to parent component
+        props.onApprove?.(hasMediaChanges() ? mediaChanges : undefined);
       } else {
         setError(result.message || "Failed to approve");
       }
@@ -242,6 +399,61 @@ export default function VerificationCard(props: VerificationCardProps) {
               {props.description || "--"}
             </p>
           </div>
+
+          {/* Media Section for Police Version */}
+          {crimeMedia.length > 0 && (
+            <>
+              <hr className="my-4 border-t-2 border-[#d9d9d9]" />
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-semibold text-[#7d7d7d]">Attached Evidence:</h3>
+                <button
+                  onClick={() => {
+                    const newEditMode = !editMediaMode;
+                    setEditMediaMode(newEditMode);
+                    setEditModeActive(newEditMode);
+                    // Clear optimistic changes and newly added media when exiting edit mode
+                    if (!newEditMode) {
+                      setOptimisticMediaChanges({});
+                      setNewlyAddedMedia([]);
+                    }
+                  }}
+                  className="text-xs px-3 py-1 rounded-full border border-[#237E54] text-[#237E54] hover:bg-green-50 transition-colors"
+                >
+                  {editMediaMode ? 'View Mode' : 'Edit Media'}
+                </button>
+              </div>
+
+              {editMediaMode ? (
+                <PoliceMediaEditor
+                  crimeId={Number(props.submissionId)}
+                  media={displayedMedia}
+                  onMediaUpdate={(mediaId, updates) => {
+                    if (updates.visibility) handleVisibilityChange(mediaId, updates.visibility);
+                    if (updates.caption !== undefined) handleCaptionChange(mediaId, updates.caption);
+                    if (updates.evidenceMarked !== undefined) handleEvidenceMarkChange(mediaId, updates.evidenceMarked);
+                  }}
+                  onMediaDelete={(mediaId) => handleMediaRemove(mediaId)}
+                  onMediaAdd={(files) => handleMediaAdd(files)}
+                  disabled={loading}
+                />
+              ) : (
+                <MediaGallery
+                  media={displayedMedia}
+                  userRole="police"
+                  editable={false}
+                />
+              )}
+
+              {/* Media Changes Indicator */}
+              {hasMediaChanges() && (
+                <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-700">
+                    ⚠️ You have pending media changes that will be applied on approval.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
         </>
       )}
 
