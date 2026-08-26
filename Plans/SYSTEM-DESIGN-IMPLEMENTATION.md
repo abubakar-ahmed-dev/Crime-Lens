@@ -17,22 +17,22 @@ This document serves as the central hub for the CrimeLens system design upgrade 
 
 | Phase | Component | Status | Folder |
 |-------|-----------|--------|--------|
-| 0 | k6 Baseline Testing | ✅ Complete | `Plans/phase-0-k6-baseline/` |
-| 1 | PostgreSQL Optimization | ✅ Complete | `Plans/phase-1-postgresql-optimization/` |
-| 2 | Health Checks | ✅ Complete | `Plans/phase-2-health-checks/` |
-| 3 | Redis Caching | ✅ Complete | `Plans/phase-3-redis-caching/` |
-| 4 | Rate Limiting | ✅ Complete | `Plans/phase-4-rate-limiting/` |
-| 5 | API Security | ✅ Complete | `Plans/phase-5-api-security/` |
-| 6 | HTTP Compression | ✅ Complete | `Plans/phase-6-http-compression/` |
-| 7 | Pino Logging | ✅ Complete | `Plans/phase-7-pino-logging/` |
-| 8 | Prometheus + Grafana | ✅ Complete | `Plans/phase-8-prometheus-grafana/` |
-| 9 | Docker | ✅ Complete | `Plans/phase-9-docker/` |
-| 10 | Nginx | ✅ Complete | `Plans/phase-10-nginx/` |
-| 11 | Horizontal Scaling | ✅ Complete | `Plans/phase-11-horizontal-scaling/` |
-| 12 | BullMQ Workers | ✅ Complete | `Plans/phase-12-bullmq-workers/` |
-| 13 | Cloudflare | ✅ Complete | `Plans/phase-13-cloudflare/` |
-| 14 | GitHub Actions | ✅ Complete | `Plans/phase-14-cicd/` |
-| 15 | k6 Final Testing | ✅ Complete | `Plans/phase-15-k6-final/` |
+| 0 | k6 Baseline Testing | Remaining | `Plans/phase-0-k6-baseline/` |
+| 1 | PostgreSQL Optimization | Remaining | `Plans/phase-1-postgresql-optimization/` |
+| 2 | Health Checks | Remaining | `Plans/phase-2-health-checks/` |
+| 3 | Redis Caching | Remaining | `Plans/phase-3-redis-caching/` |
+| 4 | Rate Limiting | Remaining | `Plans/phase-4-rate-limiting/` |
+| 5 | API Security | Remaining | `Plans/phase-5-api-security/` |
+| 6 | HTTP Compression | Remaining | `Plans/phase-6-http-compression/` |
+| 7 | Pino Logging | Remaining | `Plans/phase-7-pino-logging/` |
+| 8 | Prometheus + Grafana | Remaining | `Plans/phase-8-prometheus-grafana/` |
+| 9 | Docker | Remaining | `Plans/phase-9-docker/` |
+| 10 | Nginx | Remaining | `Plans/phase-10-nginx/` |
+| 11 | Horizontal Scaling | Remaining | `Plans/phase-11-horizontal-scaling/` |
+| 12 | BullMQ Workers | Remaining | `Plans/phase-12-bullmq-workers/` |
+| 13 | Cloudflare | Remaining | `Plans/phase-13-cloudflare/` |
+| 14 | GitHub Actions | Remaining | `Plans/phase-14-cicd/` |
+| 15 | k6 Final Testing | Remaining | `Plans/phase-15-k6-final/` |
 
 ### Dependency Graph
 
