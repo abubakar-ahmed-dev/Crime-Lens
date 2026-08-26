@@ -372,10 +372,6 @@ User ──belongTo──> Role
 5. **Session Refresh Behavior**: Edge cases in Supabase token refresh not fully documented
 6. **Error Recovery**: Database connection failure handling beyond basic startup checks
 
-### Known Issues (from docs)
-- Documentation exists for `KNOWN_ISSUES.md` and `REQUIRED_FIXES.md` - content not analyzed in this review
-
----
 
 **Analysis Scope**: This report is based on codebase analysis only. No external documentation beyond the included README.md was consulted. For setup instructions, please refer to `docs/SETUP.md`.
 

@@ -662,7 +662,40 @@ Never ignore a browser regression simply because backend/unit tests pass.
 
 ---
 
-# 18. Final Rule
+## 18. Agent Workflow & Change Safety
+
+- Follow the phase plans under `Plans/` when implementing system-design work.
+- Work on **one phase at a time**; do not implement future phases unless explicitly required.
+- Inspect existing code and verify current behavior before making changes.
+- After meaningful changes, run the applicable lint, typecheck, tests, build, Playwright, and/or k6 validation required by the phase.
+- Do not proceed with known regressions or failing required checks without explicitly documenting them.
+- Preserve existing functionality and avoid unrelated refactoring.
+- Keep phase documentation concise and maintain the existing phase log rather than creating duplicate logs.
+- Multiple agents work sequentially: **Implementation → Testing → Debugging → Testing**, repeating until validation passes.
+- Do not have implementation, testing, and debugging agents modify the same files simultaneously.
+- **Only the Implementation Agent may create commits or push to GitHub.** Testing and Debugging Agents must not commit, push, reset, or discard changes.
+- Never commit secrets, credentials, generated sensitive data, or debugging artifacts.
+- Review `git diff` and validation results before committing.
+
+
+### Do Not Trust Previous Agent Claims
+
+Agents must verify the current repository state themselves.
+
+Do not assume that:
+
+- a previous agent completed a feature
+- a previous test passed
+- a previous build succeeded
+- a previous agent committed all changes
+- documentation accurately reflects the current code
+
+Use the repository, git diff/status, tests, and actual execution results as the
+source of truth.
+
+---
+
+# 19. Final Rule
 
 Correctness takes priority over speed.
 
