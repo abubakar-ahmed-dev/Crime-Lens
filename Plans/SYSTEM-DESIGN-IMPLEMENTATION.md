@@ -17,7 +17,7 @@ This document serves as the central hub for the CrimeLens system design upgrade 
 
 | Phase | Component | Status | Folder |
 |-------|-----------|--------|--------|
-| 0 | k6 Baseline Testing | Remaining | `Plans/phase-0-k6-baseline/` |
+| 0 | k6 Baseline Testing | Completed | `Plans/phase-0-k6-baseline/` |
 | 1 | PostgreSQL Optimization | Remaining | `Plans/phase-1-postgresql-optimization/` |
 | 2 | Health Checks | Remaining | `Plans/phase-2-health-checks/` |
 | 3 | Redis Caching | Remaining | `Plans/phase-3-redis-caching/` |
@@ -106,7 +106,7 @@ Each phase folder contains:
 
 Update this file as phases are completed:
 
-- [x] Phase 0: Baseline performance metrics recorded
+- [ ] Phase 0: Baseline performance metrics recorded
 - [x] Phase 1: Pagination implemented, queries optimized
 - [x] Phase 2: Health endpoints operational
 - [x] Phase 3: Redis caching operational
