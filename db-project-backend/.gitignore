@@ -4,3 +4,7 @@ node_modules/
 dist
 dist-ssr
 *.local
+
+# k6 local env & raw output (never commit)
+tests/k6/.k6.env
+tests/k6/results/
