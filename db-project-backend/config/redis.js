@@ -24,13 +24,11 @@ export const createRedisClient = () => {
     // the HELLO command used to negotiate RESP3
     RESP: 2,
     socket: {
-      reconnectStrategy: (retries) => {
-        if (retries > 10) {
-          console.error("Redis reconnection failed after 10 attempts");
-          return new Error("Redis reconnection failed");
-        }
-        return retries * 100; // Reconnect with increasing delay
-      },
+      // Retry indefinitely with capped backoff. A strategy that gives up
+      // (returns an Error) permanently disables the client until restart —
+      // a temporary Redis outage would silently kill caching (and, in a
+      // later phase, rate limiting) for the lifetime of the process.
+      reconnectStrategy: (retries) => Math.min(retries * 100, 5000),
     },
   });
 
