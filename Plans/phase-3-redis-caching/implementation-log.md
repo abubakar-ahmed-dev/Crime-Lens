@@ -8,9 +8,9 @@
 
 - `db-project-backend/config/redis.js` — node-redis client singleton
   (`REDIS_URL`, default `redis://localhost:6379`), reconnect strategy
-  (gives up after 10 retries), `connectRedis()` (never fails startup),
-  `disconnectRedis()` for graceful shutdown, `CacheKeys` registry,
-  `CacheTTL` tiers (SHORT 300s / MEDIUM 600s / LONG 3600s).
+  (indefinite retry, capped 5 s backoff), `connectRedis()` (never fails
+  startup), `disconnectRedis()` for graceful shutdown, `CacheKeys`
+  registry, `CacheTTL` tiers (SHORT 300s / MEDIUM 600s / LONG 3600s).
 - `db-project-backend/services/cacheService.js` — error-resilient cache-aside
   service: `get`/`set` (setEx + JSON)/`delete`/`deletePattern`/`isConnected`/
   `getMetrics`. Every operation is guarded by `redisClient.isOpen` and swallows
@@ -83,9 +83,14 @@ rather than replacing it.
 5. **Errors are never cached**: `withCache` only stores payloads when
    `res.statusCode < 400`; otherwise a transient DB error would be cached for
    the full TTL.
-6. **Redis down at boot** takes ~5.5 s of reconnect attempts (10 retries per
-   plan) before the server continues without cache. cosmetic: client errors
-   log `err.code` (AggregateError has an empty `.message`).
+6. **Reconnect strategy retries indefinitely** with capped backoff
+   (`min(retries*100ms, 5s)`) instead of the plan's give-up-after-10-retries.
+   Discovered live: the plan's strategy permanently disabled the client after
+   a >5.5 s Redis blip until API restart (dev server stuck at `redis: down`
+   with Redis already back). Auto-recovery verified via `CLIENT KILL` test:
+   connection dropped server-side, client reconnected and resumed PING.
+   Related cosmetic fix: client errors log `err.code` (AggregateError has an
+   empty `.message`).
 
 ## Validation Performed (Implementation Agent)
 
@@ -95,6 +100,9 @@ All against live backend + local Redis 5 (Windows portable build):
 - Boot with Redis down: server starts, `/api/ready` 200, stats/types/zones
   serve fresh DB data, redis reported `down` — graceful degradation PASS
 - Boot with Redis up: clean connect — PASS
+- Connection-loss auto-recovery: `CLIENT KILL` drops the connection
+  server-side; client reconnects automatically (indefinite capped-backoff
+  strategy) and resumes PING — PASS
 - `X-Cache` MISS→HIT on all six cached endpoints: PASS
 - Distinct cache keys per query-param combination: PASS
 - TTLs: stats 300 s, trend 600 s, reference 3600 s; expiry mechanism verified
