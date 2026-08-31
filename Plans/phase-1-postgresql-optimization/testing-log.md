@@ -1,104 +1,145 @@
 # Phase 1: PostgreSQL Optimization & Pagination — Testing Log
 
-## Testing Record — 2026-08-31
+## Independent Re-Verification — 2026-08-31 (Testing Agent)
 
-Environment: Windows 10 Pro, backend via `npm start` (nodemon, hot-reload),
-Supabase PostgreSQL (remote), frontend via Vite dev server (Playwright checks).
-Police-role access for `/crimes/all` via a 1-hour dev test JWT signed with the
-backend's `JWT_SECRET` (same `verifyToken` path as a real login; user-approved).
+Scope: fresh verification of commit `7ed7100` (branch `refactor/query-optimization`,
+working tree clean) against `plan.md`. Prior testing record superseded by this run
+(overwritten per user instruction). No implementation code was modified during testing.
 
-## Pre-Change Baseline Capture
+Environment: Windows 10, backend `:5001` (nodemon, hot-reload; **positively verified**
+to serve Phase-1 code — `GET /api/crimes?page=1&limit=1` returned the pagination
+envelope, a Phase-1-only artifact). Frontend Vite `:5173`. Remote Supabase PostgreSQL.
+Police sessions via dev JWTs signed with the backend `JWT_SECRET` (payload shape
+mirrors the real login controller: `{id, username, role, role_id}`); browser session
+injected via the same localStorage keys real login writes (`token`, `user`,
+`authMode=staff`, `staffRole`, `userRole`). `NODE_ENV` unset, `DB_POOL_*` /
+`*_PAGE_SIZE` unset → default pool (10/0) and default page sizes under test.
 
-Before any code change, captured from the running pre-change backend:
+## 1. Diff Review (commit 7ed7100)
 
-- `GET /api/crimes` → bare array, 12 crimes, full media (map-legacy)
-- `GET /api/crimes/all` (police JWT) → `{ success, data[12] }`, full media per row
-- `GET /api/stats/summary` → `{ totalZones:4, totalCrimes:6, topCrimeType:Theft/"5",
-  topZone:North Nazimabad/"8" }` — note `crimeCount` is a STRING (pg COUNT)
-- `pg_indexes` snapshot → 17 indexes on audited tables
+Reviewed the full diff of all 12 changed files against the plan's opt-in contract:
 
-## Pre-Test Finding That Changed the Plan
+- `getCrimesForMap`: `paginated` gate on `page|limit !== undefined`; COUNT subquery
+  wraps the identical base SQL (same JOINs/WHERE, so filter totals are correct);
+  `ORDER BY c."reportedAt" DESC, c.id DESC` + `LIMIT/OFFSET` only in paginated mode;
+  media `LIMIT 3` only in paginated mode; catch branch returns `[]` legacy /
+  envelope paginated. Matches plan.
+- `getAllCrimes`: same gate; count = `COUNT(*) FROM "Crime" WHERE status='approved'`;
+  pre-existing deterministic ORDER BY kept in both modes. Matches plan.
+- `getStatsSummary`: two GROUP BY/LEFT JOIN aggregate queries replace the
+  correlated-subquery `findOne`s; `topRows[0] || null` preserves null-when-empty.
+- `pagination.js`, `queryLogger.js`, `server.js` mount, `db.js` pool, `.env-sample`,
+  `crimeRoutes.js` comments, index script: all match plan (2 plan indexes skipped
+  with documented reasons; `envValidation.js` untouched).
 
-`Latest_schema.sql` is stale, but the LIVE DB already had 17 indexes —
-`supabase-setup.sql:157-173` creates btree + GIST indexes, and
-`migration-media-upload.sql` created `CrimeMedia` indexes including
-`(CrimeId, visibility)` — the original plan's `idx_crime_media_visibility`
-target. Audit-before-apply prevented creating 2 redundant/duplicate indexes.
-Applied set reduced from the plan's 6 to 4 (see implementation log).
+Result: implementation conforms to the approved design. No deviations found.
 
-## Test Results
-
-### Syntax / Static
-
-```text
-node --check on 7 touched files:            PASS
-ESLint / TypeScript / unit tests / build:   N/A — no tooling configured in backend
-```
-
-### API Parity & Behavior (34 checks scripted against live backend)
-
-```text
-Legacy parity (map bare array, ids, shape):            PASS
-Legacy parity (/crimes/all envelope, count, keys):     PASS
-Auth regression (/crimes/all still police-only):       PASS (403 unauth)
-Pagination envelope + metadata math:                   PASS
-Page separation + full 3-page union == legacy ids:     PASS
-Media cap ≤3 paginated / uncapped legacy:              PASS
-Clamping (99999→200) and invalid params (abc, -2):     PASS
-Beyond-last-page → empty data + correct meta:          PASS
-Filters combine with pagination (type/zone/radius):    PASS
-Stats summary shape/value/type parity:                 PASS (crimeCount stays string)
-
-Result: 33/34 PASS on first run; the single FAIL was a TEST-SCRIPT bug
-(union check fetched 2 of 3 pages). Re-run with all 3 pages: PASS.
-No implementation defects found.
-```
-
-### Database Evidence
+## 2. Static / Syntax
 
 ```text
-Index apply (4x CREATE INDEX IF NOT EXISTS + ANALYZE): PASS
-pg_indexes after snapshot:                             21 indexes (17 → 4 new, no dupes)
-EXPLAIN (ANALYZE, BUFFERS) paginated map query:        Index Scan using idx_crime_approved_date,
-                                                       execution 0.252ms server-side
+node --check on 7 touched JS files (pagination.js, queryLogger.js, server.js,
+config/db.js, CrimeControllers.js, statsController.js, crimeRoutes.js):  PASS
+ESLint / TypeScript / unit tests / build:  N/A — no tooling configured in backend
 ```
 
-### Playwright MCP Browser Regression
-
-Frontend: Vite dev server; police session injected via localStorage
-(`authMode=staff`, `staffRole=police`, minted JWT) — mirrors real login storage keys.
+## 3. API Test Suite — 53 checks scripted against live backend
 
 ```text
-Homepage load:                                    PASS
-/map (public):                                    PASS — Leaflet renders, markers + clusters
-                                                  ("3"/"5" cluster buttons) expandable;
-                                                  network request /api/crimes?mode=basic returned
-                                                  legacy bare array (12 crimes, full media, public-
-                                                  visibility filtering intact) — array consumer
-                                                  contract unchanged
-/all-records (police):                            PASS — all 12 records in table; client-side
-                                                  search (Crime Type = Theft) filters correctly;
-                                                  legacy full-dataset behavior intact
-/statistics:                                      PASS — Total Zones 4, Total Crimes 6,
-                                                  Top Crime Theft, Top Zone North Nazimabad
-                                                  (matches API values); trend/bar/pie charts render
-User-visible changes:                             NONE (goal was zero, achieved)
+Legacy parity — map (bare array, exact 15-key row contract, 12 rows,        PASS
+  media arrays uncapped, citizen sees only public media)
+Legacy parity — /crimes/all ({success, data} envelope, no pagination key,   PASS
+  12 rows, incidentDate DESC + id DESC ordering, police media uncapped)
+Auth regression (/crimes/all 401 no token, 403 invalid token):              PASS
+Pagination envelope (keys exactly success/data/pagination):                 PASS
+Metadata math (page/limit echo, total=legacy count, totalPages, hasNext/    PASS
+  hasPrev boundaries)
+Page separation + union of ALL pages == legacy id set, no duplicates:       PASS
+Stability across identical requests (deterministic ordering):               PASS
+Media cap ≤3 paginated / uncapped legacy:                                   PASS
+Clamping & invalid params (99999→200, page only→50, abc→1, -2→1,            PASS
+  limit -5→1, limit 0→50, beyond-last→empty data + correct meta)
+Filters + pagination (crimeType total/union parity, zoneId total/filter,    PASS
+  radius ST_DWithin envelope + non-zero total)
+/crimes/all paginated (meta 12/3 pages, union == legacy ids, media          PASS
+  uncapped, hasNext/hasPrev progression)
+Stats summary (keys exactly totalZones/totalCrimes/topCrimeType/topZone,    PASS
+  totalZones=4 number, crimeCount remains STRING, top-type id/name/count
+  cross-checked against map-data mode: Theft/5 — consistent)
+
+RESULT: 53/53 PASS.
 ```
 
-### Not Executed (with reason)
+Honesty note: first run was 50/51 — the single FAIL and one SKIP were bugs in my
+own test script (asserted a `geom` response key that never existed pre-Phase-1 —
+verified against `7ed7100^` source — and read radius coords from that key). Fixed
+the script; all 53 checks then passed. No implementation defect found at any point.
+
+## 4. Database Evidence (live Supabase)
 
 ```text
-k6 baseline comparison:   DEFERRED to Phase 15 per user instruction (load testing
-                          runs after all phases, not per phase). Phase 0 baseline
-                          numbers remain the comparison reference.
-Production build:         N/A — backend has no build step (plain Node, nodemon).
+pg_indexes (Crime, CrimeMedia, CrimeType, Zone):     21 total
+  idx_crime_status_reported (status, "reportedAt" DESC):        PRESENT
+  idx_crime_approved_date ("reportedAt" DESC) WHERE approved:   PRESENT (partial)
+  idx_crime_stats_covering (crimeTypeId, status, "reportedAt"): PRESENT
+  idx_crime_zone_status (zoneId, status):                       PRESENT
+Near-duplicate check (same table + column set):       CLEAN
+EXPLAIN (ANALYZE, BUFFERS) paginated map query:       Limit → Incremental Sort →
+  Index Scan using idx_crime_approved_date (no Seq Scan, no full Sort;
+  execution 0.098 ms server-side at current row counts)
+max_connections: 60 (pool max 10 × 1 instance → comfortable headroom;
+  multi-instance math deferred to Phase 11 per plan)
 ```
+
+## 5. Playwright MCP Browser Regression (police session)
+
+```text
+Homepage:                              PASS — loads normally
+/map (public data path):               PASS — Leaflet renders (24 tiles), clusters
+                                       "3"+"5" expand on click to individual markers
+                                       (cluster of 5 → 5 markers); marker popup shows
+                                       title/media image/type/zone/date; network
+                                       request /api/crimes?mode=basic returned legacy
+                                       bare array, 12 crimes, FULL media (police
+                                       visibility rows present — uncapped legacy path)
+                                       ; type filter Theft → API called with
+                                       crimeType=Theft, markers update
+/all-records (police):                 PASS — table shows all 12 records; client-side
+                                       search (Crime Type = Theft) filters to exactly
+                                       5 rows, all Theft — legacy full-dataset +
+                                       client-side-filter behavior intact
+/statistics:                           PASS — Total Zones 4, Total Crimes 6, Top
+                                       Crime Theft, Top Zone North Nazimabad (match
+                                       API values); 11 recharts elements render
+Console errors across all pages:       0
+User-visible changes vs pre-Phase-1:   NONE (goal: zero — achieved)
+```
+
+## 6. Not Executed (with reason)
+
+```text
+k6 comparison:        DEFERRED to Phase 15 (user decision — load testing runs
+                      after all phases; Phase 0 numbers remain the reference)
+Production build:     N/A — backend has no build step
+500-error-shape test: verified by code review only (legacy `[]` vs paginated
+                      envelope in the catch branch); not reproducible without
+                      breaking the DB connection
+```
+
+## Pre-Existing Conditions Confirmed Still Present (NOT Phase-1 regressions)
+
+- `mediaCount` drift: crime 20 has `mediaCount=4` but 3 media rows.
+- Crimes with (0,0) location (ids 7, 9) — render at null island on map.
+- `firstthumbnail` alias typo in `updateCrime` (out of phase scope).
+
+- `Note:` The above points are fixed now by owner.
 
 ## Final Testing Status — Phase 1
 
-All executable validation for this phase PASSED. No regressions found in map,
-AllRecords, statistics, auth/authorization, or media behavior. No outstanding
-defects from testing. (Pre-existing data/code issues are listed in the
-implementation log as follow-ups, none introduced by this phase.)
+All executable validation independently re-run by the Testing Agent and PASSED:
+static checks, 53/53 API checks (legacy parity, auth, pagination behavior, edge
+cases, filter combinations, stats parity), live database index + EXPLAIN evidence,
+and zero-regression Playwright browser validation of map, AllRecords, and
+statistics workflows. No implementation defects discovered. No outstanding
+failures. k6 comparison remains deferred to Phase 15 by user decision.
 
-Status: PHASE 1 TESTING COMPLETE (within deferred-k6 scope).
+Status: PHASE 1 RE-VERIFICATION COMPLETE — ALL CHECKS PASS.

@@ -1284,7 +1284,7 @@ export const updateCrime = async (req, res) => {
             replacements: {
               crimeId: id,
               count: parseInt(mediaStats[0].count),
-              thumbnailUrl: mediaStats[0].firstthumbnail,
+              thumbnailUrl: mediaStats[0].firstThumbnail,
             },
             type: QueryTypes.UPDATE,
             transaction: t,
