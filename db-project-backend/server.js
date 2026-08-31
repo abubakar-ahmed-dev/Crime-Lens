@@ -16,6 +16,7 @@ import zonesRoutes from "./routes/zoneRoutes.js";
 import crimeRoutes from "./routes/crimeRoutes.js";
 import citizenAuthRoutes from "./routes/citizenAuthRoutes.js";
 import mediaRoutes from "./routes/mediaRoutes.js";
+import { queryLoggerMiddleware } from "./middleware/queryLogger.js";
 
 dotenv.config();
 
@@ -35,6 +36,7 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use(queryLoggerMiddleware); // dev-only slow-request logging (>100ms)
 
 app.use("/api/admin", adminRoutes);
 app.use("/api/auth", authRoutes);

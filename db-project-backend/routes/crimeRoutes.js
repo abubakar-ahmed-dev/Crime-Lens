@@ -11,12 +11,18 @@ router.get(
   optionalAuth,
   getCrimesForMap
 );
+// Query params: mode, crimeType, zoneId, startDate, endDate, lat, lng, radius
+// Pagination (opt-in): page, limit — omitting both returns the legacy
+// unpaginated array; supplying either returns { success, data, pagination }
+// with media capped at 3 per crime.
 
 router.get(
   "/all",
   policeOnly,
   getAllCrimes
 );
+// Pagination (opt-in): page, limit — omitting both returns the legacy
+// { success, data } full dataset; supplying either paginates with metadata.
 
 router.get(
   "/types",
