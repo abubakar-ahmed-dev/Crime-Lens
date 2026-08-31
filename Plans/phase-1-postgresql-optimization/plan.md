@@ -1,815 +1,423 @@
 # Phase 1: PostgreSQL Optimization & Pagination
 
+> Status: PLANNED (not started — verified 2026-08-30; phase folder contained only this plan,
+> no `utils/pagination.js`, no `middleware/queryLogger.js`, no `scripts/add-performance-indexes.sql`)
+> Branch: create `phase-1-postgresql-optimization` from `k6-baseline`
+> Depends on: Phase 0 baseline (complete — see `Plans/phase-0-k6-baseline/testing-log.md`)
+
 ## Objective
 
-Optimize database queries and implement pagination to improve performance and enable scalability. This phase focuses on database-level improvements before adding caching layers.
+Optimize database queries and add opt-in pagination to the two unbounded list endpoints,
+reducing DB load before caching layers are introduced (Phase 3). Preserve every existing
+API response byte-for-byte when pagination parameters are not supplied.
 
-## What We'll Implement
+## ⚠️ Resolved Design Decision: Opt-In Pagination (approved by user, 2026-08-30)
 
-1. **Pagination** - Add pagination to all list endpoints
-2. **Query optimization** - Review and optimize expensive queries
-3. **Index verification** - Ensure all critical indexes are in place
-4. **Connection pool tuning** - Optimize for the workload
+The original plan made pagination always-on (default limit 50, envelope response always).
+That would have broken the frontend:
 
-## Current State Analysis
+- `db-project-frontend/src/pages/MapViewPage/index.tsx:94-96` consumes `GET /api/crimes`
+  as a **bare array** (`setCrimeData(data)` → `CrimeMarkers.tsx` iterates it).
+- `db-project-frontend/src/pages/AllRecordsPage/component/AllRecords.tsx:123-133` loads the
+  **full dataset** from `/crimes/all` into `backupRecords` for client-side search; a 50-row
+  cap would silently limit search scope.
 
-**Files to modify:**
-- `db-project-backend/controllers/CrimeControllers.js` - Map and list queries
-- `db-project-backend/controllers/statsController.js` - Statistics queries
-- `db-project-backend/config/db.js` - Connection pool configuration
-- `db-project-backend/models/Crime.js` - Index definitions
-- `db-project-backend/routes/crimeRoutes.js` - Route definitions
+**Decision: pagination is opt-in.** No `page`/`limit` params → legacy behavior unchanged.
+Params present → paginated envelope. Frontend is NOT modified in this phase.
 
-**Current Issues:**
-- `getCrimesForMap()` fetches ALL crimes with media (N+1 problem)
-- `getAllCrimes()` returns all records without pagination
-- Statistics queries use raw SQL but could be optimized
-- Connection pool has max: 5, min: 0 (may need adjustment for scaling)
+```text
+GET /api/crimes                      (no page/limit)
+→ [ { id, title, ..., media: [...all] } ]              (byte-compatible legacy array)
+
+GET /api/crimes?page=1&limit=50
+→ { success: true,
+    data: [ ...≤limit rows, media capped at 3 ],
+    pagination: { page, limit, total, totalPages, hasNextPage, hasPrevPage } }
+
+GET /api/crimes/all                  (no page/limit)
+→ { success: true, data: [ ...full dataset ] }         (unchanged legacy envelope)
+
+GET /api/crimes/all?page=1&limit=50
+→ { success: true, data: [...], pagination: {...} }
+```
+
+Media cap of 3 applies ONLY in paginated mode (legacy mode keeps full media fetch —
+`CrimeMarkers.tsx:43-44` computes `policeOnlyMediaCount` from `mediaCount` minus public
+media, and truncation there would skew the displayed counts).
+
+## Verified Current-State Facts (2026-08-30 — do not re-assume)
+
+| Fact | Evidence |
+|---|---|
+| Phase 1 not started | Phase folder has only `plan.md`; target files absent |
+| `getCrimesForMap` has NO `ORDER BY` | `CrimeControllers.js:63-200` — LIMIT/OFFSET would be nondeterministic without adding one |
+| `getAllCrimes` has deterministic `ORDER BY` | `CrimeControllers.js:872` — `incidentDate DESC, id DESC` (safe to paginate as-is) |
+| `Latest_schema.sql` is STALE | `Crime` table def (line 65-81) lacks `mediaCount`/`thumbnailUrl` (added by `migration-media-upload.sql`); it also contains **zero** `CREATE INDEX` statements |
+| `Crime` model declares 5 indexes in Sequelize | `models/Crime.js:63-70` (crimeTypeId, reportedAt, status, [zoneId, reportedAt], GIST location) — but `sync()` is never called (Supabase SQL scripts used instead), so these MAY NOT EXIST in the live DB |
+| `CrimeMedia` model ALSO declares never-applied indexes | `models/CrimeMedia.js:109-114` (CrimeId, fileType, visibility, [CrimeId, visibility]) — same `sync()`-never-runs caveat; composite [CrimeId, visibility] exactly matches the map media query pattern |
+| New env vars are validation-safe | `config/envValidation.js` only enforces 4 required vars (DATABASE_URL, SUPABASE_URL, SUPABASE_ANON_KEY, JWT_SECRET) and never rejects extras — `DB_POOL_MAX`/`DB_POOL_MIN`/`DEFAULT_PAGE_SIZE`/`MAX_PAGE_SIZE` need no validator changes |
+| `db.sequelize` is accessible as the plan's code assumes | `models/index.js:1` imports from `config/db.js` and controllers already use `db.sequelize.query` |
+| Backend has NO ESLint, NO test runner, NO build script, NO TypeScript | `db-project-backend/package.json` — only `start: nodemon server.js` |
+| k6 `public-map.js` sends no page/limit params | grep confirmed — legacy shape under opt-in design; **no k6 script changes needed** |
+| Pool config | `config/db.js` — hardcoded `max: 5, min: 0` |
+| Master-plan progress checkboxes are all `[x]` incorrectly | `SYSTEM-DESIGN-IMPLEMENTATION.md:109-124` — doc bug; fix at phase completion (only Phase 0/1 rows true) |
+| Query logger mount point | `server.js` — after `express.json()` (line 37), before route mounting |
+| Pre-existing bug (OUT OF SCOPE) | `CrimeControllers.js:1214` reads `mediaStats[0].firstthumbnail` but alias is `firstThumbnail` — log as known issue, do NOT fix in this phase |
+
+## Files to Create
+
+```
+db-project-backend/utils/pagination.js                  (new — pagination utility)
+db-project-backend/middleware/queryLogger.js            (new — dev slow-request logger)
+db-project-backend/scripts/add-performance-indexes.sql  (new — guarded index script)
+Plans/phase-1-postgresql-optimization/implementation-log.md
+Plans/phase-1-postgresql-optimization/testing-log.md
+```
+
+## Files to Modify
+
+```
+db-project-backend/controllers/CrimeControllers.js      (getCrimesForMap, getAllCrimes only)
+db-project-backend/controllers/statsController.js       (getStatsSummary only)
+db-project-backend/config/db.js                         (env-driven pool, explicit default branch)
+db-project-backend/server.js                            (mount queryLogger — one line)
+db-project-backend/.env-sample                          (document new env vars)
+Plans/SYSTEM-DESIGN-IMPLEMENTATION.md                   (progress tracker — at completion only)
+```
+
+## Explicitly NOT Changed
+
+- **All frontend files** (per approved decision).
+- `getPendingSubmissions` (also unbounded, but out of plan scope — note for a future phase).
+- All write paths (`reportCrime`, `approveCrimeReport`, `rejectCrimeReport`, `updateCrime`, `deleteCrime`).
+- `crimeRoutes.js` middleware chain and all auth middleware.
+- The `firstthumbnail` typo (known-issue log only).
+- No Redis/caching/compression — future phases. No speculative `X-Cacheable` headers
+  (original plan's Step 4 added them; that is Phase 3 concern — removed).
+
+---
 
 ## Implementation Steps
 
-### Step 1: Add Pagination Utility
+### Step 1 — Pagination utility
 
-**File: `db-project-backend/utils/pagination.js`**
+**File: `db-project-backend/utils/pagination.js`** (new)
+
+Follow the original plan's utility, with one correction: wire the constants to the env vars
+the plan adds (no dead config). Defaults preserve the original plan's values.
 
 ```javascript
-/**
- * Pagination utility for consistent pagination across endpoints
- */
-
 export const DEFAULT_PAGE = 1;
-export const DEFAULT_LIMIT = 50;
-export const MAX_LIMIT = 200;
+export const DEFAULT_LIMIT = parseInt(process.env.DEFAULT_PAGE_SIZE || "50", 10);
+export const MAX_LIMIT = parseInt(process.env.MAX_PAGE_SIZE || "200", 10);
 
-/**
- * Parse and validate pagination parameters
- * @param {Object} query - Express request query object
- * @returns {Object} Parsed pagination parameters
- */
 export function parsePaginationParams(query) {
-  const page = Math.max(1, parseInt(query.page) || DEFAULT_PAGE);
-  const limit = Math.min(
-    MAX_LIMIT,
-    Math.max(1, parseInt(query.limit) || DEFAULT_LIMIT)
-  );
-
-  const offset = (page - 1) * limit;
-
-  return { page, limit, offset };
+  const page = Math.max(1, parseInt(query.page, 10) || DEFAULT_PAGE);
+  const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(query.limit, 10) || DEFAULT_LIMIT));
+  return { page, limit, offset: (page - 1) * limit };
 }
 
-/**
- * Build pagination metadata for response
- * @param {number} page - Current page
- * @param {number} limit - Items per page
- * @param {number} total - Total items
- * @returns {Object} Pagination metadata
- */
 export function buildPaginationMeta(page, limit, total) {
   const totalPages = Math.ceil(total / limit);
-
   return {
     pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
+      page, limit, total, totalPages,
       hasNextPage: page < totalPages,
       hasPrevPage: page > 1,
     },
   };
 }
 
-/**
- * Apply pagination to Sequelize query options
- * @param {Object} options - Sequelize query options
- * @param {Object} pagination - Pagination params from parsePaginationParams
- * @returns {Object} Enhanced query options with pagination
- */
-export function applyPaginationToQuery(options, pagination) {
-  return {
-    ...options,
-    limit: pagination.limit,
-    offset: pagination.offset,
-  };
-}
-
-/**
- * Build paginated response
- * @param {Array} data - Paginated data
- * @param {Object} meta - Pagination metadata
- * @returns {Object} Formatted response with pagination
- */
 export function buildPaginatedResponse(data, meta) {
-  return {
-    success: true,
-    data,
-    ...meta,
-  };
+  return { success: true, data, ...meta };
 }
 ```
 
-### Step 2: Add Pagination to getCrimesForMap
+Edge cases to handle: `page=abc` → page 1; `limit=-5` → 1; `limit=99999` → clamped to
+MAX_LIMIT; `page` beyond last page → empty `data` array with correct metadata (not an error).
 
-**File: `db-project-backend/controllers/CrimeControllers.js`**
+### Step 2 — Opt-in pagination for `getCrimesForMap`
+
+**File: `db-project-backend/controllers/CrimeControllers.js`** (`getCrimesForMap`, line 63)
+
+Structure:
 
 ```javascript
-// Add import at top
-import { parsePaginationParams, buildPaginationMeta, buildPaginatedResponse } from '../utils/pagination.js';
+import { parsePaginationParams, buildPaginationMeta, buildPaginatedResponse } from "../utils/pagination.js";
 
-// Modify getCrimesForMap function
 export const getCrimesForMap = async (req, res) => {
   try {
-    const { mode, crimeType, zoneId, startDate, endDate, lat, lng, radius } = req.query;
-    
-    // Parse pagination parameters
-    const pagination = parsePaginationParams(req.query);
+    const { mode, crimeType, zoneId, startDate, endDate, lat, lng, radius,
+            page: pageParam, limit: limitParam } = req.query;
 
-    // Determine user role for visibility filtering
-    const userRole = req.user?.role || 'citizen';
+    const paginated = pageParam !== undefined || limitParam !== undefined;
+    const pagination = paginated ? parsePaginationParams(req.query) : null;
+    const userRole = req.user?.role || "citizen";
 
-    // Count query first
-    let countSql = `
-      SELECT COUNT(DISTINCT c.id) as total
-      FROM "Crime" c
-      JOIN "CrimeType" ct ON c."crimeTypeId" = ct.id
-      LEFT JOIN "Zone" z ON c."zoneId" = z.id
-      WHERE c.status = 'approved'
-    `;
+    // ... existing base SQL + filter building (UNCHANGED) ...
 
-    const countConditions = [];
-    const countReplacements = {};
-
-    // Apply same filters as data query
-    if (crimeType && crimeType !== "All") {
-      countConditions.push(`ct.name ILIKE :crimeType`);
-      countReplacements.crimeType = crimeType;
-    }
-    if (zoneId && zoneId !== "All") {
-      countConditions.push(`c."zoneId" = :zoneId`);
-      countReplacements.zoneId = zoneId;
-    }
-    if (startDate) {
-      countConditions.push(`c."incidentDate" >= :startDate`);
-      countReplacements.startDate = new Date(startDate).toISOString();
-    }
-    if (endDate) {
-      countConditions.push(`c."incidentDate" <= :endDate`);
-      countReplacements.endDate = new Date(endDate).toISOString();
-    }
-    if (mode === "radius" && lat && lng && radius) {
-      countConditions.push(`
-        ST_DWithin(
-          c.location::geography,
-          ST_SetSRID(ST_Point(:lng, :lat), 4326),
-          :radius
-        )
-      `);
-      countReplacements.lat = parseFloat(lat);
-      countReplacements.lng = parseFloat(lng);
-      countReplacements.radius = parseFloat(radius);
+    // NEW (paginated mode only): count query sharing the identical WHERE/JOIN set
+    if (paginated) {
+      const countResult = await db.sequelize.query(countSql, { ... });
+      total = countResult[0].total;
     }
 
-    if (countConditions.length > 0) {
-      countSql += " AND " + countConditions.join(" AND ");
+    // NEW: ORDER BY is added ONLY when paginating. Legacy responses must stay
+    // byte-compatible; adding ORDER BY without LIMIT is also a (safe, but
+    // out-of-minimal-change) behavior delta — keep it scoped to paginated mode.
+    if (paginated) {
+      sql += ` ORDER BY c."reportedAt" DESC, c.id DESC LIMIT :limit OFFSET :offset`;
+      replacements.limit = pagination.limit;
+      replacements.offset = pagination.offset;
+    } else {
+      sql += ";";  // exactly as today
     }
 
-    const countResult = await db.sequelize.query(countSql, {
-      type: db.sequelize.QueryTypes.SELECT,
-      replacements: countReplacements,
-    });
-    const total = countResult[0].total;
+    // ... existing execution + media fetch, with ONE change:
+    // media query gains `LIMIT 3` only when paginated (preview cap) ...
 
-    // Data query with pagination
-    let sql = `
-      SELECT
-        c.id,
-        c.title,
-        c.description,
-        c.address,
-        c."zoneId",
-        z.name AS "zoneName",
-        c."crimeTypeId",
-        ct.name AS "crimeTypeName",
-        c.status,
-        c."incidentDate",
-        c."thumbnailUrl",
-        c."mediaCount",
-        ST_AsGeoJSON(c.location)::json AS geom
-      FROM "Crime" c
-      JOIN "CrimeType" ct ON c."crimeTypeId" = ct.id
-      LEFT JOIN "Zone" z ON c."zoneId" = z.id
-      WHERE c.status = 'approved'
-    `;
-
-    const conditions = [];
-    const replacements = {};
-
-    // Apply filters (same as count)
-    if (crimeType && crimeType !== "All") {
-      conditions.push(`ct.name ILIKE :crimeType`);
-      replacements.crimeType = crimeType;
+    // Response:
+    if (paginated) {
+      const meta = buildPaginationMeta(pagination.page, pagination.limit, total);
+      return res.json(buildPaginatedResponse(formatted, meta));
     }
-    if (zoneId && zoneId !== "All") {
-      conditions.push(`c."zoneId" = :zoneId`);
-      replacements.zoneId = zoneId;
-    }
-    if (startDate) {
-      conditions.push(`c."incidentDate" >= :startDate`);
-      replacements.startDate = new Date(startDate).toISOString();
-    }
-    if (endDate) {
-      conditions.push(`c."incidentDate" <= :endDate`);
-      replacements.endDate = new Date(endDate).toISOString();
-    }
-    if (mode === "radius" && lat && lng && radius) {
-      conditions.push(`
-        ST_DWithin(
-          c.location::geography,
-          ST_SetSRID(ST_Point(:lng, :lat), 4326),
-          :radius
-        )
-      `);
-      replacements.lat = parseFloat(lat);
-      replacements.lng = parseFloat(lng);
-      replacements.radius = parseFloat(radius);
-    }
-
-    if (conditions.length > 0) {
-      sql += " AND " + conditions.join(" AND ");
-    }
-
-    // Add pagination
-    sql += ` ORDER BY c."reportedAt" DESC LIMIT :limit OFFSET :offset;`;
-    replacements.limit = pagination.limit;
-    replacements.offset = pagination.offset;
-
-    const crimes = await db.sequelize.query(sql, {
-      type: db.sequelize.QueryTypes.SELECT,
-      replacements,
-    });
-
-    // Fetch media (optimize: only for current page)
-    const crimesWithMedia = await Promise.all(
-      crimes.map(async (c) => {
-        if (!c.geom) return null;
-
-        const loc = typeof c.geom === "string" ? JSON.parse(c.geom) : c.geom;
-
-        let media = [];
-        if (c.mediaCount > 0) {
-          const mediaQuery = userRole === 'citizen'
-            ? `SELECT id, "fileType", "url", "thumbnailUrl", "caption",
-                      "visibility", "evidenceMarked", "originalName", "fileSize"
-               FROM "CrimeMedia"
-               WHERE "CrimeId" = :crimeId AND "visibility" = 'public'
-               ORDER BY id ASC
-               LIMIT 3;`  // Only fetch first 3 for map preview
-            : `SELECT id, "fileType", "url", "thumbnailUrl", "caption",
-                      "visibility", "evidenceMarked", "originalName", "fileSize"
-               FROM "CrimeMedia"
-               WHERE "CrimeId" = :crimeId
-               ORDER BY id ASC
-               LIMIT 3;`;
-
-          const mediaRows = await db.sequelize.query(mediaQuery, {
-            replacements: { crimeId: c.id },
-            type: db.sequelize.QueryTypes.SELECT,
-          });
-          media = mediaRows;
-        }
-
-        return {
-          id: c.id,
-          crimeTypeId: c.crimeTypeId,
-          crimeTypeName: c.crimeTypeName,
-          incidentDate: c.incidentDate,
-          status: c.status,
-          latitude: loc.coordinates[1],
-          longitude: loc.coordinates[0],
-          title: c.title,
-          description: c.description,
-          address: c.address,
-          zoneId: c.zoneId,
-          zoneName: c.zoneName,
-          thumbnailUrl: c.thumbnailUrl,
-          mediaCount: c.mediaCount || 0,
-          media: media,
-        };
-      })
-    );
-
-    const formatted = crimesWithMedia.filter(Boolean);
-    const meta = buildPaginationMeta(pagination.page, pagination.limit, total);
-
-    return res.json(buildPaginatedResponse(formatted, meta));
-
-  } catch (err) {
-    console.error("Map Crime Error:", err);
-    res.status(500).json({ success: false, message: "Internal server error" });
-  }
+    return res.json(formatted);   // legacy array — unchanged
+  } catch (err) { /* unchanged */ }
 };
 ```
 
-### Step 3: Add Pagination to getAllCrimes
+Requirements:
+- Count query and data query MUST share identical JOINs and WHERE conditions (including
+  the radius `ST_DWithin` clause) — otherwise pagination totals are wrong under filters.
+- Deterministic pagination order: `ORDER BY c."reportedAt" DESC, c.id DESC` (the tiebreaker
+  matters — `reportedAt` alone can repeat).
+- Error responses unchanged (`res.status(500).json([])` in legacy mode; in paginated mode
+  return `res.status(500).json({ success: false, message: "Internal server error" })` —
+  consistent with envelope mode).
 
-**File: `db-project-backend/controllers/CrimeControllers.js`**
+### Step 3 — Opt-in pagination for `getAllCrimes`
 
-```javascript
-export const getAllCrimes = async (req, res) => {
-  try {
-    const pagination = parsePaginationParams(req.query);
-    
-    // Count query
-    const countResult = await sequelize.query(
-      `SELECT COUNT(*) as total FROM "Crime" WHERE status = 'approved';`,
-      { type: QueryTypes.SELECT }
-    );
-    const total = countResult[0].total;
+**File: `db-project-backend/controllers/CrimeControllers.js`** (`getAllCrimes`, line 833)
 
-    // Data query with pagination
-    const crimes = await sequelize.query(
-      `
-      SELECT c.id AS id,
-             c.title AS title,
-             c.description AS description,
-             c.address AS address,
-             c."thumbnailUrl" AS "thumbnailUrl",
-             c."mediaCount" AS "mediaCount",
-             z.name AS "zoneName",
-             pb.id AS "registeredBranchId",
-             crs."submitterCnic" AS "submitterCnic",
-             ct.name AS "crimeTypeName",
-             c."incidentDate" AS "incidentDate",
-             c.status AS status,
-             ST_AsGeoJSON(c.location)::json AS location,
-             CASE WHEN c.location IS NOT NULL THEN ST_Y(c.location) END AS latitude,
-             CASE WHEN c.location IS NOT NULL THEN ST_X(c.location) END AS longitude
-      FROM "Crime" c
-      LEFT JOIN "Zone" z ON z.id = c."zoneId"
-      LEFT JOIN LATERAL (
-        SELECT pb_inner.id
-        FROM "PoliceBranch" pb_inner
-        WHERE pb_inner."zoneId" = c."zoneId"
-        ORDER BY pb_inner.id ASC
-        LIMIT 1
-      ) pb ON true
-      LEFT JOIN "CrimeType" ct ON ct.id = c."crimeTypeId"
-      LEFT JOIN LATERAL (
-        SELECT cs."submitterId"
-        FROM "CrimeSubmission" cs
-        WHERE cs."CrimeId" = c.id
-        ORDER BY cs."submittedAt" DESC
-        LIMIT 1
-      ) cs_latest ON true
-      LEFT JOIN "CrimeReportsSubmitter" crs ON crs.id = cs_latest."submitterId"
-      WHERE c.status = 'approved'
-      ORDER BY c."incidentDate" DESC, c.id DESC
-      LIMIT :limit OFFSET :offset;
-      `,
-      { 
-        type: QueryTypes.SELECT,
-        replacements: { 
-          limit: pagination.limit,
-          offset: pagination.offset 
-        }
-      }
-    );
+Same opt-in pattern. Existing query already has deterministic `ORDER BY c."incidentDate" DESC, c.id DESC`
+(no change needed there). Paginated mode adds:
+- `SELECT COUNT(*) FROM "Crime" WHERE status = 'approved'` (matches the data query's WHERE).
+- `LIMIT :limit OFFSET :offset` appended after the existing ORDER BY.
+- Response: legacy mode → `{ success: true, data }` (unchanged); paginated →
+  `{ success: true, data, pagination }`.
+- Media fetch unchanged (police list shows all media per crime).
 
-    // Fetch media only for current page
-    const crimesWithMedia = await Promise.all(
-      crimes.map(async (crime) => {
-        const mediaRows = await sequelize.query(
-          `
-          SELECT id, "fileType", "url", "thumbnailUrl", "caption",
-                 "visibility", "evidenceMarked", "originalName", "fileSize",
-                 "uploadedBy", "uploadedAt"
-          FROM "CrimeMedia"
-          WHERE "CrimeId" = :crimeId
-          ORDER BY id ASC;
-          `,
-          {
-            replacements: { crimeId: crime.id },
-            type: QueryTypes.SELECT,
-          }
-        );
-        return {
-          ...crime,
-          media: mediaRows,
-        };
-      })
-    );
+### Step 4 — Optimize `getStatsSummary`
 
-    const meta = buildPaginationMeta(pagination.page, pagination.limit, total);
+**File: `db-project-backend/controllers/statsController.js`** (`getStatsSummary`, line 6)
 
-    return res.status(200).json(buildPaginatedResponse(crimesWithMedia, meta));
+Phase 0 identified this as the worst endpoint (baseline P50 4.8s → stress P50 29.4s). The
+current `findOne` + correlated-subquery-per-row pattern scans O(types × crimes). Replace the
+two `findOne` calls with single aggregate queries:
 
-  } catch (error) {
-    console.error("❌ Error fetching crimes:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Error fetching crime records"
-    });
-  }
-};
+```sql
+-- Top crime type (replaces findOne + correlated literal)
+SELECT ct.id, ct.name, COUNT(c.id) AS "crimeCount"
+FROM "CrimeType" ct
+LEFT JOIN "Crime" c ON c."crimeTypeId" = ct.id AND c.status = 'approved'
+GROUP BY ct.id, ct.name
+ORDER BY "crimeCount" DESC
+LIMIT 1;
+
+-- Top zone (same shape)
+SELECT z.id, z.name, COUNT(c.id) AS "crimeCount"
+FROM "Zone" z
+LEFT JOIN "Crime" c ON c."zoneId" = z.id AND c.status = 'approved'
+GROUP BY z.id, z.name
+ORDER BY "crimeCount" DESC
+LIMIT 1;
 ```
 
-### Step 4: Optimize Statistics Queries
+Constraints:
+- Response JSON shape MUST stay identical: `{ totalZones, totalCrimes, topCrimeType, topZone }`.
+  Verify the current response with curl BEFORE changing, and match `crimeCount`'s JSON type
+  (pg returns COUNT as string; confirm what the ORM path returns today and cast to match).
+- `Zone.count()` and the 30-day `Crime.count()` remain as-is (already cheap and indexed).
+- No caching headers, no materialized views — Redis caching is Phase 3.
 
-**File: `db-project-backend/controllers/statsController.js`**
-
-```javascript
-// Add materialized view hint or optimize queries
-// Current queries are already using raw SQL which is good
-// Add query result caching hint for future Redis implementation
-
-export const getStatsSummary = async (req, res) => {
-  try {
-    const { Crime, CrimeType, Zone } = db;
-
-    // Add cache control hint for future Redis
-    res.setHeader('X-Cacheable', 'true');
-    res.setHeader('X-Cache-TTL', '300'); // 5 minutes
-
-    // Total zones
-    const totalZones = await Zone.count();
-
-    // Total approved crimes in last 30 days (already indexed)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const totalCrimes = await Crime.count({
-      where: {
-        status: "approved",
-        reportedAt: { [Op.gte]: thirtyDaysAgo }
-      }
-    });
-
-    // Top Crime Type (use indexed column)
-    const topCrimeType = await CrimeType.findOne({
-      attributes: [
-        "id",
-        "name",
-        [
-          literal(`
-            (SELECT COUNT(*) 
-             FROM "Crime" AS c 
-             WHERE c."crimeTypeId" = "CrimeType"."id"
-             AND c."status" = 'approved')
-          `),
-          "crimeCount"
-        ]
-      ],
-      order: [[literal("crimeCount"), "DESC"]],
-      limit: 1,
-      raw: true // Add raw: true for better performance
-    });
-
-    // Top Zone (use indexed column)
-    const topZone = await Zone.findOne({
-      attributes: [
-        "id",
-        "name",
-        [
-          literal(`
-            (SELECT COUNT(*) 
-             FROM "Crime" AS c 
-             WHERE c."zoneId" = "Zone"."id"
-             AND c."status" = 'approved')
-          `),
-          "crimeCount"
-        ]
-      ],
-      order: [[literal("crimeCount"), "DESC"]],
-      limit: 1,
-      raw: true
-    });
-
-    res.json({
-      totalZones,
-      totalCrimes,
-      topCrimeType,
-      topZone
-    });
-
-  } catch (err) {
-    console.error("Stats summary error:", err);
-    res.status(500).json({ error: "Failed to load summary" });
-  }
-};
-```
-
-### Step 5: Optimize Connection Pool
+### Step 5 — Connection pool configuration
 
 **File: `db-project-backend/config/db.js`**
 
+Rewrite with env-driven pool. Two corrections to the original plan:
+1. **Explicit default branch** — original plan applied dev pool only when
+   `NODE_ENV === 'development'` and prod pool only when `'production'`; with `NODE_ENV`
+   unset (local `npm start` default), NEITHER branch applied and Sequelize silently used
+   its own defaults. The default branch must be explicit.
+2. **Skip the plan's global `define: { timestamps: false }`** — every model already sets
+   `timestamps` explicitly (and `CrimeReportsSubmitter` uses `true`; a global false would be
+   redundant at best and misleading at worst). Minimal change: pool only.
+
 ```javascript
-import { Sequelize } from "sequelize";
-import dotenv from "dotenv";
-
-dotenv.config();
-
-// Calculate optimal pool size based on expected load
-// Formula: (number of CPUs * 2) + effective_spindle_factor
-// For now, use conservative values that can be adjusted per environment
-const isProduction = process.env.NODE_ENV === 'production';
-const isDevelopment = process.env.NODE_ENV === 'development';
-
 const poolConfig = {
-  // For development: smaller pool
-  ...(isDevelopment ? {
-    max: 5,
-    min: 0,
-  } : {}),
-  
-  // For production: larger pool
-  ...(isProduction ? {
-    max: parseInt(process.env.DB_POOL_MAX || '20', 10),
-    min: parseInt(process.env.DB_POOL_MIN || '5', 10),
-  } : {}),
-  
-  // Common settings
+  max: parseInt(process.env.DB_POOL_MAX || "10", 10),
+  min: parseInt(process.env.DB_POOL_MIN || "0", 10),
   acquire: 30000,
   idle: 10000,
-  evict: 5000, // Run eviction every 5 seconds
+  evict: 5000,
 };
 
 const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: "postgres",
-  logging: isDevelopment ? console.log : false,
-  dialectOptions: {
-    ssl: {
-      require: true,
-      rejectUnauthorized: false,
-    },
-  },
+  logging: process.env.NODE_ENV === "development" ? console.log : false,
+  benchmark: process.env.NODE_ENV === "development",
+  dialectOptions: { ssl: { require: true, rejectUnauthorized: false } },
   pool: poolConfig,
-  
-  // Performance optimizations
-  define: {
-    timestamps: false, // Disable timestamps for better performance
-    underscored: false, // Keep camelCase
-  },
-  
-  // Query optimization
-  benchmark: isDevelopment, // Log query execution time in dev
-  retry: {
-    max: 3, // Retry failed queries up to 3 times
-  },
+  retry: { max: 3 },
 });
-
-export default sequelize;
 ```
 
-### Step 6: Verify and Add Missing Indexes
+Notes:
+- Default `max` raised 5 → 10 (Phase 0 evidence: pool max 5 was the global throughput
+  ceiling — all endpoints converged to a shared latency plateau). Override via `DB_POOL_MAX`.
+- Supabase capacity check: 10 connections × 1 instance is well within limits; the
+  `instances × connections` formula is revisited in Phase 11 (do not pre-optimize).
+- Keep `retry.max: 3` from original plan; document that retry applies to connection
+  acquisition failures.
 
-**File: `db-project-backend/scripts/add-performance-indexes.sql`**
+### Step 6 — Performance indexes (VERIFY-FIRST)
+
+**File: `db-project-backend/scripts/add-performance-indexes.sql`** (new)
+
+⚠️ `Latest_schema.sql` is stale and the DB's actual index state is unknown (model-declared
+indexes are only created by `sync()`, which never runs). Therefore:
+
+1. **Before applying**: capture current indexes —
+   `SELECT tablename, indexname, indexdef FROM pg_indexes WHERE schemaname='public' AND tablename IN ('Crime','CrimeMedia','CrimeType','Zone') ORDER BY tablename, indexname;`
+   (run via a short `node` script using `DATABASE_URL` + `sequelize.query`, or Supabase SQL editor — psql is not guaranteed on this machine).
+2. Compare against the target set; drop any of the six below that already exist under a
+   different name (avoid near-duplicate indexes). Note: the `CrimeMedia` composite index
+   target is model-declared (`CrimeMedia.js:113`) and the `Crime` indexes are model-declared
+   (`Crime.js:63-70`) — expected to be MISSING in the live DB, but verify, don't assume.
+3. Apply the guarded script (all `IF NOT EXISTS`, so re-runnable):
 
 ```sql
--- Add additional performance indexes if missing
+-- Composite for the map query pattern (status + recency)
+CREATE INDEX IF NOT EXISTS idx_crime_status_reported ON "Crime"(status, "reportedAt" DESC);
+-- Type filtering with status
+CREATE INDEX IF NOT EXISTS idx_crime_type_status ON "Crime"("crimeTypeId", status);
+-- Zone filtering with status
+CREATE INDEX IF NOT EXISTS idx_crime_zone_status ON "Crime"("zoneId", status);
+-- Partial index: approved-only recency (smaller, matches map/stats hot path)
+CREATE INDEX IF NOT EXISTS idx_crime_approved_date ON "Crime"("reportedAt" DESC) WHERE status = 'approved';
+-- Covering index for stats group-bys
+CREATE INDEX IF NOT EXISTS idx_crime_stats_covering ON "Crime"("crimeTypeId", status, "reportedAt");
+-- Media visibility lookups (map media fetch)
+CREATE INDEX IF NOT EXISTS idx_crime_media_visibility ON "CrimeMedia"("CrimeId", "visibility");
 
--- Check if indexes exist, create if not
-DO $$
-BEGIN
-    -- Composite index for common map query pattern
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_indexes 
-        WHERE indexname = 'idx_crime_status_reported'
-    ) THEN
-        CREATE INDEX idx_crime_status_reported 
-        ON "Crime"(status, "reportedAt" DESC);
-    END IF;
-
-    -- Index for crime type filtering with status
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_indexes 
-        WHERE indexname = 'idx_crime_type_status'
-    ) THEN
-        CREATE INDEX idx_crime_type_status 
-        ON "Crime"("crimeTypeId", status);
-    END IF;
-
-    -- Index for zone-based queries with status
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_indexes 
-        WHERE indexname = 'idx_crime_zone_status'
-    ) THEN
-        CREATE INDEX idx_crime_zone_status 
-        ON "Crime"("zoneId", status);
-    END IF;
-
-    -- Partial index for approved crimes only (smaller index, faster queries)
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_indexes 
-        WHERE indexname = 'idx_crime_approved_date'
-    ) THEN
-        CREATE INDEX idx_crime_approved_date 
-        ON "Crime"("reportedAt" DESC) 
-        WHERE status = 'approved';
-    END IF;
-
-    -- Covering index for common statistics queries
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_indexes 
-        WHERE indexname = 'idx_crime_stats_covering'
-    ) THEN
-        CREATE INDEX idx_crime_stats_covering 
-        ON "Crime"("crimeTypeId", status, "reportedAt");
-    END IF;
-
-    -- Index for media visibility queries
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_indexes 
-        WHERE indexname = 'idx_crime_media_visibility'
-    ) THEN
-        CREATE INDEX idx_crime_media_visibility 
-        ON "CrimeMedia"("CrimeId", "visibility");
-    END IF;
-END $$;
-
--- Analyze tables to update statistics
 ANALYZE "Crime";
 ANALYZE "CrimeMedia";
 ANALYZE "CrimeType";
 ANALYZE "Zone";
-
--- Report index usage
-SELECT 
-    schemaname,
-    tablename,
-    indexname,
-    indexdef
-FROM pg_indexes
-WHERE schemaname = 'public' 
-    AND tablename IN ('Crime', 'CrimeMedia', 'CrimeType', 'Zone')
-ORDER BY tablename, indexname;
 ```
 
-### Step 7: Add Query Logging for Development
+4. **After applying**: re-run the `pg_indexes` report; save before/after into the testing log.
+   Where practical, `EXPLAIN ANALYZE` the map query (with crimeType/zone/date filters) and
+   record plan changes. CLAUDE.md forbids blind index additions — the before/after evidence
+   is the deliverable, not the script itself.
+5. `EXPLAIN ANALYZE` output must not be committed if it embeds data values — commit only
+   the plan shape (node types + index names).
 
-**File: `db-project-backend/middleware/queryLogger.js`**
+### Step 7 — Dev slow-request logger + mount
+
+**File: `db-project-backend/middleware/queryLogger.js`** (new) — as per original plan
+(>100ms dev-only warning on `res.json`). **The original plan omitted this**: it must also be
+mounted in `server.js`, immediately after `app.use(express.json())` and before route mounts:
 
 ```javascript
-/**
- * Query logging middleware for development
- * Logs slow queries (>100ms) for optimization
- */
-
-export function queryLoggerMiddleware(req, res, next) {
-  if (process.env.NODE_ENV !== 'development') {
-    return next();
-  }
-
-  const startTime = Date.now();
-  
-  // Log response with query time
-  const originalJson = res.json;
-  res.json = function(data) {
-    const duration = Date.now() - startTime;
-    
-    if (duration > 100) {
-      console.log(`⚠️  Slow query detected:`, {
-        method: req.method,
-        path: req.path,
-        duration: `${duration}ms`,
-        query: req.query,
-      });
-    }
-    
-    return originalJson.call(this, data);
-  };
-  
-  next();
-}
-
-export default queryLoggerMiddleware;
+import { queryLoggerMiddleware } from "./middleware/queryLogger.js";
+// ...
+app.use(express.json());
+app.use(queryLoggerMiddleware);   // dev-only no-op in other environments
 ```
 
-### Step 8: Add Environment Variables
+Keep the implementation minimal (original plan's version is fine); no timing of the DB
+itself — that arrives with Pino/Phase 7.
 
-**File: `db-project-backend/.env-sample`**
+### Step 8 — Environment variables
+
+**File: `db-project-backend/.env-sample`** — append (placeholders only, no secrets):
 
 ```bash
-# Add to existing .env-sample
+# Database Connection Pool (Phase 1)
+DB_POOL_MAX=10
+DB_POOL_MIN=0
 
-# Database Connection Pool
-DB_POOL_MAX=20
-DB_POOL_MIN=5
-
-# Pagination Defaults
+# Pagination Defaults (Phase 1) — consumed by utils/pagination.js
 DEFAULT_PAGE_SIZE=50
 MAX_PAGE_SIZE=200
 ```
 
-### Step 9: Update Routes
+Do NOT rename or remove any existing variable. `envValidation.js` is not touched
+(these are optional vars with safe defaults).
 
-**File: `db-project-backend/routes/crimeRoutes.js`**
+### Step 9 — Route documentation (comment-only)
 
-```javascript
-// Add query parameter documentation
-router.get(
-  "/",
-  optionalAuth,
-  getCrimesForMap
-);
-// Query params: page, limit, crimeType, zoneId, startDate, endDate, lat, lng, radius, mode
+**File: `db-project-backend/routes/crimeRoutes.js`** — comment-only addition documenting
+the new query params (`page`, `limit`) and the opt-in contract. No middleware or route
+changes.
 
-router.get("/all", policeOnly, getAllCrimes);
-// Query params: page, limit
-```
+### Step 10 — Phase logs + tracker
 
-## Verification Steps
+- Create `implementation-log.md` (current implementation state) and `testing-log.md`
+  (testing record) per `Plans/CLAUDE.md` ownership rules.
+- At completion, fix the progress tracker in `SYSTEM-DESIGN-IMPLEMENTATION.md`: mark
+  Phase 1 checkbox `[x]` only, and leave 2–15 unchecked (they are all currently, and
+  incorrectly, checked).
 
-1. **Test Pagination**: 
-```bash
-# Test page 1
-curl "http://localhost:5001/api/crimes?page=1&limit=10"
+---
 
-# Test page 2
-curl "http://localhost:5001/api/crimes?page=2&limit=10"
+## Validation Plan
 
-# Test with filters
-curl "http://localhost:5001/api/crimes?page=1&limit=5&crimeType=Theft"
-```
+| Check | Tool | Notes |
+|---|---|---|
+| Syntax | `node --check` on every touched `.js` file | Executable substitute — backend has no lint/typecheck/test tooling (package.json verified) |
+| ESLint / TypeScript / unit tests | **N/A** | Not configured in backend; report as N/A, do not claim PASS |
+| Legacy parity | curl | `GET /api/crimes` (no params) and `/crimes/all` (no params) return byte-equivalent structures to pre-change responses (capture before/after) |
+| Pagination behavior | curl | `page=1&limit=10` vs `page=2&limit=10` → different rows, correct `total/totalPages/hasNextPage`; `limit=99999` clamps; `page=abc` → defaults; filters + pagination combine correctly (radius, crimeType, zone, dates) |
+| Stats shape | curl | `/api/stats/summary` JSON identical pre/post (capture before change) |
+| Indexes | `pg_indexes` before/after + `EXPLAIN ANALYZE` where practical | Evidence into testing log |
+| Pool | Backend start log + curl under k6 | Verify pool sizes applied via Sequelize `pool` config logging in dev |
+| k6 compare | `k6 run tests/k6/runs/baseline.js` | Compare vs Phase 0 (P95 5.13s / P99 7.69s / 25.5 req/s @ 100 VU). Record actuals; the plan's "20% improvement" is an expectation, not a claim. No k6 script edits needed (opt-in design keeps legacy shape for param-less requests) |
+| **Playwright MCP** | Browser | **Required** (backend CLAUDE.md §16 — pagination-affecting change): map renders with markers/media popups as today; police AllRecords loads and client-side search works as today; citizen map view unchanged. Expect NO visible differences — any visible difference is a regression |
+| Git | `git status` + `git diff` review | Only intended files; no secrets; phase-scoped commit(s) on `phase-1-postgresql-optimization` |
 
-2. **Verify Indexes**: Run the SQL script and check index creation
+Playwright note: if a browser regression appears → STOP, fix, re-run automated checks,
+re-run Playwright (per CLAUDE.md §7/§17). Only the Implementation Agent commits/pushes.
 
-3. **Test Connection Pool**: Monitor database connections during load test
+## Acceptance Criteria
 
-4. **Performance Test**: Compare response times before/after
-
-## Expected Results
-
-- **Pagination**: All list endpoints return paginated responses
-- **Performance**: Reduced memory usage and faster response times
-- **Indexes**: All critical queries use indexes
-- **Connection Pool**: Optimal for the workload
-
-## Success Criteria
-
-- [ ] Pagination utility created and integrated
-- [ ] getCrimesForMap() supports pagination
-- [ ] getAllCrimes() supports pagination  
-- [ ] All performance indexes created
-- [ ] Connection pool optimized for environment
-- [ ] Response times improved by 20%+ (measured in Phase 0 vs Phase 1)
-
-## Files Modified
-
-```
-db-project-backend/
-├── config/db.js (connection pool optimization)
-├── controllers/
-│   ├── CrimeControllers.js (pagination)
-│   └── statsController.js (optimization)
-├── middleware/
-│   └── queryLogger.js (new)
-├── utils/
-│   └── pagination.js (new)
-├── routes/
-│   └── crimeRoutes.js (documentation)
-└── scripts/
-    └── add-performance-indexes.sql (new)
-```
-
-## Frontend Integration
-
-The frontend will need to be updated to support pagination. This will be documented in the frontend update plan, but the backend now returns:
-
-```json
-{
-  "success": true,
-  "data": [...],
-  "pagination": {
-    "page": 1,
-    "limit": 50,
-    "total": 1000,
-    "totalPages": 20,
-    "hasNextPage": true,
-    "hasPrevPage": false
-  }
-}
-```
-
-## Dependencies
-
-- Phase 0 baseline metrics (for comparison)
-- Database access for index creation
-- Backend restart for connection pool changes
+- [ ] Pagination utility created; constants wired to env vars (no dead config)
+- [ ] `getCrimesForMap` + `getAllCrimes` support opt-in pagination with deterministic ordering
+- [ ] Param-less requests return legacy responses (verified by captured before/after comparison)
+- [ ] `getStatsSummary` uses aggregate JOIN queries; response shape identical
+- [ ] Index script applied; before/after `pg_indexes` evidence recorded; no near-duplicate indexes
+- [ ] Pool env-driven with explicit default branch; documented in `.env-sample`
+- [ ] Query logger created AND mounted in `server.js` (dev-only)
+- [ ] k6 baseline re-run; actuals recorded vs Phase 0 in testing log
+- [ ] Playwright map + AllRecords regression: no user-visible change
+- [ ] Phase logs created; master tracker corrected (Phase 1 only)
+- [ ] `git diff` reviewed; no unrelated files, no secrets
 
 ## Rollback Procedure
 
-If issues arise:
-1. Revert pagination changes to use LIMIT/OFFSET manually
-2. Drop new indexes if they cause issues
-3. Restore original connection pool settings
-4. Restart backend
+1. Revert controller/pool/middleware changes (`git revert` the phase commit(s)).
+2. Drop the six indexes if they caused issues (`DROP INDEX IF EXISTS idx_...` — they are
+   additive and safe to leave in place if harmless).
+3. Restart backend; re-run legacy-parity curl checks.
 
-## Estimated Completion Time
+## Risks & Notes
 
-- Pagination utility: 1 hour
-- Controller updates: 2-3 hours
-- Index optimization: 1 hour
-- Connection pool tuning: 30 minutes
-- Testing and verification: 1-2 hours
-- **Total: 5-7 hours**
+- **Highest risk: silent response-shake regression** — mitigated by the opt-in design and
+  mandatory Playwright pass.
+- `ORDER BY c."reportedAt" DESC` on the map query in paginated mode requires
+  `idx_crime_status_reported` / partial `idx_crime_approved_date` to avoid a sort —
+  verify with `EXPLAIN ANALYZE` after index creation.
+- Supabase network RTT dominates local-dev latencies (Phase 0 finding); pool/index gains
+  may be partially masked — report what is measured, not what is hoped.
+- One instance × pool max 10 is safe for Supabase; Phase 11 owns the multi-instance math.

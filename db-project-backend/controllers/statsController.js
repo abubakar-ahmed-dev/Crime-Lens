@@ -21,71 +21,37 @@ export const getStatsSummary = async (req, res) => {
       }
     });
 
-    // Top Crime Type (approved only)
-    const topCrimeType = await CrimeType.findOne({
-      attributes: [
-        "id",
-        "name",
-        [
-          literal(`
-            (
-              SELECT COUNT(*) 
-              FROM "Crime" AS c 
-              WHERE c."crimeTypeId" = "CrimeType"."id"
-              AND c."status" = 'approved'
-            )
-          `),
-          "crimeCount"
-        ]
-      ],
-      order: [
-        [
-          literal(`
-            (
-              SELECT COUNT(*) 
-              FROM "Crime" AS c 
-              WHERE c."crimeTypeId" = "CrimeType"."id"
-              AND c."status" = 'approved'
-            )
-          `),
-          "DESC"
-        ]
-      ],
-      limit: 1
-    });
+    // Top crime type / zone via single GROUP BY joins instead of per-row
+    // correlated subqueries (worst endpoint in Phase 0 baseline).
+    // crimeCount stays a pg COUNT (string) to match the previous response shape.
+    const topCrimeTypeRows = await db.sequelize.query(
+      `
+      SELECT ct.id, ct.name, COUNT(c.id) AS "crimeCount"
+      FROM "CrimeType" ct
+      LEFT JOIN "Crime" c
+        ON c."crimeTypeId" = ct.id AND c.status = 'approved'
+      GROUP BY ct.id, ct.name
+      ORDER BY "crimeCount" DESC
+      LIMIT 1;
+      `,
+      { type: QueryTypes.SELECT }
+    );
 
-    // Top Zone (approved only)
-    const topZone = await Zone.findOne({
-      attributes: [
-        "id",
-        "name",
-        [
-          literal(`
-            (
-              SELECT COUNT(*) 
-              FROM "Crime" AS c 
-              WHERE c."zoneId" = "Zone"."id"
-              AND c."status" = 'approved'
-            )
-          `),
-          "crimeCount"
-        ]
-      ],
-      order: [
-        [
-          literal(`
-            (
-              SELECT COUNT(*) 
-              FROM "Crime" AS c 
-              WHERE c."zoneId" = "Zone"."id"
-              AND c."status" = 'approved'
-            )
-          `),
-          "DESC"
-        ]
-      ],
-      limit: 1
-    });
+    const topZoneRows = await db.sequelize.query(
+      `
+      SELECT z.id, z.name, COUNT(c.id) AS "crimeCount"
+      FROM "Zone" z
+      LEFT JOIN "Crime" c
+        ON c."zoneId" = z.id AND c.status = 'approved'
+      GROUP BY z.id, z.name
+      ORDER BY "crimeCount" DESC
+      LIMIT 1;
+      `,
+      { type: QueryTypes.SELECT }
+    );
+
+    const topCrimeType = topCrimeTypeRows[0] || null;
+    const topZone = topZoneRows[0] || null;
 
     res.json({
       totalZones,

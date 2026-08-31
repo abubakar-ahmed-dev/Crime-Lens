@@ -2,6 +2,11 @@
 import { Op, fn, col, literal, QueryTypes, } from "sequelize";
 import sequelize from "../config/db.js";
 import db from "../models/index.js";
+import {
+  parsePaginationParams,
+  buildPaginationMeta,
+  buildPaginatedResponse,
+} from "../utils/pagination.js";
 const { Crime, CrimeSubmission, CrimeReportsSubmitter, CrimeType, Zone, CrimeMedia } = db;
 
 const parseRequiredCoordinates = (latitude, longitude) => {
@@ -63,6 +68,11 @@ const validateLocationInsideZone = async (zoneId, latitude, longitude, transacti
 export const getCrimesForMap = async (req, res) => {
   try {
     const { mode, crimeType, zoneId, startDate, endDate, lat, lng, radius } = req.query;
+
+    // Pagination is OPT-IN: only activate when page/limit params are supplied.
+    // Without them the legacy (unpaginated, full-media) response is returned.
+    const paginated = req.query.page !== undefined || req.query.limit !== undefined;
+    const pagination = paginated ? parsePaginationParams(req.query) : null;
 
     // Determine user role for visibility filtering
     const userRole = req.user?.role || 'citizen'; // Default to citizen if no user
@@ -133,7 +143,26 @@ export const getCrimesForMap = async (req, res) => {
       sql += " AND " + conditions.join(" AND ");
     }
 
-    sql += ";";
+    // Total count for pagination metadata (shares the same JOINs/filters as the
+    // data query so totals stay correct under crimeType/zone/date/radius filters)
+    let total = null;
+    if (paginated) {
+      const countResult = await db.sequelize.query(
+        `SELECT COUNT(*) AS total FROM (${sql}) AS filtered;`,
+        { type: db.sequelize.QueryTypes.SELECT, replacements }
+      );
+      total = countResult[0].total;
+    }
+
+    // Deterministic ordering is required for LIMIT/OFFSET to be stable.
+    // Only added in paginated mode so the legacy response path stays unchanged.
+    if (paginated) {
+      sql += ` ORDER BY c."reportedAt" DESC, c.id DESC LIMIT :limit OFFSET :offset;`;
+      replacements.limit = pagination.limit;
+      replacements.offset = pagination.offset;
+    } else {
+      sql += ";";
+    }
 
     // Execute the query
     const crimes = await db.sequelize.query(sql, {
@@ -148,20 +177,22 @@ export const getCrimesForMap = async (req, res) => {
 
         const loc = typeof c.geom === "string" ? JSON.parse(c.geom) : c.geom;
 
-        // Fetch media for this crime
+        // Fetch media for this crime. In paginated mode media is capped at 3
+        // per crime (map preview); legacy mode returns all media as before.
         let media = [];
         if (c.mediaCount > 0) {
+          const mediaLimit = paginated ? " LIMIT 3" : "";
           const mediaQuery = userRole === 'citizen'
             ? `SELECT id, "fileType", "url", "thumbnailUrl", "caption",
                       "visibility", "evidenceMarked", "originalName", "fileSize"
                FROM "CrimeMedia"
                WHERE "CrimeId" = :crimeId AND "visibility" = 'public'
-               ORDER BY id ASC;`
+               ORDER BY id ASC${mediaLimit};`
             : `SELECT id, "fileType", "url", "thumbnailUrl", "caption",
                       "visibility", "evidenceMarked", "originalName", "fileSize"
                FROM "CrimeMedia"
                WHERE "CrimeId" = :crimeId
-               ORDER BY id ASC;`;
+               ORDER BY id ASC${mediaLimit};`;
 
           const mediaRows = await db.sequelize.query(mediaQuery, {
             replacements: { crimeId: c.id },
@@ -191,11 +222,22 @@ export const getCrimesForMap = async (req, res) => {
     );
 
     const formatted = crimesWithMedia.filter(Boolean);
+
+    if (paginated) {
+      const meta = buildPaginationMeta(pagination.page, pagination.limit, total);
+      return res.json(buildPaginatedResponse(formatted, meta));
+    }
+
     return res.json(formatted);
 
   } catch (err) {
     console.error("Map Crime Error:", err);
-    res.status(500).json([]);
+    // Preserve legacy error shape in unpaginated mode; envelope in paginated mode
+    if (req.query.page !== undefined || req.query.limit !== undefined) {
+      res.status(500).json({ success: false, message: "Internal server error" });
+    } else {
+      res.status(500).json([]);
+    }
   }
 };
 
@@ -832,9 +874,11 @@ export const reportCrime = async (req, res) => {
 
 export const getAllCrimes = async (req, res) => {
   try {
-    // Base query with media fields added
-    const crimes = await sequelize.query(
-      `
+    // Pagination is OPT-IN: only active when page/limit params are supplied.
+    const paginated = req.query.page !== undefined || req.query.limit !== undefined;
+    const pagination = paginated ? parsePaginationParams(req.query) : null;
+
+    let sql = `
       SELECT c.id AS id,
              c.title AS title,
              c.description AS description,
@@ -869,9 +913,33 @@ export const getAllCrimes = async (req, res) => {
       ) cs_latest ON true
       LEFT JOIN "CrimeReportsSubmitter" crs ON crs.id = cs_latest."submitterId"
       WHERE c.status = 'approved'
-      ORDER BY c."incidentDate" DESC, c.id DESC;
-      `,
-      { type: QueryTypes.SELECT }
+    `;
+
+    // Total count for pagination metadata
+    let total = null;
+    if (paginated) {
+      const countResult = await sequelize.query(
+        `SELECT COUNT(*) AS total FROM "Crime" WHERE status = 'approved';`,
+        { type: QueryTypes.SELECT }
+      );
+      total = countResult[0].total;
+    }
+
+    // ORDER BY is pre-existing (deterministic); LIMIT/OFFSET only in paginated mode
+    if (paginated) {
+      sql += `ORDER BY c."incidentDate" DESC, c.id DESC LIMIT :limit OFFSET :offset;`;
+    } else {
+      sql += `ORDER BY c."incidentDate" DESC, c.id DESC;`;
+    }
+
+    const crimes = await sequelize.query(
+      sql,
+      {
+        type: QueryTypes.SELECT,
+        ...(paginated
+          ? { replacements: { limit: pagination.limit, offset: pagination.offset } }
+          : {}),
+      }
     );
 
     // Fetch full media details for each crime (police/admin see all media)
@@ -897,6 +965,11 @@ export const getAllCrimes = async (req, res) => {
         };
       })
     );
+
+    if (paginated) {
+      const meta = buildPaginationMeta(pagination.page, pagination.limit, total);
+      return res.status(200).json(buildPaginatedResponse(crimesWithMedia, meta));
+    }
 
     return res.status(200).json({
       success: true,
@@ -1211,7 +1284,7 @@ export const updateCrime = async (req, res) => {
             replacements: {
               crimeId: id,
               count: parseInt(mediaStats[0].count),
-              thumbnailUrl: mediaStats[0].firstthumbnail,
+              thumbnailUrl: mediaStats[0].firstThumbnail,
             },
             type: QueryTypes.UPDATE,
             transaction: t,
