@@ -20,7 +20,7 @@ This document serves as the central hub for the CrimeLens system design upgrade 
 | 0 | k6 Baseline Testing | Completed | `Plans/phase-0-k6-baseline/` |
 | 1 | PostgreSQL Optimization | Completed | `Plans/phase-1-postgresql-optimization/` |
 | 2 | Health Checks | Completed | `Plans/phase-2-health-checks/` |
-| 3 | Redis Caching | Remaining | `Plans/phase-3-redis-caching/` |
+| 3 | Redis Caching | Completed | `Plans/phase-3-redis-caching/` |
 | 4 | Rate Limiting | Remaining | `Plans/phase-4-rate-limiting/` |
 | 5 | API Security | Remaining | `Plans/phase-5-api-security/` |
 | 6 | HTTP Compression | Remaining | `Plans/phase-6-http-compression/` |
@@ -108,7 +108,7 @@ Update this file as phases are completed:
 
 - [x] Phase 0: Baseline performance metrics recorded
 - [x] Phase 1: Pagination implemented, queries optimized
-- [ ] Phase 2: Health endpoints operational
+- [x] Phase 2: Health endpoints operational
 - [x] Phase 3: Redis caching operational
 - [ ] Phase 4: Rate limiting enforced
 - [ ] Phase 5: Security hardening complete
