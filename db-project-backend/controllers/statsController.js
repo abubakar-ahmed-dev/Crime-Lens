@@ -2,8 +2,13 @@
 
 import { Op, fn, col, literal, QueryTypes } from "sequelize";
 import db from "../models/index.js";
+import { CacheKeys, CacheTTL } from "../config/redis.js";
+import { withCache } from "../middleware/cacheDecorator.js";
 
-export const getStatsSummary = async (req, res) => {
+export const getStatsSummary = withCache({
+  keyGenerator: () => CacheKeys.STATS_SUMMARY,
+  ttl: CacheTTL.SHORT, // 5 minutes
+})(async (req, res) => {
   try {
     const { Crime, CrimeType, Zone } = db;
 
@@ -64,14 +69,19 @@ export const getStatsSummary = async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Failed to load summary" });
   }
-};
-
+});
 
 // -----------------------------
 // 📌 PIE CHART — Crimes by Type
 // -----------------------------
 
-export const getCrimesByType = async (req, res) => {
+export const getCrimesByType = withCache({
+  keyGenerator: (req) => {
+    const { start, end } = req.query;
+    return `${CacheKeys.STATS_BY_TYPE}:${start || "all"}:${end || "all"}`;
+  },
+  ttl: CacheTTL.SHORT,
+})(async (req, res) => {
   try {
     const { start, end } = req.query;
 
@@ -116,13 +126,18 @@ export const getCrimesByType = async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Pie chart failed" });
   }
-};
-
+});
 
 // -----------------------------
 // 📌 BAR CHART — Crimes by Zone
 // -----------------------------
-export const getCrimesByZone = async (req, res) => {
+export const getCrimesByZone = withCache({
+  keyGenerator: (req) => {
+    const { start, end } = req.query;
+    return `${CacheKeys.STATS_BY_ZONE}:${start || "all"}:${end || "all"}`;
+  },
+  ttl: CacheTTL.SHORT,
+})(async (req, res) => {
   try {
     const { start, end } = req.query;
 
@@ -167,12 +182,18 @@ export const getCrimesByZone = async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Bar chart failed" });
   }
-};
+});
 
 // -----------------------------
 // 📌 LINE CHART — Monthly Trend
 // -----------------------------
-export const getCrimeTrend = async (req, res) => {
+export const getCrimeTrend = withCache({
+  keyGenerator: (req) => {
+    const { crimeTypeId, start, end } = req.query;
+    return `${CacheKeys.STATS_TREND}:${crimeTypeId || "all"}:${start || "all"}:${end || "all"}`;
+  },
+  ttl: CacheTTL.MEDIUM, // 10 minutes for trend data
+})(async (req, res) => {
   try {
     const { crimeTypeId, start, end } = req.query;
 
@@ -225,4 +246,4 @@ export const getCrimeTrend = async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Line chart failed" });
   }
-};
+});

@@ -5,11 +5,14 @@
  *   /health — process health: the API is running. No dependency calls.
  *   /ready  — dependency health: the API can serve traffic right now.
  *
- * Phase 2 checks PostgreSQL only. Phase 3 (Redis) extends /ready by adding
- * a redis entry to the same checks object — no redesign required.
+ * Phase 3 adds Redis to /ready's checks object. Redis is NOT a readiness
+ * gate: the API degrades gracefully to database queries when Redis is down,
+ * so only the database decides `ready` vs `not_ready`. Redis state is still
+ * reported for monitoring/diagnostics.
  */
 
 import db from "../models/index.js";
+import { redisClient } from "../config/redis.js";
 
 const API_VERSION = "1.0.0";
 
@@ -44,7 +47,7 @@ export const processHealth = (req, res) => {
 export const readinessCheck = async (req, res) => {
   const checks = {
     database: { status: "unknown", responseTime: null },
-    redis: { status: "not_implemented", message: "Redis not yet implemented (Phase 3)" },
+    redis: { status: "unknown", responseTime: null },
   };
 
   let ready = true;
@@ -59,6 +62,29 @@ export const readinessCheck = async (req, res) => {
       status: "down",
       responseTime: Date.now() - started,
       message: "Database connection failed",
+    };
+  }
+
+  // Redis: reported but not gating. If Redis is down the API still serves
+  // traffic from the database (cache-aside degrades gracefully).
+  const redisStarted = Date.now();
+  try {
+    if (redisClient.isOpen) {
+      await redisClient.ping();
+      checks.redis = { status: "up", responseTime: Date.now() - redisStarted };
+    } else {
+      checks.redis = {
+        status: "down",
+        message: "Redis client not connected",
+        responseTime: Date.now() - redisStarted,
+      };
+    }
+  } catch (error) {
+    console.error("Readiness check: redis unreachable:", error.message);
+    checks.redis = {
+      status: "down",
+      message: "Redis ping failed",
+      responseTime: Date.now() - redisStarted,
     };
   }
 

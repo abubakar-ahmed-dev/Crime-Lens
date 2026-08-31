@@ -17,6 +17,7 @@ const optionalEnvVars = [
   'CORS_ORIGINS',
   'PORT',
   'NODE_ENV',
+  'REDIS_URL',
 ];
 
 /**
@@ -40,6 +41,9 @@ export function validateEnv() {
   }
   if (!process.env.CORS_ORIGINS) {
     usingDefaults.push('CORS_ORIGINS (will use default: http://localhost:5173)');
+  }
+  if (!process.env.REDIS_URL) {
+    usingDefaults.push('REDIS_URL (will use default: redis://localhost:6379)');
   }
   // if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
   //   usingDefaults.push('SUPABASE_SERVICE_ROLE_KEY (admin features limited)');
