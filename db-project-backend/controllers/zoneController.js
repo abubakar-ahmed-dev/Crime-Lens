@@ -1,6 +1,8 @@
 // backend/controllers/zoneController.js
 import db from "../models/index.js";
 import { QueryTypes } from "sequelize";
+import { CacheKeys, CacheTTL } from "../config/redis.js";
+import cacheService from "../services/cacheService.js";
 
 export const getZoneSeverity = async (req, res) => {
   try {
@@ -70,9 +72,18 @@ export const getZoneSeverity = async (req, res) => {
 
 export const getAllZones = async (req, res) => {
   try {
+    const cacheKey = CacheKeys.ZONES;
+
+    // Cache-aside: zone boundaries rarely change (1h TTL)
+    const cached = await cacheService.get(cacheKey);
+    if (cached) {
+      res.setHeader("X-Cache", "HIT");
+      return res.json(cached);
+    }
+
     const zones = await db.sequelize.query(
       `
-      SELECT 
+      SELECT
         id,
         name,
         ST_AsGeoJSON(boundary)::json AS boundary
@@ -84,6 +95,8 @@ export const getAllZones = async (req, res) => {
       }
     );
 
+    await cacheService.set(cacheKey, zones, CacheTTL.LONG);
+    res.setHeader("X-Cache", "MISS");
     res.json(zones);
   } catch (err) {
     console.error("Error fetching zones:", err);

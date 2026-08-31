@@ -6,6 +6,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import db from "./models/index.js";
 import { validateEnv } from "./config/envValidation.js";
+import { connectRedis, disconnectRedis } from "./config/redis.js";
 
 import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -62,6 +63,10 @@ const startServer = async () => {
   try {
     await sequelize.authenticate();
     console.log("✅ Database connection established with Supabase.");
+
+    // Redis is best-effort: startup must not fail when it is unavailable
+    await connectRedis();
+
     server = app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
@@ -111,7 +116,12 @@ const gracefulShutdown = async (signal, exitCode = 0) => {
     .then(() => console.log("Database connection pool closed"))
     .catch((error) => console.error("Error closing database pool:", error.message));
 
-  await Promise.all([serverClosed, poolClosed]);
+  // 3. Close Redis (best-effort — must never block or fail shutdown)
+  const redisClosed = disconnectRedis().catch((error) =>
+    console.error("Error closing Redis:", error.message)
+  );
+
+  await Promise.all([serverClosed, poolClosed, redisClosed]);
 
   console.log("Graceful shutdown completed");
   process.exit(exitCode);

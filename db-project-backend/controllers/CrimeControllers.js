@@ -7,6 +7,9 @@ import {
   buildPaginationMeta,
   buildPaginatedResponse,
 } from "../utils/pagination.js";
+import { CacheKeys, CacheTTL } from "../config/redis.js";
+import cacheService from "../services/cacheService.js";
+import { withCacheInvalidation } from "../middleware/cacheDecorator.js";
 const { Crime, CrimeSubmission, CrimeReportsSubmitter, CrimeType, Zone, CrimeMedia } = db;
 
 const parseRequiredCoordinates = (latitude, longitude) => {
@@ -243,6 +246,15 @@ export const getCrimesForMap = async (req, res) => {
 
 export const getAllCrimeTypes = async (req, res) => {
   try {
+    const cacheKey = CacheKeys.CRIME_TYPES;
+
+    // Cache-aside: reference data rarely changes (1h TTL)
+    const cached = await cacheService.get(cacheKey);
+    if (cached) {
+      res.setHeader("X-Cache", "HIT");
+      return res.json(cached);
+    }
+
     const crimeTypes = await sequelize.query(
       `
       SELECT id, name
@@ -254,6 +266,8 @@ export const getAllCrimeTypes = async (req, res) => {
       }
     );
 
+    await cacheService.set(cacheKey, crimeTypes, CacheTTL.LONG);
+    res.setHeader("X-Cache", "MISS");
     res.json(crimeTypes);
   } catch (err) {
     console.error("Error fetching crime types:", err);
@@ -340,7 +354,10 @@ export const getPendingSubmissions = async (req, res) => {
 };
 
 
-export const approveCrimeReport = async (req, res) => {
+export const approveCrimeReport = withCacheInvalidation([
+  CacheKeys.PATTERN_STATS, // approved crimes feed all statistics
+  CacheKeys.PATTERN_CRIMES,
+])(async (req, res) => {
   let t;
   try {
     const { submissionId } = req.params;
@@ -567,9 +584,12 @@ export const approveCrimeReport = async (req, res) => {
       message: "Error approving crime report",
     });
   }
-};
+});
 
-export const rejectCrimeReport = async (req, res) => {
+export const rejectCrimeReport = withCacheInvalidation([
+  CacheKeys.PATTERN_STATS,
+  CacheKeys.PATTERN_CRIMES,
+])(async (req, res) => {
   let t;
   try {
     const { submissionId } = req.params;
@@ -672,11 +692,13 @@ export const rejectCrimeReport = async (req, res) => {
       message: "Error rejecting crime report",
     });
   }
-};
+});
 
 
 
-export const reportCrime = async (req, res) => {
+export const reportCrime = withCacheInvalidation([
+  CacheKeys.PATTERN_STATS,
+])(async (req, res) => {
   let t;
   try {
     const {
@@ -869,7 +891,7 @@ export const reportCrime = async (req, res) => {
     console.error("Report Crime Error:", error);
     res.status(500).json({ success: false, message: "Error adding crime" });
   }
-};
+});
 
 
 export const getAllCrimes = async (req, res) => {
@@ -1063,7 +1085,10 @@ export const getCrimeById = async (req, res) => {
 };
 
 
-export const updateCrime = async (req, res) => {
+export const updateCrime = withCacheInvalidation([
+  CacheKeys.PATTERN_STATS,
+  CacheKeys.PATTERN_CRIMES,
+])(async (req, res) => {
   let t;
   try {
     const { id } = req.params;
@@ -1304,10 +1329,13 @@ export const updateCrime = async (req, res) => {
     console.error("Error updating crime:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
-};
+});
 
 
-export const deleteCrime = async (req, res) => {
+export const deleteCrime = withCacheInvalidation([
+  CacheKeys.PATTERN_STATS,
+  CacheKeys.PATTERN_CRIMES,
+])(async (req, res) => {
   let t;
   try {
     const { id } = req.params;
@@ -1384,4 +1412,4 @@ export const deleteCrime = async (req, res) => {
     console.error("Delete Crime Error:", error);
     res.status(500).json({ success: false, message: "Error deleting crime" });
   }
-};
+});
