@@ -4,7 +4,7 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "nodemon server.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.1",
@@ -22,6 +22,7 @@
     "nodemon": "^3.1.14",
     "pg": "^8.16.3",
     "pg-hstore": "^2.3.4",
+    "rate-limiter-flexible": "^11.2.0",
     "redis": "^6.2.1",
     "sequelize": "^6.37.7"
   }

@@ -18,6 +18,8 @@ const optionalEnvVars = [
   'PORT',
   'NODE_ENV',
   'REDIS_URL',
+  'RATE_LIMIT_ENABLED',
+  'RATE_LIMIT_WHITELIST_IPS',
 ];
 
 /**

@@ -8,6 +8,7 @@ import {
   getAllAgents,updateAgent, deleteAgent
 } from "../controllers/agentController.js";
 import { verifyToken, authorizeRoles } from "../middleware/authMiddleware.js";
+import { applyRateLimit } from "../middleware/rateLimiterMiddleware.js";
 
 const router = express.Router();
 
@@ -21,8 +22,8 @@ router.put("/update/:id", adminOnly, updateAgent);
 // Delete agent
 router.delete("/delete/:id", adminOnly, deleteAgent);
 
-// Public agent registration request
-router.post("/request", agentRequest);
+// Public agent registration request — strict limit (unauthenticated write)
+router.post("/request", applyRateLimit("citizenAuth"), agentRequest);
 
 // Admin-only routes
 router.post("/verify/:requestId", adminOnly, verifyAgentRequest);

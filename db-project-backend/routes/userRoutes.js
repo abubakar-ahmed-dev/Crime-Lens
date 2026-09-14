@@ -7,13 +7,14 @@ import {
   rejectCrimeReport,
 } from "../controllers/CrimeControllers.js";
 import { authorizeCitizen, verifyToken, authorizeRoles } from "../middleware/authMiddleware.js";
+import { applyRateLimit } from "../middleware/rateLimiterMiddleware.js";
 
 const router = express.Router();
 
 const policeOnly = [verifyToken, authorizeRoles("police")];
 
-// Crime Reporting (Citizen)
-router.post("/report-crime", authorizeCitizen, reportCrime);
+// Crime Reporting (Citizen) — per-user write limit
+router.post("/report-crime", authorizeCitizen, applyRateLimit("crimeReport"), reportCrime);
 
 // Crime Verification (Police Officer)
 router.get("/pending", policeOnly, getPendingSubmissions);

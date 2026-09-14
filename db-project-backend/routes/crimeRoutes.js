@@ -2,6 +2,7 @@
 import express from "express";
 import { getCrimeById, getAllCrimeTypes, getAllCrimes, getCrimesForMap, updateCrime, deleteCrime, } from "../controllers/CrimeControllers.js";
 import { verifyToken, authorizeRoles, optionalAuth } from "../middleware/authMiddleware.js";
+import { applyRateLimit } from "../middleware/rateLimiterMiddleware.js";
 
 const router = express.Router();
 const policeOnly = [verifyToken, authorizeRoles("police")];
@@ -9,6 +10,7 @@ const policeOnly = [verifyToken, authorizeRoles("police")];
 router.get(
   "/",
   optionalAuth,
+  applyRateLimit("publicAPI"),
   getCrimesForMap
 );
 // Query params: mode, crimeType, zoneId, startDate, endDate, lat, lng, radius
@@ -26,6 +28,7 @@ router.get(
 
 router.get(
   "/types",
+  applyRateLimit("publicAPI"),
   getAllCrimeTypes
 );
 
@@ -33,12 +36,13 @@ router.get(
 router.get("/get-crime/:id", policeOnly, getCrimeById);
 
 
-router.put("/update/:id", policeOnly, updateCrime);
+router.put("/update/:id", policeOnly, applyRateLimit("writeAction"), updateCrime);
 
 
 router.delete(
   "/delete/:id",
   policeOnly,
+  applyRateLimit("writeAction"),
   deleteCrime
 );
 
