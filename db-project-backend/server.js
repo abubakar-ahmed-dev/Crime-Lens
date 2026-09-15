@@ -21,14 +21,25 @@ import crimeRoutes from "./routes/crimeRoutes.js";
 import citizenAuthRoutes from "./routes/citizenAuthRoutes.js";
 import mediaRoutes from "./routes/mediaRoutes.js";
 import healthRoutes from "./routes/healthRoutes.js";
-import { queryLoggerMiddleware } from "./middleware/queryLogger.js";
+import { logger, httpLogger } from "./config/logger.js";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 // Validate environment variables before starting the server
 validateEnv();
 
 const app = express();
+
+// ---------------------------------------------------------------------------
+// Structured logging (Phase 7) — first, so every request is timed end-to-end.
+// pino-http attaches req.log (with request_id) and emits one completion line
+// per request; health endpoints are excluded from auto-logging.
+// ---------------------------------------------------------------------------
+app.use(httpLogger);
+app.use((req, res, next) => {
+  if (req.id) res.setHeader("X-Request-ID", req.id);
+  next();
+});
 
 // ---------------------------------------------------------------------------
 // Security headers (Phase 5)
@@ -83,8 +94,6 @@ app.use(compression({
   },
 }));
 
-app.use(queryLoggerMiddleware); // dev-only slow-request logging (>100ms)
-
 // Health routes mounted FIRST so /health and /ready stay responsive
 // regardless of downstream route/middleware issues
 app.use("/api", healthRoutes);
@@ -107,16 +116,16 @@ let server;
 const startServer = async () => {
   try {
     await sequelize.authenticate();
-    console.log("✅ Database connection established with Supabase.");
+    logger.info("Database connection established with Supabase");
 
     // Redis is best-effort: startup must not fail when it is unavailable
     await connectRedis();
 
     server = app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+      logger.info({ port: PORT, environment: process.env.NODE_ENV || "development" }, "Server started");
     });
   } catch (error) {
-    console.error("❌ Unable to connect to the database:", error.message);
+    logger.error({ err: error }, "Unable to connect to the database");
     process.exit(1);
   }
 };
@@ -136,12 +145,12 @@ const gracefulShutdown = async (signal, exitCode = 0) => {
   if (shuttingDown) return; // ignore repeated signals while already shutting down
   shuttingDown = true;
 
-  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  logger.info(`${signal} received. Starting graceful shutdown`);
 
   // Arm the force-exit guard for THIS shutdown only (unref'd so it can
   // never keep the event loop alive during normal operation)
   const forceExit = setTimeout(() => {
-    console.error(`Graceful shutdown timed out after ${SHUTDOWN_TIMEOUT_MS}ms; forcing exit`);
+    logger.error(`Graceful shutdown timed out after ${SHUTDOWN_TIMEOUT_MS}ms; forcing exit`);
     process.exit(1);
   }, SHUTDOWN_TIMEOUT_MS);
   forceExit.unref();
@@ -150,7 +159,7 @@ const gracefulShutdown = async (signal, exitCode = 0) => {
   const serverClosed = new Promise((resolve) => {
     if (!server) return resolve();
     server.close(() => {
-      console.log("HTTP server closed");
+      logger.info("HTTP server closed");
       resolve();
     });
   });
@@ -158,17 +167,17 @@ const gracefulShutdown = async (signal, exitCode = 0) => {
   // 2. Close the database connection pool
   const poolClosed = sequelize
     .close()
-    .then(() => console.log("Database connection pool closed"))
-    .catch((error) => console.error("Error closing database pool:", error.message));
+    .then(() => logger.info("Database connection pool closed"))
+    .catch((error) => logger.error({ err: error }, "Error closing database pool"));
 
   // 3. Close Redis (best-effort — must never block or fail shutdown)
   const redisClosed = disconnectRedis().catch((error) =>
-    console.error("Error closing Redis:", error.message)
+    logger.error({ err: error }, "Error closing Redis")
   );
 
   await Promise.all([serverClosed, poolClosed, redisClosed]);
 
-  console.log("Graceful shutdown completed");
+  logger.info("Graceful shutdown completed");
   process.exit(exitCode);
 };
 
@@ -176,12 +185,12 @@ process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 process.on("uncaughtException", (err) => {
-  console.error("Uncaught exception:", err);
+  logger.error({ err }, "Uncaught exception");
   gracefulShutdown("UNCAUGHT_EXCEPTION", 1);
 });
 
 process.on("unhandledRejection", (err) => {
-  console.error("Unhandled promise rejection:", err);
+  logger.error({ err }, "Unhandled promise rejection");
   gracefulShutdown("UNHANDLED_REJECTION", 1);
 });
 

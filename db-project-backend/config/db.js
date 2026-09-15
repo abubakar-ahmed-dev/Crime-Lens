@@ -1,7 +1,7 @@
 import { Sequelize } from "sequelize";
 import dotenv from "dotenv";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 // Connection pool is env-driven. Defaults apply to ANY environment (including
 // when NODE_ENV is unset, e.g. local `npm start`): max 10 / min 0.

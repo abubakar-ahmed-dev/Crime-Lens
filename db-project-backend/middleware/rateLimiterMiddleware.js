@@ -79,7 +79,10 @@ export const applyRateLimit = (limiterType) => {
     } catch (rejection) {
       if (!(rejection instanceof RateLimiterRes)) {
         // Store failure beyond the insurance limiter — fail open, keep serving
-        console.error(`Rate limiter store error (${limiterType}):`, rejection?.message || rejection);
+        req.log.error(
+          { err: rejection, limiterType },
+          "Rate limiter store error — failing open"
+        );
         return next();
       }
 

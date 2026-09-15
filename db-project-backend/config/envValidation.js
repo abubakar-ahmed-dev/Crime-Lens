@@ -5,6 +5,8 @@
  * Throws an error if any required variables are missing.
  */
 
+import { logger } from "./logger.js";
+
 const requiredEnvVars = [
   'DATABASE_URL',
   'SUPABASE_URL',
@@ -20,6 +22,7 @@ const optionalEnvVars = [
   'REDIS_URL',
   'RATE_LIMIT_ENABLED',
   'RATE_LIMIT_WHITELIST_IPS',
+  'LOG_LEVEL',
 ];
 
 /**
@@ -47,6 +50,9 @@ export function validateEnv() {
   if (!process.env.REDIS_URL) {
     usingDefaults.push('REDIS_URL (will use default: redis://localhost:6379)');
   }
+  if (!process.env.LOG_LEVEL) {
+    usingDefaults.push('LOG_LEVEL (will use default: debug dev / info production)');
+  }
   // if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
   //   usingDefaults.push('SUPABASE_SERVICE_ROLE_KEY (admin features limited)');
   // }
@@ -61,12 +67,12 @@ export function validateEnv() {
 
   // Warn about defaults
   if (usingDefaults.length > 0) {
-    console.warn('⚠️  Using default values for:\n  - ' + usingDefaults.join('\n  - '));
+    logger.warn({ defaults: usingDefaults }, 'Using default environment values');
   }
 
   // Log validation success (only in development)
   if (process.env.NODE_ENV !== 'production') {
-    console.log('✅ Environment variables validated successfully');
+    logger.debug('Environment variables validated successfully');
   }
 }
 

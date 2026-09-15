@@ -234,7 +234,7 @@ export const getCrimesForMap = async (req, res) => {
     return res.json(formatted);
 
   } catch (err) {
-    console.error("Map Crime Error:", err);
+    req.log.error({ err }, "Map Crime Error");
     // Preserve legacy error shape in unpaginated mode; envelope in paginated mode
     if (req.query.page !== undefined || req.query.limit !== undefined) {
       res.status(500).json({ success: false, message: "Internal server error" });
@@ -270,7 +270,7 @@ export const getAllCrimeTypes = async (req, res) => {
     res.setHeader("X-Cache", "MISS");
     res.json(crimeTypes);
   } catch (err) {
-    console.error("Error fetching crime types:", err);
+    req.log.error({ err }, "Error fetching crime types");
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -345,7 +345,7 @@ export const getPendingSubmissions = async (req, res) => {
 
     res.status(200).json({ success: true, data: crimesWithMedia });
   } catch (error) {
-    console.error("Fetch Pending Crimes Error:", error);
+    req.log.error({ err: error }, "Fetch Pending Crimes Error");
     res.status(500).json({
       success: false,
       message: "Error fetching pending submissions",
@@ -578,7 +578,7 @@ export const approveCrimeReport = withCacheInvalidation([
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("Approve Crime Error:", error);
+    req.log.error({ err: error }, "Approve Crime Error");
     res.status(500).json({
       success: false,
       message: "Error approving crime report",
@@ -686,7 +686,7 @@ export const rejectCrimeReport = withCacheInvalidation([
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("Reject Crime Error:", error);
+    req.log.error({ err: error }, "Reject Crime Error");
     res.status(500).json({
       success: false,
       message: "Error rejecting crime report",
@@ -888,7 +888,7 @@ export const reportCrime = withCacheInvalidation([
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("Report Crime Error:", error);
+    req.log.error({ err: error }, "Report Crime Error");
     res.status(500).json({ success: false, message: "Error adding crime" });
   }
 });
@@ -999,7 +999,7 @@ export const getAllCrimes = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Error fetching crimes from view:", error);
+    req.log.error({ err: error }, "Error fetching crimes from view");
     return res.status(500).json({
       success: false,
       message: "Error fetching crime records"
@@ -1079,7 +1079,7 @@ export const getCrimeById = async (req, res) => {
 
     res.json({ success: true, data: crime });
   } catch (err) {
-    console.error("Error fetching crime:", err);
+    req.log.error({ err }, "Error fetching crime");
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -1326,7 +1326,7 @@ export const updateCrime = withCacheInvalidation([
     res.json({ success: true, message: "Crime updated successfully" });
   } catch (err) {
     if (t && !t.finished) await t.rollback();
-    console.error("Error updating crime:", err);
+    req.log.error({ err }, "Error updating crime");
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
@@ -1409,7 +1409,7 @@ export const deleteCrime = withCacheInvalidation([
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("Delete Crime Error:", error);
+    req.log.error({ err: error }, "Delete Crime Error");
     res.status(500).json({ success: false, message: "Error deleting crime" });
   }
 });

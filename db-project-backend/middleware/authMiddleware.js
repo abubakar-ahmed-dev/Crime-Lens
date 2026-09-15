@@ -98,7 +98,7 @@ export const authorizeCitizen = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error("Citizen auth error:", error);
+    req.log.error({ err: error }, "Citizen auth error");
     return res.status(401).json({
       success: false,
       error: "Unauthorized",
