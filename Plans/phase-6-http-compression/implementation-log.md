@@ -1,6 +1,6 @@
 # Phase 6 — HTTP Compression: Implementation Log
 
-## Status: Implemented & Validated (API level; Playwright pending restart)
+## Status: Implemented & Validated (API + browser)
 
 ## What Was Implemented
 
@@ -70,11 +70,31 @@ Latency (serial curl, warm cache, dev machine):
     → 400, bad login shape → 400); 401s preserved on report-crime / update
   - CORS `exposedHeaders` untouched (no new headers this phase)
 
+## Playwright MCP Validation (PASS)
+
+Against the user's restarted :5001 backend + :5173 frontend:
+
+- **Map**: renders with markers over the running backend
+- **Statistics**: 3 recharts wrappers render, page content populated
+- **Login**: role selection → wrong-credentials flow reaches backend, error
+  message rendered in form
+- No new console errors beyond the expected 401/404 XHR noise
+
+### Browser transport finding (not a defect)
+
+Playwright's managed Chromium requests `Accept-Encoding: identity` (its
+network stack suppresses compression so bodies stay inspectable), and the
+server correctly honored that: responses arrived uncompressed (raw
+`Content-Length`, no `Content-Encoding`) — proof the negotiation is
+per-client, not a global switch. Chrome-in-the-wild behavior was verified
+with curl replaying Chrome's exact header set
+(`Accept-Encoding: gzip, deflate, br, zstd`) → `Content-Encoding: br`,
+1173 B. `zstd` token in the client header does not break negotiation.
+Consequence: compressed transfer itself is verified via curl; Playwright
+verifies functional parity across both transports.
+
 ## Not Executed (with reason)
 
-- Playwright: pending — requires the user to restart the :5001 instance onto
-  this code; will verify map/statistics/login flows over compressed
-  transport (browsers send `Accept-Encoding: gzip, deflate, br`).
 - k6: deferred to phase 15 (final scalability testing); no load claims made.
 - ESLint / TypeScript: backend has no ESLint config and is plain JS
   (pre-existing gap).
