@@ -9,6 +9,11 @@ import dotenv from "dotenv";
 import db from "./models/index.js";
 import { validateEnv } from "./config/envValidation.js";
 import { connectRedis, disconnectRedis } from "./config/redis.js";
+import {
+  metricsEndpoint,
+  metricsMiddleware,
+  startMetricsUpdater,
+} from "./config/prometheus.js";
 import { sanitizeInput } from "./middleware/validationMiddleware.js";
 
 import adminRoutes from "./routes/adminRoutes.js";
@@ -94,6 +99,15 @@ app.use(compression({
   },
 }));
 
+// ---------------------------------------------------------------------------
+// Prometheus metrics (Phase 8)
+// /metrics serves the register only (no I/O) — gauges refresh on the 30s
+// updater. Mounted at root, unauthenticated; network-level allow-listing is
+// deferred to the Nginx/Cloudflare phases. Excluded from request logging.
+// ---------------------------------------------------------------------------
+app.use(metricsMiddleware());
+app.get("/metrics", metricsEndpoint);
+
 // Health routes mounted FIRST so /health and /ready stay responsive
 // regardless of downstream route/middleware issues
 app.use("/api", healthRoutes);
@@ -120,6 +134,9 @@ const startServer = async () => {
 
     // Redis is best-effort: startup must not fail when it is unavailable
     await connectRedis();
+
+    // 30s refresher for pool/cache/health gauges (unref'd, no scrape I/O)
+    startMetricsUpdater();
 
     server = app.listen(PORT, () => {
       logger.info({ port: PORT, environment: process.env.NODE_ENV || "development" }, "Server started");

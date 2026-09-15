@@ -8,6 +8,7 @@
 
 import { redisClient, CacheTTL } from "../config/redis.js";
 import { logger } from "../config/logger.js";
+import { redisOperations } from "../config/prometheus.js";
 
 class CacheService {
   /**
@@ -20,10 +21,12 @@ class CacheService {
       if (!redisClient.isOpen) return null;
 
       const value = await redisClient.get(key);
+      redisOperations.labels({ operation: "get", status: "ok" }).inc();
       if (!value) return null;
 
       return JSON.parse(value);
     } catch (error) {
+      redisOperations.labels({ operation: "get", status: "fail" }).inc();
       logger.error({ err: error, key }, "Cache get error");
       return null;
     }
@@ -41,8 +44,10 @@ class CacheService {
       if (!redisClient.isOpen) return false;
 
       await redisClient.setEx(key, ttl, JSON.stringify(value));
+      redisOperations.labels({ operation: "set", status: "ok" }).inc();
       return true;
     } catch (error) {
+      redisOperations.labels({ operation: "set", status: "fail" }).inc();
       logger.error({ err: error, key }, "Cache set error");
       return false;
     }
@@ -58,8 +63,10 @@ class CacheService {
       if (!redisClient.isOpen) return false;
 
       await redisClient.del(key);
+      redisOperations.labels({ operation: "delete", status: "ok" }).inc();
       return true;
     } catch (error) {
+      redisOperations.labels({ operation: "delete", status: "fail" }).inc();
       logger.error({ err: error, key }, "Cache delete error");
       return false;
     }
@@ -84,8 +91,10 @@ class CacheService {
         await redisClient.del(batch);
         deleted += batch.length;
       }
+      redisOperations.labels({ operation: "deletePattern", status: "ok" }).inc();
       return deleted > 0;
     } catch (error) {
+      redisOperations.labels({ operation: "deletePattern", status: "fail" }).inc();
       logger.error({ err: error, pattern }, "Cache pattern delete error");
       return false;
     }

@@ -68,9 +68,13 @@ export const httpLogger = pinoHttp({
   customAttributeKeys: {
     reqId: "request_id",
   },
-  // Polled endpoints must not flood the log
+  // Polled endpoints must not flood the log (health probes, metrics scrapes)
   autoLogging: {
-    ignore: (req) => req.url === "/api/health" || req.url === "/health" || req.url === "/ready",
+    ignore: (req) =>
+      req.url === "/api/health" ||
+      req.url === "/health" ||
+      req.url === "/ready" ||
+      req.url.startsWith("/metrics"),
   },
 });
 

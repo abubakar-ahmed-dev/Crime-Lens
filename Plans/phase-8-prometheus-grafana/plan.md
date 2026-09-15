@@ -2,626 +2,226 @@
 
 ## Objective
 
-Implement comprehensive application monitoring with Prometheus metrics collection and Grafana visualization for real-time insights into system performance and health.
+Expose Prometheus metrics from the API (HTTP latency/errors, DB pool, Redis
+cache, business events, component health), ship a real Prometheus scrape
+config and an importable Grafana dashboard, and verify everything against a
+live scrape — without adding per-request I/O or unbounded label cardinality.
 
-## What We'll Implement
+## Audit Corrections vs Previous Plan (why this rewrite)
 
-1. **Prometheus client** for metrics collection
-2. **Custom metrics** for business operations
-3. **HTTP middleware metrics** (request duration, count, error rate)
-4. **Database metrics** (connection pool, query time)
-5. **Redis metrics** (cache hit rate, operations)
-6. **Grafana dashboards** for visualization
+1. **`activeUsers` gauge was semantically broken** — `.inc()` on every
+   request with no `dec()` anywhere: a counter pretending to be a gauge that
+   only ever grows. "Active users" needs session tracking we do not have.
+   Dropped (CLAUDE.md §12: no metrics that are not useful).
+2. **Double `collectDefaultMetrics`** — the plan called it once, then again
+   under an `ENABLE_GC_METRICS` flag with a prefix, doubling node metric
+   families. GC metrics are already part of prom-client's defaults. One
+   call; flag dropped.
+3. **DB pool fields don't exist** — Sequelize 6 uses the `tarn` pool:
+   `pool.used / available / waiting / max`. The plan read
+   `pool.active / idle / total` → all `undefined` → zeros forever. Fixed
+   labels: `used`, `available`, `waiting`, `max`.
+4. **`dbQueryDuration` histogram with a `table` label was not implementable
+   as written** — the backend is raw-SQL-heavy; there is no reliable way to
+   derive a table label, and instrumenting every `sequelize.query` means
+   wrapping ~100 call sites or deep monkey-patching. Dropped this phase
+   (documented as a candidate when a query layer/service exists).
+5. **`redisOperations` counter was defined but never incremented** — dead
+   metric. Kept but WIRED in `cacheService` (get/set/delete/deletePattern ×
+   ok/fail).
+6. **`cacheHitRate` with fake `cache_type` labels** — set the SAME global
+   Redis INFO hit-rate under two invented labels. One honest gauge, no
+   label (global Redis cache hit rate from `keyspace_hits/(hits+misses)`).
+7. **Scrape-time dependency hammering** — `metricsEndpoint` ran
+   `sequelize.authenticate()` + Redis `PING` on EVERY scrape (Prometheus:
+   every 15 s). Component-health gauges now refresh on a 30 s `setInterval`
+   (unref'd) inside the metrics module; `/metrics` serves the register with
+   no I/O of its own.
+8. **Cardinality hazard in `req.route?.path`** — Express 5 route objects are
+   not reliably present at `finish`; fallback was `req.path`, i.e. raw paths
+   with IDs (`/api/crimes/update/123`) → unbounded label values. Route label
+   = `req.baseUrl + req.route.path` when a route matched, else `unmatched`.
+9. **Plan referenced `detailedHealth`, which does not exist** (phase 2 built
+   `processHealth`/`readinessCheck`). Step removed.
+10. **`/metrics` must never be logged-spammed or rate-limited** — added to
+    pino-http `autoLogging.ignore` and excluded from the metrics middleware
+    and rate limiters (a 429 or 1 line/15 s noise for a scraper is wrong).
+11. **Ops configs relocated** — `prometheus.yml` and the Grafana dashboard
+    do not belong inside `backend/config/`. New top-level `infra/` directory:
+    `infra/prometheus/prometheus.yml`,
+    `infra/grafana/provisioning/...` (datasource + dashboard auto-provision
+    so a single `docker run -v` mount gives a working Grafana), and
+    `infra/grafana/dashboards/crimelens-api.json` as a REAL importable
+    dashboard (schemaVersion, gridPos, datasource refs — the plan's sketch
+    was not importable).
+12. **Controller snippets were stale** — the plan's business-metric edits
+    rewrote `reportCrime`/`approveCrimeReport` without the existing
+    `withCacheInvalidation` decorators and referenced the pre-phase-7
+    `console.error` lines. Implementation inserts `.inc()` calls into the
+    real decorated handlers; no rewrites.
 
 ## Implementation Steps
 
-### Step 1: Install Monitoring Dependencies
+### Step 1: Install
 
 ```bash
 npm install prom-client
 ```
 
-### Step 2: Create Prometheus Configuration
+(prom-client v15.x; nothing else — Grafana/Prometheus run as containers)
 
-**File: `db-project-backend/config/prometheus.js`**
+### Step 2: `db-project-backend/config/prometheus.js` (new)
 
-```javascript
-import promClient from 'prom-client';
-import { logger } from './logger.js';
+- `register` (prom-client Registry) + ONE `collectDefaultMetrics({ register })`
+- HTTP metrics (all with `crimelens_` prefix, `registers: [register]`):
+  - `crimelens_http_request_duration_seconds` Histogram
+    labels `{ method, route, status_code }`, buckets
+    `[0.005..10]`
+  - `crimelens_http_requests_total` Counter, same labels
+  - `crimelens_http_errors_total` Counter (status ≥ 400), same labels
+- Redis:
+  - `crimelens_redis_operations_total` Counter `{ operation, status }` —
+    incremented in `services/cacheService.js` (get/set/delete/deletePattern,
+    ok/fail)
+  - `crimelens_cache_hit_rate` Gauge — Redis INFO keyspace hit ratio
+- DB pool: `crimelens_db_pool_connections` Gauge `{ state }` =
+  used/available/waiting/max from Sequelize's tarn pool (read directly, no
+  I/O)
+- Business:
+  - `crimelens_crimes_reported_total` Counter `{ status, zone_id }`
+    (submitted/failed) — inc in `reportCrime` after commit / in catch
+  - `crimelens_crimes_verified_total` Counter `{ decision }`
+    (approved/rejected/failed) — inc in `approveCrimeReport` /
+    `rejectCrimeReport`
+- Health: `crimelens_system_health` Gauge `{ component }` (database, redis,
+  api) — refreshed by a 30 s unref'd interval that runs
+  `sequelize.authenticate()` + Redis `PING`; interval started explicitly
+  from `server.js` (`startMetricsUpdater()`), never at import
+- Route-label helper: `req.route ? \`${req.baseUrl || ''}${req.route.path}\``
+  else `unmatched`
+- `metricsMiddleware` — observes duration, incs request/error counters on
+  `res.finish`; skips `/metrics` and `/api/health*`
+- `metricsEndpoint` — `register.metrics()` only (Content-Type set), no I/O
 
-/**
- * Prometheus metrics configuration
- */
-
-// Create a Registry which registers the default metrics
-export const register = new promClient.Registry();
-
-// Add default metrics (CPU, memory, event loop lag, etc.)
-promClient.collectDefaultMetrics({ register });
-
-// Enable GC metrics
-if (process.env.ENABLE_GC_METRICS === 'true') {
-  promClient.collectDefaultMetrics({
-    register,
-    prefix: 'node_',
-  });
-}
-
-/**
- * Custom metrics for CrimeLens
- */
-
-// HTTP request metrics
-export const httpRequestDuration = new promClient.Histogram({
-  name: 'crimelens_http_request_duration_seconds',
-  help: 'Duration of HTTP requests in seconds',
-  labelNames: ['method', 'route', 'status_code'],
-  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
-  registers: [register],
-});
-
-export const httpRequestCount = new promClient.Counter({
-  name: 'crimelens_http_requests_total',
-  help: 'Total number of HTTP requests',
-  labelNames: ['method', 'route', 'status_code'],
-  registers: [register],
-});
-
-export const httpErrors = new promClient.Counter({
-  name: 'crimelens_http_errors_total',
-  help: 'Total number of HTTP errors',
-  labelNames: ['method', 'route', 'status_code'],
-  registers: [register],
-});
-
-// Database metrics
-export const dbQueryDuration = new promClient.Histogram({
-  name: 'crimelens_db_query_duration_seconds',
-  help: 'Duration of database queries in seconds',
-  labelNames: ['operation', 'table'],
-  buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5],
-  registers: [register],
-});
-
-export const dbConnections = new promClient.Gauge({
-  name: 'crimelens_db_connections',
-  help: 'Number of database connections',
-  labelNames: ['state'], // active, idle, total
-  registers: [register],
-});
-
-// Redis metrics
-export const redisOperations = new promClient.Counter({
-  name: 'crimelens_redis_operations_total',
-  help: 'Total number of Redis operations',
-  labelNames: ['operation', 'status'],
-  registers: [register],
-});
-
-export const cacheHitRate = new promClient.Gauge({
-  name: 'crimelens_cache_hit_rate',
-  help: 'Cache hit rate percentage',
-  labelNames: ['cache_type'],
-  registers: [register],
-});
-
-// Business metrics
-export const crimesReported = new promClient.Counter({
-  name: 'crimelens_crimes_reported_total',
-  help: 'Total number of crimes reported',
-  labelNames: ['status', 'zone_id'],
-  registers: [register],
-});
-
-export const crimesVerified = new promClient.Counter({
-  name: 'crimelens_crimes_verified_total',
-  help: 'Total number of crimes verified',
-  labelNames: ['decision'], // approved, rejected
-  registers: [register],
-});
-
-export const activeUsers = new promClient.Gauge({
-  name: 'crimelens_active_users',
-  help: 'Number of active users',
-  labelNames: ['role'],
-  registers: [register],
-});
-
-// System metrics
-export const systemHealth = new promClient.Gauge({
-  name: 'crimelens_system_health',
-  help: 'System health status (1=healthy, 0=unhealthy)',
-  labelNames: ['component'], // database, redis, api
-  registers: [register],
-});
-
-/**
- * Metrics middleware factory
- */
-export const metricsMiddleware = (options = {}) => {
-  const { excludePaths = ['/health', '/ready', '/metrics'] } = options;
-
-  return (req, res, next) => {
-    const start = Date.now();
-    
-    // Track active users
-    if (req.user) {
-      activeUsers.labels({ role: req.user.role }).inc();
-    }
-
-    res.on('finish', () => {
-      const duration = (Date.now() - start) / 1000;
-      const route = req.route?.path || req.path;
-
-      httpRequestDuration
-        .labels({ method: req.method, route, status_code: res.statusCode })
-        .observe(duration);
-
-      httpRequestCount
-        .labels({ method: req.method, route, status_code: res.statusCode })
-        .inc();
-
-      if (res.statusCode >= 400) {
-        httpErrors
-          .labels({ method: req.method, route, status_code: res.statusCode })
-          .inc();
-      }
-    });
-
-    next();
-  };
-};
-
-/**
- * Update health metrics
- */
-export const updateHealthMetrics = async (db, redisClient) => {
-  // Database health
-  try {
-    await db.sequelize.authenticate();
-    systemHealth.labels({ component: 'database' }).set(1);
-  } catch {
-    systemHealth.labels({ component: 'database' }).set(0);
-  }
-
-  // Redis health
-  if (redisClient && redisClient.isOpen) {
-    try {
-      await redisClient.ping();
-      systemHealth.labels({ component: 'redis' }).set(1);
-    } catch {
-      systemHealth.labels({ component: 'redis' }).set(0);
-    }
-  } else {
-    systemHealth.labels({ component: 'redis' }).set(0);
-  }
-
-  // API health
-  systemHealth.labels({ component: 'api' }).set(1);
-};
-
-/**
- * Update database connection metrics
- */
-export const updateDbMetrics = async (sequelize) => {
-  try {
-    const pool = sequelize.connectionManager.pool;
-    
-    if (pool) {
-      dbConnections.labels({ state: 'active' }).set(pool.active || 0);
-      dbConnections.labels({ state: 'idle' }).set(pool.idle || 0);
-      dbConnections.labels({ state: 'total' }).set(pool.max || 0);
-    }
-  } catch (error) {
-    logger.error('Error updating DB metrics', { error: error.message });
-  }
-};
-
-/**
- * Update cache metrics
- */
-export const updateCacheMetrics = async (cacheService) => {
-  try {
-    const metrics = await cacheService.getMetrics();
-    
-    if (metrics.connected) {
-      const hitRate = parseFloat(metrics.hitRate) || 0;
-      cacheHitRate.labels({ cache_type: 'statistics' }).set(hitRate);
-      cacheHitRate.labels({ cache_type: 'reference_data' }).set(hitRate);
-    }
-  } catch (error) {
-    logger.error('Error updating cache metrics', { error: error.message });
-  }
-};
-
-/**
- * Metrics endpoint
- */
-export const metricsEndpoint = async (req, res) => {
-  try {
-    // Update health metrics before serving
-    const db = (await import('../models/index.js')).default;
-    const { redisClient } = await import('./redis.js');
-    const cacheService = (await import('../services/cacheService.js')).default;
-
-    await updateHealthMetrics(db, redisClient);
-    await updateDbMetrics(db.sequelize);
-    await updateCacheMetrics(cacheService);
-
-    res.set('Content-Type', register.contentType);
-    res.end(await register.metrics());
-  } catch (error) {
-    logger.error('Metrics endpoint error', { error: error.message });
-    res.status(500).end('Error generating metrics');
-  }
-};
-
-export default {
-  register,
-  httpRequestDuration,
-  httpRequestCount,
-  httpErrors,
-  dbQueryDuration,
-  dbConnections,
-  redisOperations,
-  cacheHitRate,
-  crimesReported,
-  crimesVerified,
-  activeUsers,
-  systemHealth,
-  metricsMiddleware,
-  metricsEndpoint,
-  updateHealthMetrics,
-};
-```
-
-### Step 3: Add Metrics Route
-
-**File: `db-project-backend/server.js`**
+### Step 3: `server.js` wiring
 
 ```javascript
-import { metricsEndpoint, metricsMiddleware } from './config/prometheus.js';
-
-// Add metrics endpoint (before other routes)
-app.get('/metrics', metricsEndpoint);
-
-// Add metrics middleware to track all requests
-app.use(metricsMiddleware({ excludePaths: ['/health', '/ready', '/metrics'] }));
+app.get("/metrics", metricsEndpoint);   // BEFORE httpLogger? No — after, but
+                                        // excluded from autoLogging + metrics
+app.use(metricsMiddleware());
+startMetricsUpdater();                  // 30 s health-gauge refresh, unref'd
 ```
 
-### Step 4: Add Business Metrics to Controllers
+- Mount `/metrics` at app root (no `/api` prefix), unauthenticated for now;
+  hardening (network-level allow-list) documented for the Nginx/Cloudflare
+  phases
+- pino-http `autoLogging.ignore` extended with `/metrics`
+- Rate limiters untouched (none apply at root level — verify a scrape never
+  hits `crimelens:rl:*`)
 
-**File: `db-project-backend/controllers/CrimeControllers.js`**
+### Step 4: Grafana + Prometheus configs (new `infra/` tree)
 
-```javascript
-import { crimesReported, crimesVerified } from '../config/prometheus.js';
-
-export const reportCrime = async (req, res) => {
-  try {
-    // ... existing implementation
-
-    await t.commit();
-
-    // Track metric
-    crimesReported.labels({ 
-      status: 'submitted', 
-      zone_id: zone || 'unknown' 
-    }).inc();
-
-    res.status(201).json({
-      success: true,
-      message: "Crime report submitted successfully",
-      data: {
-        crime: { ...newCrime },
-        submission: newCrimeSubmission,
-        media: createdMedia,
-      },
-    });
-  } catch (error) {
-    if (t && !t.finished) await t.rollback();
-    
-    crimesReported.labels({ status: 'failed', zone_id: 'unknown' }).inc();
-    
-    console.error("Report Crime Error:", error);
-    res.status(500).json({ success: false, message: "Error adding crime" });
-  }
-};
-
-export const approveCrimeReport = async (req, res) => {
-  try {
-    // ... existing implementation
-
-    await t.commit();
-
-    // Track metric
-    crimesVerified.labels({ decision: 'approved' }).inc();
-
-    res.status(200).json({
-      success: true,
-      message: "Crime report approved and verified",
-      data: {
-        submissionId: submissionId,
-        crimeId: updatedCrime.id,
-        status: updatedCrime.status,
-      },
-    });
-  } catch (error) {
-    if (t && !t.finished) await t.rollback();
-    
-    crimesVerified.labels({ decision: 'failed' }).inc();
-    
-    console.error("Approve Crime Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error approving crime report",
-    });
-  }
-};
-
-export const rejectCrimeReport = async (req, res) => {
-  try {
-    // ... existing implementation
-
-    await t.commit();
-
-    // Track metric
-    crimesVerified.labels({ decision: 'rejected' }).inc();
-
-    res.status(200).json({
-      success: true,
-      message: "Crime report rejected",
-      data: { crimeId: updatedCrime.id, status: updatedCrime.status },
-    });
-  } catch (error) {
-    if (t && !t.finished) await t.rollback();
-    
-    crimesVerified.labels({ decision: 'failed' }).inc();
-    
-    console.error("Reject Crime Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error rejecting crime report",
-    });
-  }
-};
+```
+infra/
+├── prometheus/prometheus.yml          # 15s scrape of localhost:5001 (host.docker.internal note for Docker Desktop)
+└── grafana/
+    ├── provisioning/datasources/prometheus.yml   # auto-provisioned datasource
+    ├── provisioning/dashboards/dashboards.yml    # auto-provisioned dashboard loader
+    └── dashboards/crimelens-api.json             # importable: request rate, p50/p95/p99, error rate,
+                                                   # pool gauges, cache hit rate, redis ops, crimes reported,
+                                                   # verification decisions, system health stat
 ```
 
-### Step 5: Create Grafana Dashboards
-
-**File: `db-project-backend/config/grafana/dashboards/crimelens-dashboard.json`**
-
-```json
-{
-  "dashboard": {
-    "title": "CrimeLens API Dashboard",
-    "tags": ["crimelens", "api"],
-    "timezone": "browser",
-    "panels": [
-      {
-        "title": "Request Rate",
-        "targets": [
-          {
-            "expr": "rate(crimelens_http_requests_total[5m])"
-          }
-        ],
-        "type": "graph"
-      },
-      {
-        "title": "Response Time (p95)",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, rate(crimelens_http_request_duration_seconds_bucket[5m]))"
-          }
-        ],
-        "type": "graph"
-      },
-      {
-        "title": "Error Rate",
-        "targets": [
-          {
-            "expr": "rate(crimelens_http_errors_total[5m]) / rate(crimelens_http_requests_total[5m])"
-          }
-        ],
-        "type": "graph"
-      },
-      {
-        "title": "Database Query Duration",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, rate(crimelens_db_query_duration_seconds_bucket[5m]))"
-          }
-        ],
-        "type": "graph"
-      },
-      {
-        "title": "Database Connections",
-        "targets": [
-          {
-            "expr": "crimelens_db_connections"
-          }
-        ],
-        "type": "graph"
-      },
-      {
-        "title": "Cache Hit Rate",
-        "targets": [
-          {
-            "expr": "crimelens_cache_hit_rate"
-          }
-        ],
-        "type": "gauge"
-      },
-      {
-        "title": "Crimes Reported (Hourly)",
-        "targets": [
-          {
-            "expr": "rate(crimelens_crimes_reported_total[1h])"
-          }
-        ],
-        "type": "graph"
-      },
-      {
-        "title": "System Health",
-        "targets": [
-          {
-            "expr": "crimelens_system_health"
-          }
-        ],
-        "type": "stat"
-      }
-    ]
-  }
-}
-```
-
-### Step 6: Create Prometheus Configuration
-
-**File: `prometheus.yml`** (for local development)
-
-```yaml
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
-
-scrape_configs:
-  - job_name: 'crimelens-api'
-    static_configs:
-      - targets: ['localhost:5001']
-    metrics_path: '/metrics'
-```
-
-### Step 7: Add Health Check Metrics Integration
-
-**File: `db-project-backend/controllers/healthController.js`**
-
-```javascript
-import { systemHealth } from '../config/prometheus.js';
-
-export const detailedHealth = async (req, res) => {
-  // ... existing health checks
-
-  // Add metrics endpoint reference
-  healthInfo._links = {
-    metrics: '/metrics',
-    health: '/health/detailed',
-    ready: '/ready',
-  };
-
-  // ... rest of implementation
-};
-```
+Panels use only metrics defined above (`crimelens_*` + `nodejs_/process_`
+defaults); datasource UID pinned so provisioning matches the dashboard JSON.
 
 ## Testing
 
-### Test Metrics Endpoint
-
 ```bash
-# Scrape metrics
-curl http://localhost:5001/metrics
+# 1. Format + presence: make a few requests, then
+curl -s http://localhost:5001/metrics | grep -E "^crimelens_(http|redis|db|cache|crimes|system)" | head
+#   Expect: # HELP/# TYPE pairs; crimelens_http_requests_total with
+#   route="/api/crimes/types" (NOT raw paths with IDs); no "unmatched" for
+#   matched routes; default nodejs_/process_ metrics present
 
-# Should return Prometheus format metrics
-# crimelens_http_requests_total{method="GET",route="/api/crimes/types",status_code="200"} 123
+# 2. Cardinality sanity: request /api/crimes/update/1 (401), confirm the
+#    route label is the PATTERN "/api/crimes/update/:id" (or "unmatched"
+#    per middleware design), never "/api/crimes/update/1"
+
+# 3. Scrape-cost check: /metrics completes with no DB/Redis query delay
+#    (time curl; compare with a request to /api/stats/summary)
+
+# 4. Health gauges: stop-start check optional; at minimum confirm
+#    crimelens_system_health{component="database"} 1 while DB is up
+
+# 5. Business metrics: submit + approve/reject a crime (or simulate where
+#    feasible) and confirm counter deltas; 401-path failure counters verified
+#    via a forced failure if credentials unavailable — record what was tested
+
+# 6. Prometheus live scrape (if Docker available):
+docker run -d -p 9090:9090 -v $(pwd)/infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus
+#   Target must show UP at http://localhost:9090/targets
+
+# 7. Grafana live check (if Docker available): run Grafana with the
+#    provisioning dir mounted; dashboard must load with data
+
+# 8. Regression: phase 3/4/5/7 — X-Cache, X-RateLimit-*, validation gates,
+#    401s, structured request logs all unchanged; /metrics produces NO
+#    request log lines and NO rate-limit keys
 ```
 
-### Test with Prometheus
+If Docker is unavailable on the machine, steps 6–7 are recorded as
+"not executed" with the dashboard JSON checked structurally instead (valid
+JSON, correct schemaVersion keys, datasource UID match) — per CLAUDE.md:
+never claim a check passed without executing it.
 
-```bash
-# Start Prometheus locally
-docker run -p 9090:9090 \
-  -v ~/prometheus.yml:/etc/prometheus/prometheus.yml \
-  prom/prometheus
+## Out of Scope
 
-# Access at http://localhost:9090
-```
-
-### Test with Grafana
-
-```bash
-# Start Grafana locally
-docker run -p 3000:3000 grafana/grafana
-
-# Add Prometheus as data source
-# Import dashboard from config
-```
-
-## Expected Metrics
-
-**HTTP Metrics:**
-- Request rate (RPS)
-- Response times (p50, p95, p99)
-- Error rate (%)
-- Request count by status code
-
-**Database Metrics:**
-- Query duration
-- Connection pool usage
-- Active/idle connections
-
-**Cache Metrics:**
-- Hit rate percentage
-- Operations count
-
-**Business Metrics:**
-- Crimes reported per hour
-- Verification decisions (approved/rejected)
-- Active users by role
+- Per-query DB latency histogram (see audit note 4)
+- Alerting rules (can be added on top once Prometheus runs in CI/staging)
+- Auth on `/metrics` (network-level hardening deferred to Nginx/Cloudflare
+  phases; documented there)
 
 ## Success Criteria
 
-- [ ] Metrics endpoint accessible
-- [ ] Prometheus format valid
-- [ ] Default metrics collected
-- [ ] Custom HTTP metrics working
-- [ ] Database metrics collected
-- [ ] Redis metrics collected
-- [ ] Business metrics tracked
-- [ ] Grafana dashboard imported
-- [ ] Health check metrics included
+- [ ] `/metrics` returns valid Prometheus exposition format with default +
+      custom families
+- [ ] HTTP metrics: correct route labels (patterns, not raw IDs), status
+      breakdown, error counter only for ≥400
+- [ ] Redis op counters increment from cacheService; hit-rate gauge matches
+      Redis INFO
+- [ ] DB pool gauges report real tarn values (non-zero while serving)
+- [ ] Business counters increment on report/verify paths
+- [ ] Health gauges refresh without I/O in the scrape path
+- [ ] Prometheus scrape config + importable Grafana dashboard committed;
+      live docker check executed OR recorded as not-executed
+- [ ] `/metrics` absent from request logs and rate-limit keys
+- [ ] API responses unchanged (byte-identical payloads on sampled endpoints)
 
-## Files Created
+## Files Created/Modified
 
 ```
 db-project-backend/
-├── config/
-│   ├── prometheus.js (new)
-│   └── grafana/
-│       └── dashboards/
-│           └── crimelens-dashboard.json (new)
-├── controllers/
-│   ├── CrimeControllers.js (modified - metrics)
-│   └── healthController.js (modified)
-└── server.js (modified - metrics endpoint)
-
-prometheus.yml (new - for local development)
+├── config/prometheus.js          (new)
+├── services/cacheService.js      (modified — redis op counters)
+├── controllers/CrimeControllers.js (modified — business counters)
+└── server.js                     (modified — endpoint, middleware, updater)
+infra/
+├── prometheus/prometheus.yml     (new)
+└── grafana/                      (new — provisioning + dashboard JSON)
+Plans/phase-8-prometheus-grafana/implementation-log.md (new)
 ```
 
-## Monitoring Dashboard
+## Rollback
 
-The Grafana dashboard includes:
-1. **API Performance** - Request rate, latency, error rate
-2. **Database Health** - Connection pool, query time
-3. **Cache Performance** - Hit rate, operations
-4. **Business Metrics** - Crimes reported, verification rate
-5. **System Health** - Component status
-
-## Dependencies
-
-- Phase 2 health checks (metrics for health status)
-- Phase 3 Redis (cache metrics)
-- Phase 7 Pino (log metrics integration)
-
-## Rollback Procedure
-
-If monitoring causes performance issues:
-1. Remove metrics middleware from server.js
-2. Comment out metric tracking in controllers
-3. Restart backend
+Remove `app.get("/metrics")`, `metricsMiddleware`, `startMetricsUpdater`
+from `server.js` and uninstall `prom-client`; the `infra/` files are inert
+without Docker. No data/schema/contract changes.
 
 ## Estimated Completion Time
 
-- Prometheus setup: 1.5 hours
-- Custom metrics: 2 hours
-- Controller integration: 1 hour
-- Grafana dashboard: 1.5 hours
-- Testing: 30 minutes
-- **Total: 6.5 hours**
+- Metrics module + wiring: 1.5 h
+- cacheService/controller counters: 45 min
+- infra/ configs + dashboard JSON: 1.5 h
+- Validation incl. docker live check: 1 h
+- **Total: ~4.5 h**
