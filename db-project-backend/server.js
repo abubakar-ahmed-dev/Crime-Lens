@@ -3,10 +3,12 @@ dns.setDefaultResultOrder("ipv4first");
 
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import dotenv from "dotenv";
 import db from "./models/index.js";
 import { validateEnv } from "./config/envValidation.js";
 import { connectRedis, disconnectRedis } from "./config/redis.js";
+import { sanitizeInput } from "./middleware/validationMiddleware.js";
 
 import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -26,18 +28,45 @@ dotenv.config();
 validateEnv();
 
 const app = express();
+
+// ---------------------------------------------------------------------------
+// Security headers (Phase 5)
+// helmet() removes X-Powered-By and applies CSP/HSTS/nosniff/frameguard by
+// default. Adjustments for this API:
+//   - frameguard DENY (never framed)
+//   - CORP cross-origin so media-thumbnail redirects remain embeddable
+//   - no HSTS `preload` (irreversible; revisit when a production domain exists)
+// The legacy `xssFilter`/`hidePoweredBy` helmet options are gone in helmet 8 —
+// X-XSS-Protection is correctly sent as `0` and CSP is the real mitigation.
+// ---------------------------------------------------------------------------
+app.use(helmet({
+  frameguard: { action: "DENY" },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
+
 const corsOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
 app.use(cors({
-  origin: corsOrigins,
+  origin: corsOrigins, // requests from unlisted origins get no ACAO header
   methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
+  maxAge: 86400,
+  // Phase 3/4 diagnostic headers are useless to browser clients otherwise
+  exposedHeaders: ["X-Cache", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
 }));
 
-app.use(express.json());
+// JSON body size cap (413 on excess). Multipart uploads are bounded by their
+// multer configs instead (media: 5MB/file, CSV: 1MB).
+app.use(express.json({ limit: "1mb" }));
+
+// Strip script blocks / javascript: URIs / inline handlers from body+query
+app.use(sanitizeInput);
+
 app.use(queryLoggerMiddleware); // dev-only slow-request logging (>100ms)
 
 // Health routes mounted FIRST so /health and /ready stay responsive

@@ -17,6 +17,7 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "fast-csv": "^5.0.5",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "nodemon": "^3.1.14",
@@ -24,6 +25,7 @@
     "pg-hstore": "^2.3.4",
     "rate-limiter-flexible": "^11.2.0",
     "redis": "^6.2.1",
-    "sequelize": "^6.37.7"
+    "sequelize": "^6.37.7",
+    "zod": "^4.6.5"
   }
 }

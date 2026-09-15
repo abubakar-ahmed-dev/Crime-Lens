@@ -27,6 +27,8 @@ import {
   getCrimeTrend,
 } from "../controllers/statsController.js";
 import { applyRateLimit } from "../middleware/rateLimiterMiddleware.js";
+import { validate } from "../middleware/validationMiddleware.js";
+import { statsQuerySchema } from "../validators/schemas.js";
 
 const router = express.Router();
 
@@ -34,12 +36,27 @@ const router = express.Router();
 router.get("/summary", applyRateLimit("publicAPI"), getStatsSummary);
 
 // Pie chart — crimes by type
-router.get("/crime-type-distribution", applyRateLimit("publicAPI"), getCrimesByType);
+router.get(
+  "/crime-type-distribution",
+  applyRateLimit("publicAPI"),
+  validate(statsQuerySchema, "query"),
+  getCrimesByType
+);
 
 // Bar chart — crimes per zone
-router.get("/zone-crime-count", applyRateLimit("publicAPI"), getCrimesByZone);
+router.get(
+  "/zone-crime-count",
+  applyRateLimit("publicAPI"),
+  validate(statsQuerySchema, "query"),
+  getCrimesByZone
+);
 
 // Line chart — trend of a crime
-router.get("/crime-trend", applyRateLimit("publicAPI"), getCrimeTrend);
+router.get(
+  "/crime-trend",
+  applyRateLimit("publicAPI"),
+  validate(statsQuerySchema, "query"),
+  getCrimeTrend
+);
 
 export default router;
