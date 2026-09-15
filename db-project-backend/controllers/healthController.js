@@ -59,7 +59,7 @@ export const readinessCheck = async (req, res) => {
     checks.database = { status: "up", responseTime: Date.now() - started };
   } catch (error) {
     ready = false;
-    console.error("Readiness check: database unreachable:", error.message);
+    req.log.error({ err: error }, "Readiness check: database unreachable");
     checks.database = {
       status: "down",
       responseTime: Date.now() - started,
@@ -82,7 +82,7 @@ export const readinessCheck = async (req, res) => {
       };
     }
   } catch (error) {
-    console.error("Readiness check: redis unreachable:", error.message);
+    req.log.error({ err: error }, "Readiness check: redis unreachable");
     checks.redis = {
       status: "down",
       message: "Redis ping failed",

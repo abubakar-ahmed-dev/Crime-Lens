@@ -1,7 +1,7 @@
 import multer from "multer";
 import dotenv from "dotenv";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 // ============================================================================
 // Multer Configuration for Media Upload (Images & Videos)

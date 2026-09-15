@@ -118,7 +118,7 @@ export const login = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("authController.login error:", err);
+    req.log.error({ err }, "authController.login error");
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };

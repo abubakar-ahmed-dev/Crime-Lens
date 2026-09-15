@@ -227,7 +227,7 @@ export const googleAuthCitizen = asyncHandler(async (req, res) => {
   if (!submitter && mode === "login") {
     if (supabaseAdmin) {
       await supabaseAdmin.auth.admin.deleteUser(supabaseUserId).catch((error) => {
-        console.error("Failed to remove unregistered Google auth user:", error);
+        req.log.warn({ err: error }, "Failed to remove unregistered Google auth user");
       });
     }
 

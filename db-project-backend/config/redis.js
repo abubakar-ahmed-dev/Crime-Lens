@@ -12,8 +12,9 @@
 
 import redis from "redis";
 import dotenv from "dotenv";
+import { logger } from "./logger.js";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 
@@ -33,18 +34,18 @@ export const createRedisClient = () => {
   });
 
   client.on("connect", () => {
-    console.log("✅ Redis client connected");
+    logger.info("Redis client connected");
   });
 
   client.on("error", (err) => {
     // Logged, never thrown — cache consumers treat Redis as best-effort.
     // Connection failures arrive as AggregateError with an empty message,
     // so include the code for diagnosability.
-    console.error("Redis Client Error:", err.code || err.message || err);
+    logger.error({ err, code: err.code }, "Redis client error");
   });
 
   client.on("reconnecting", () => {
-    console.log("⚠️  Redis client reconnecting...");
+    logger.warn("Redis client reconnecting");
   });
 
   return client;
@@ -60,10 +61,10 @@ export const redisClient = createRedisClient();
 export const connectRedis = async () => {
   try {
     await redisClient.connect();
-    console.log("✅ Redis connection established");
+    logger.info("Redis connection established");
     return true;
   } catch (error) {
-    console.error("❌ Redis connection failed (continuing without cache):", error.message);
+    logger.error({ err: error }, "Redis connection failed (continuing without cache)");
     return false;
   }
 };
@@ -75,9 +76,9 @@ export const disconnectRedis = async () => {
   try {
     if (!redisClient.isOpen) return;
     await redisClient.quit();
-    console.log("✅ Redis connection closed");
+    logger.info("Redis connection closed");
   } catch (error) {
-    console.error("❌ Redis disconnection error:", error.message);
+    logger.error({ err: error }, "Redis disconnection error");
   }
 };
 

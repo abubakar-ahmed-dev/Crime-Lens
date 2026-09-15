@@ -123,7 +123,7 @@ export const agentRequest = async (req, res) => {
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("Agent Request Error:", error);
+    req.log.error({ err: error }, "Agent Request Error");
     res
       .status(500)
       .json({ success: false, message: "Error submitting agent request" });
@@ -295,7 +295,7 @@ export const verifyAgentRequest = async (req, res) => {
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("Verify Agent Error:", error);
+    req.log.error({ err: error }, "Verify Agent Error");
     res
       .status(500)
       .json({ success: false, message: "Error verifying agent request" });
@@ -395,7 +395,7 @@ export const rejectAgentRequest = async (req, res) => {
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("Reject Agent Error:", error);
+    req.log.error({ err: error }, "Reject Agent Error");
     res
       .status(500)
       .json({ success: false, message: "Error rejecting agent request" });
@@ -461,7 +461,7 @@ export const getPendingRequests = async (req, res) => {
 
     res.status(200).json({ success: true, data: formattedRequests });
   } catch (error) {
-    console.error("Fetch Requests Error:", error);
+    req.log.error({ err: error }, "Fetch Requests Error");
     res
       .status(500)
       .json({ success: false, message: "Error fetching requests" });
@@ -536,7 +536,7 @@ export const getRequestById = async (req, res) => {
 
     res.status(200).json({ success: true, data: formattedRequest });
   } catch (error) {
-    console.error("Fetch Request Error:", error);
+    req.log.error({ err: error }, "Fetch Request Error");
     res
       .status(500)
       .json({ success: false, message: "Error fetching request" });
@@ -571,7 +571,7 @@ export const getAllAgents = async (req, res) => {
       data: agents,
     });
   } catch (err) {
-    console.error("Error fetching agents from view:", err);
+    req.log.error({ err }, "Error fetching agents from view");
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -716,7 +716,7 @@ export const updateAgent = async (req, res) => {
     return res.json({ success: true, message: "Agent updated successfully" });
   } catch (err) {
     if (!t.finished) await t.rollback();
-    console.error("Error updating agent:", err);
+    req.log.error({ err }, "Error updating agent");
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -798,7 +798,7 @@ export const deleteAgent = async (req, res) => {
     });
   } catch (err) {
     if (!t.finished) await t.rollback();
-    console.error("Error deleting agent:", err);
+    req.log.error({ err }, "Error deleting agent");
     return res
       .status(500)
       .json({ success: false, message: "Server error" });

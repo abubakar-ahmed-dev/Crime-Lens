@@ -206,7 +206,7 @@ export const uploadMedia = async (req, res) => {
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("Upload media error:", error);
+    req.log.error({ err: error }, "Upload media error");
 
     const cloudinaryError = handleCloudinaryError(error);
     if (cloudinaryError.code !== "CLOUDINARY_ERROR") {
@@ -268,7 +268,7 @@ export const getCrimeMedia = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get crime media error:", error);
+    req.log.error({ err: error }, "Get crime media error");
     res.status(500).json({
       success: false,
       message: "Error retrieving media",
@@ -360,7 +360,7 @@ export const updateMedia = async (req, res) => {
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("Update media error:", error);
+    req.log.error({ err: error }, "Update media error");
     res.status(500).json({
       success: false,
       message: "Error updating media",
@@ -421,7 +421,7 @@ export const deleteMedia = async (req, res) => {
 
     // Delete from Cloudinary (fire and forget, non-critical)
     deleteFile(publicId, fileType).catch((err) => {
-      console.error("Cloudinary delete error (non-critical):", err);
+      req.log.warn({ err }, "Cloudinary delete error (non-critical)");
     });
 
     res.status(200).json({
@@ -434,7 +434,7 @@ export const deleteMedia = async (req, res) => {
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("Delete media error:", error);
+    req.log.error({ err: error }, "Delete media error");
     res.status(500).json({
       success: false,
       message: "Error deleting media",
@@ -579,7 +579,7 @@ export const addMediaToCrime = async (req, res) => {
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("Add media to crime error:", error);
+    req.log.error({ err: error }, "Add media to crime error");
     res.status(500).json({
       success: false,
       message: "Error adding media to crime",
@@ -643,7 +643,7 @@ export const removeMediaFromCrime = async (req, res) => {
 
     // Delete from Cloudinary (fire and forget)
     deleteFile(publicId, fileType).catch((err) => {
-      console.error("Cloudinary delete error (non-critical):", err);
+      req.log.warn({ err }, "Cloudinary delete error (non-critical)");
     });
 
     res.status(200).json({
@@ -656,7 +656,7 @@ export const removeMediaFromCrime = async (req, res) => {
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("Remove media from crime error:", error);
+    req.log.error({ err: error }, "Remove media from crime error");
     res.status(500).json({
       success: false,
       message: "Error removing media from crime",
@@ -693,7 +693,7 @@ export const getMediaThumbnail = async (req, res) => {
     const thumbnailUrl = getThumbnail(media.publicId, media.fileType);
     res.redirect(thumbnailUrl);
   } catch (error) {
-    console.error("Get thumbnail error:", error);
+    req.log.error({ err: error }, "Get thumbnail error");
     res.status(500).json({
       success: false,
       message: "Error retrieving thumbnail",

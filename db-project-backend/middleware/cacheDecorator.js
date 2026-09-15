@@ -14,6 +14,7 @@
  */
 
 import cacheService from "../services/cacheService.js";
+import { logger } from "../config/logger.js";
 
 /**
  * Wrap a GET controller with cache-aside behavior
@@ -51,7 +52,7 @@ export const withCache = (options = {}) => {
         res.json = (data) => {
           if (res.statusCode < 400) {
             cacheService.set(cacheKey, data, ttl).catch((err) => {
-              console.error("Cache set error:", err.message);
+              logger.error({ err, cacheKey }, "Cache set error");
             });
           }
           res.setHeader("X-Cache", "MISS");
@@ -61,7 +62,7 @@ export const withCache = (options = {}) => {
         return handler(req, res, next);
       } catch (error) {
         // Any decorator failure must not break the endpoint
-        console.error("Cache decorator error:", error.message);
+        logger.error({ err: error }, "Cache decorator error");
         return handler(req, res, next);
       }
     };
@@ -85,7 +86,7 @@ export const withCacheInvalidation = (patterns = []) => {
           try {
             await cacheService.deletePattern(pattern);
           } catch (err) {
-            console.error(`Cache invalidation error for ${pattern}:`, err.message);
+            logger.error({ err, pattern }, "Cache invalidation error");
           }
         }
       }

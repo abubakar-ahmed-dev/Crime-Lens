@@ -65,7 +65,7 @@ export const getZoneSeverity = async (req, res) => {
       })
     );
   } catch (err) {
-    console.error("Error fetching zone severity:", err);
+    req.log.error({ err }, "Error fetching zone severity");
     return res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -99,7 +99,7 @@ export const getAllZones = async (req, res) => {
     res.setHeader("X-Cache", "MISS");
     res.json(zones);
   } catch (err) {
-    console.error("Error fetching zones:", err);
+    req.log.error({ err }, "Error fetching zones");
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -144,7 +144,7 @@ export const checkLocationInsideZone = async (req, res) => {
 
     res.json({ success: true, inside: Boolean(rows[0].inside) });
   } catch (err) {
-    console.error("Error checking zone location:", err);
+    req.log.error({ err }, "Error checking zone location");
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };

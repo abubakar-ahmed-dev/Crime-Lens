@@ -66,8 +66,8 @@ export const getStatsSummary = withCache({
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to load summary" });
+    req.log.error({ err }, "Stats summary query failed");
+    res.status(500).json({ error: "Failed to load summary" })
   }
 });
 
@@ -123,8 +123,8 @@ export const getCrimesByType = withCache({
     res.json(rows);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Pie chart failed" });
+    req.log.error({ err }, "Crimes-by-type query failed");
+    res.status(500).json({ error: "Pie chart failed" })
   }
 });
 
@@ -179,8 +179,8 @@ export const getCrimesByZone = withCache({
     res.json(rows);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Bar chart failed" });
+    req.log.error({ err }, "Crimes-by-zone query failed");
+    res.status(500).json({ error: "Bar chart failed" })
   }
 });
 
@@ -243,7 +243,7 @@ export const getCrimeTrend = withCache({
     res.json(rows);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Line chart failed" });
+    req.log.error({ err }, "Crime trend query failed");
+    res.status(500).json({ error: "Line chart failed" })
   }
 });
