@@ -4,6 +4,7 @@ dns.setDefaultResultOrder("ipv4first");
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import compression from "compression";
 import dotenv from "dotenv";
 import db from "./models/index.js";
 import { validateEnv } from "./config/envValidation.js";
@@ -66,6 +67,21 @@ app.use(express.json({ limit: "1mb" }));
 
 // Strip script blocks / javascript: URIs / inline handlers from body+query
 app.use(sanitizeInput);
+
+// ---------------------------------------------------------------------------
+// HTTP compression (Phase 6)
+// gzip + brotli (compression >= 1.8 negotiates via Accept-Encoding; brotli
+// defaults to quality 4 — a sane CPU/size balance for dynamic responses).
+// Bodies under 1KB stay uncompressed; clients can opt out with the
+// x-no-compression request header. Vary: Accept-Encoding is set by the lib.
+// ---------------------------------------------------------------------------
+app.use(compression({
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.headers["x-no-compression"]) return false;
+    return compression.filter(req, res); // mime-db content-type check
+  },
+}));
 
 app.use(queryLoggerMiddleware); // dev-only slow-request logging (>100ms)
 
