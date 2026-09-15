@@ -11,6 +11,8 @@ import {
 import { upload } from "../config/multerConfig.js";
 import { verifyToken, authorizeRoles } from "../middleware/authMiddleware.js";
 import { applyRateLimit } from "../middleware/rateLimiterMiddleware.js";
+import { validate } from "../middleware/validationMiddleware.js";
+import { branchCreateSchema } from "../validators/schemas.js";
 
 const router = express.Router();
 const adminOnly = [verifyToken, authorizeRoles("admin")];
@@ -26,7 +28,7 @@ router.post(
 );
 
 router.get("/branches", adminOnly, getBranches);
-router.post("/branches", adminOnly, createBranch);
+router.post("/branches", adminOnly, validate(branchCreateSchema), createBranch);
 router.put("/branches/:branchId/head", adminOnly, assignBranchHead);
 router.get("/police-agents", adminOnly, getApprovedPoliceAgents);
 router.post("/police-agents", adminOnly, createPoliceAgent);
