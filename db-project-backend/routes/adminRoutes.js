@@ -10,15 +10,17 @@ import {
 } from "../controllers/adminControls/BranchController.js";
 import { upload } from "../config/multerConfig.js";
 import { verifyToken, authorizeRoles } from "../middleware/authMiddleware.js";
+import { applyRateLimit } from "../middleware/rateLimiterMiddleware.js";
 
 const router = express.Router();
 const adminOnly = [verifyToken, authorizeRoles("admin")];
 
-// POST /api/admin/upload-crimes
+// POST /api/admin/upload-crimes — very strict limit (heavy DB/storage work)
 
 router.post(
   "/upload-crimes",
   ...adminOnly,
+  applyRateLimit("adminUpload"),
   upload.single("file"),
   uploadCrimesCSV
 );

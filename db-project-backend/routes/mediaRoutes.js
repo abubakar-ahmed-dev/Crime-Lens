@@ -10,6 +10,7 @@ import {
   getMediaThumbnail,
 } from "../controllers/mediaController.js";
 import { verifyToken, authorizeRoles, authorizeCitizen } from "../middleware/authMiddleware.js";
+import { applyRateLimit } from "../middleware/rateLimiterMiddleware.js";
 
 const router = express.Router();
 
@@ -56,8 +57,9 @@ router.get("/:id/thumbnail", getMediaThumbnail);
  */
 router.post(
   "/upload",
-  upload.array("files", 10), // Max 10 files (5 images + 2 videos + buffer)
   authorizeCitizen,
+  applyRateLimit("mediaUpload"), // per-user limit, checked before file parsing
+  upload.array("files", 10), // Max 10 files (5 images + 2 videos + buffer)
   uploadMedia
 );
 

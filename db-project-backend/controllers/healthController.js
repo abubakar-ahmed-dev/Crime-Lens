@@ -13,6 +13,7 @@
 
 import db from "../models/index.js";
 import { redisClient } from "../config/redis.js";
+import { getRateLimiterStatus } from "../config/rateLimiter.js";
 
 const API_VERSION = "1.0.0";
 
@@ -29,6 +30,7 @@ export const processHealth = (req, res) => {
     uptime: Math.floor(process.uptime()),
     version: API_VERSION,
     environment: process.env.NODE_ENV || "development",
+    rateLimiting: getRateLimiterStatus(),
   });
 };
 

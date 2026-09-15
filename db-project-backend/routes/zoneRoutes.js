@@ -5,14 +5,15 @@ import {
   getAllZones,
   getZoneSeverity,
 } from "../controllers/zoneController.js";
+import { applyRateLimit } from "../middleware/rateLimiterMiddleware.js";
 
 const router = express.Router();
 
 // GET /api/zones/severity
-router.get("/severity", getZoneSeverity);
+router.get("/severity", applyRateLimit("publicAPI"), getZoneSeverity);
 
-router.post("/:id/contains", checkLocationInsideZone);
+router.post("/:id/contains", applyRateLimit("publicAPI"), checkLocationInsideZone);
 
-router.get("/", getAllZones);
+router.get("/", applyRateLimit("publicAPI"), getAllZones);
 
 export default router;
