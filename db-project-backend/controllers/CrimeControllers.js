@@ -10,6 +10,7 @@ import {
 import { CacheKeys, CacheTTL } from "../config/redis.js";
 import cacheService from "../services/cacheService.js";
 import { withCacheInvalidation } from "../middleware/cacheDecorator.js";
+import { crimesReported, crimesVerified } from "../config/prometheus.js";
 const { Crime, CrimeSubmission, CrimeReportsSubmitter, CrimeType, Zone, CrimeMedia } = db;
 
 const parseRequiredCoordinates = (latitude, longitude) => {
@@ -564,6 +565,7 @@ export const approveCrimeReport = withCacheInvalidation([
 
     const updatedCrime = updatedCrimeRows[0][0];
     await t.commit();
+    crimesVerified.labels({ decision: "approved" }).inc();
     // ---------------------------
     // 4️⃣ Response
     // ---------------------------
@@ -578,6 +580,7 @@ export const approveCrimeReport = withCacheInvalidation([
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
+    crimesVerified.labels({ decision: "failed" }).inc();
     req.log.error({ err: error }, "Approve Crime Error");
     res.status(500).json({
       success: false,
@@ -874,6 +877,7 @@ export const reportCrime = withCacheInvalidation([
     }
 
     await t.commit();
+    crimesReported.labels({ status: "submitted", zone_id: String(zone || "unknown") }).inc();
     // ---------------------------
     // Response
     // ---------------------------
@@ -888,6 +892,7 @@ export const reportCrime = withCacheInvalidation([
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
+    crimesReported.labels({ status: "failed", zone_id: "unknown" }).inc();
     req.log.error({ err: error }, "Report Crime Error");
     res.status(500).json({ success: false, message: "Error adding crime" });
   }

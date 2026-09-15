@@ -1,0 +1,15 @@
+# Grafana datasource auto-provisioning (Phase 8).
+# Mounted at /etc/grafana/provisioning/datasources inside the container.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: crimelens-prom
+    type: prometheus
+    access: proxy
+    url: http://host.docker.internal:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s
