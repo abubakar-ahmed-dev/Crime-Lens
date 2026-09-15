@@ -1,6 +1,6 @@
 # Phase 8 — Prometheus + Grafana Monitoring: Implementation Log
 
-## Status: Implemented & Validated (API level; live Prometheus/Grafana not run)
+## Status: Implemented & Validated (API level + live Prometheus/Grafana retest)
 
 ## What Was Implemented
 
@@ -76,13 +76,7 @@
 
 ## Not Executed (with reason)
 
-- **Live Prometheus / Grafana containers**: Docker CLI is installed but the
-  Docker Desktop engine would not start on this machine (daemon pipe
-  unavailable after launch attempt). Per plan §Testing fallback:
-  `prometheus.yml` and the dashboard JSON were validated structurally (YAML
-  reviewed, JSON parsed, datasource UID matches dashboard refs); the live
-  target-UP and dashboard-render checks are recorded as NOT EXECUTED. Compose
-  of these files lands properly in Phase 9 (Docker).
+- ~~Live Prometheus / Grafana containers~~ — RETESTED LIVE, see below.
 - Business-counter increments: `crimesReported`/`crimesVerified` are wired
   inside auth-gated citizen/police flows; no credentials available to submit
   a real report, so live deltas were not exercised. The counter families
@@ -91,6 +85,35 @@
 - ESLint / TypeScript: no backend ESLint config; plain JS (pre-existing gap)
 - Playwright: metrics-only change, no frontend contract change (per
   CLAUDE.md §17 monitoring config does not require browser validation)
+
+## Live Prometheus + Grafana Retest (after user started Docker Desktop)
+
+Exact committed config shapes, validated against a live stack (API booted
+from this branch on :5092; Prometheus/Grafana containers via the `infra/`
+files with only the API port substituted 5001→5092 in a TEMP copy, since the
+user's backend occupies :5001):
+
+- **Prometheus** (`prom/prometheus`, config mounted read-only):
+  - `host.docker.internal:5092` target → **UP**, no scrape error
+  - `localhost:5092` target → down (container resolves localhost to ::1,
+    API binds IPv4) — exactly the documented dual-target behavior in the
+    YAML comment; harmless
+  - PromQL `crimelens_http_requests_total` returned real series with
+    pattern route labels (`GET /api/crimes/types 200 = 1`,
+    `PUT /api/crimes/update/:id 401 = 1`)
+  - `crimelens_cache_hit_rate = 0.93`, `crimelens_system_health`
+    database/redis/api all `1` queryable through Prometheus
+- **Grafana** (`grafana/grafana`, provisioning + dashboards mounted
+  read-only):
+  - health endpoint 200
+  - datasource auto-provisioned: `crimelens-prom` →
+    `http://host.docker.internal:9090`
+  - dashboard auto-provisioned: uid `crimelens-api`, title "CrimeLens API",
+    13 panels
+  - END-TO-END query through Grafana's `/api/ds/query` (Grafana →
+    Prometheus → API) returned the three `crimelens_system_health` series
+    with value 1
+- Test containers removed afterward; temp rate-limit keys flushed.
 
 ## Notes for Testing Agent
 
