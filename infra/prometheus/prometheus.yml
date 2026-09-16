@@ -1,14 +1,15 @@
-# Prometheus scrape configuration (Phase 8).
+# Prometheus scrape configuration (Phase 8, compose targets Phase 9).
 #
-# Local run (from repo root):
+# Compose run: `docker compose up` — the `backend:5001` target resolves via
+# the compose network. (Phase 9 full-stack mode.)
+#
+# Host-run API + containerized Prometheus (phase-8 workflow):
 #   docker run -d --name crimelens-prom -p 9090:9090 \
 #     -v "$(pwd)/infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
 #     prom/prometheus
-#
-# When Prometheus itself runs in Docker but the API runs on the host, the
-# `localhost:5001` target must be replaced by `host.docker.internal:5001`
-# (Docker Desktop). The extra target below covers both cases; one will be
-# DOWN — that is expected and harmless.
+#   The API is reached at `host.docker.internal:5001` from inside Docker
+#   Desktop. The other target will be DOWN in whichever mode is not active —
+#   that is expected and harmless.
 
 global:
   scrape_interval: 15s
@@ -19,5 +20,5 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - "localhost:5001"           # Prometheus on the host
-          - "host.docker.internal:5001" # Prometheus in Docker (Windows/Mac)
+          - "backend:5001"              # compose-network API service
+          - "host.docker.internal:5001" # host-run API (Docker Desktop)

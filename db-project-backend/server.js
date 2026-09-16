@@ -36,6 +36,14 @@ validateEnv();
 const app = express();
 
 // ---------------------------------------------------------------------------
+// Reverse-proxy support (Phase 9) — when the API runs behind nginx (compose),
+// every request arrives with the proxy's IP. Trusting one proxy hop makes
+// req.ip resolve from X-Forwarded-For; without it, per-IP rate limiting
+// (Phase 4) collapses all users into a single bucket.
+// ---------------------------------------------------------------------------
+if (process.env.TRUST_PROXY) app.set("trust proxy", Number(process.env.TRUST_PROXY));
+
+// ---------------------------------------------------------------------------
 // Structured logging (Phase 7) — first, so every request is timed end-to-end.
 // pino-http attaches req.log (with request_id) and emits one completion line
 // per request; health endpoints are excluded from auto-logging.

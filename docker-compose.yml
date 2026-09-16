@@ -1,0 +1,102 @@
+# CrimeLens full-stack compose (Phase 9).
+#
+#   docker compose build
+#   docker compose up -d
+#
+# Host publishes: 8080 (frontend), 5001 (backend, direct API access),
+# 9090 (Prometheus), 3000 (Grafana). Redis stays internal-only.
+# If the host backend already runs on 5001, use a local override file —
+# see docker-compose.override.yml (gitignored, not committed).
+#
+# App secrets come from db-project-backend/.env via env_file — nothing secret
+# is written here. Compose-level variables (Grafana admin creds) are
+# documented in .env-sample.
+#
+# The database stays external (Supabase) — no PostgreSQL service by design.
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: crimelens-api:latest
+    env_file: db-project-backend/.env
+    environment:
+      # In-compose overrides — these MUST differ from the host-run values:
+      # - Redis is the compose service, not localhost
+      # - behind the frontend nginx, req.ip must resolve from X-Forwarded-For
+      # - the SPA origin served on :8080
+      NODE_ENV: production
+      LOG_LEVEL: info
+      REDIS_URL: redis://redis:6379
+      TRUST_PROXY: "1"
+      CORS_ORIGINS: http://localhost:8080
+    ports:
+      - "5001:5001"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - crimelens-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    image: crimelens-web:latest
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - crimelens-network
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    # No host port publish: Redis is reachable only inside the compose network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - crimelens-network
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=200h
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    restart: unless-stopped
+    networks:
+      - crimelens-network
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - crimelens-network
+
+networks:
+  crimelens-network:
+    driver: bridge
