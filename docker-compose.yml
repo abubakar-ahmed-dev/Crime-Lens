@@ -1,12 +1,13 @@
-# CrimeLens full-stack compose (Phase 9).
+# CrimeLens full-stack compose (Phase 9; edge proxy Phase 10).
 #
 #   docker compose build
 #   docker compose up -d
 #
-# Host publishes: 8080 (frontend), 5001 (backend, direct API access),
-# 9090 (Prometheus), 3000 (Grafana). Redis stays internal-only.
-# If the host backend already runs on 5001, use a local override file —
-# see docker-compose.override.yml (gitignored, not committed).
+# Host publishes: 80 (edge nginx — the single entrypoint for SPA + API),
+# 5001 (backend, direct API access for verification), 9090 (Prometheus),
+# 3000 (Grafana). Redis and the frontend container stay internal-only.
+# If host ports are taken (dev backend on 5001 etc.), use a local override
+# file — see docker-compose.override.yml (gitignored, not committed).
 #
 # App secrets come from db-project-backend/.env via env_file — nothing secret
 # is written here. Compose-level variables (Grafana admin creds) are
@@ -30,7 +31,7 @@ services:
       LOG_LEVEL: info
       REDIS_URL: redis://redis:6379
       TRUST_PROXY: "1"
-      CORS_ORIGINS: http://localhost:8080
+      CORS_ORIGINS: http://localhost:18000
     ports:
       - "5001:5001"
     depends_on:
@@ -45,10 +46,38 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
     image: crimelens-web:latest
-    ports:
-      - "8080:80"
+    # Internal-only since Phase 10: the edge nginx proxies / to this
+    # service — the SPA is no longer published on its own host port.
     depends_on:
       - backend
+    restart: unless-stopped
+    networks:
+      - crimelens-network
+
+  nginx:
+    image: nginx:1.25-alpine
+    # Edge reverse proxy + load balancer (Phase 10): the single public
+    # entrypoint. / goes to the frontend static container, /api/ to the
+    # backend pool (Docker DNS round-robins replicas; passive health
+    # checks eject failing ones). /metrics is intentionally NOT routed —
+    # Prometheus scrapes backend:5001 on the internal network.
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx-edge.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    # Exercise the full chain: edge → backend pool → /api/health
+    # (127.0.0.1, not localhost — busybox wget prefers ::1)
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     restart: unless-stopped
     networks:
       - crimelens-network
