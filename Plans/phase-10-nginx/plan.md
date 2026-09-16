@@ -2,511 +2,209 @@
 
 ## Objective
 
-Implement Nginx as a reverse proxy and load balancer to distribute traffic across multiple API instances, handle SSL termination, and provide a single entry point for the application.
+One public entrypoint for the compose stack: an edge nginx that serves the SPA
+(via the existing frontend container) and load-balances `/api/` across the
+backend replicas using Docker DNS + passive health checks. Verified live with
+multiple backend replicas, failover, and `/metrics` kept off the edge.
 
-## What We'll Implement
+## Audit Corrections vs Previous Plan (why this rewrite)
 
-1. **Nginx reverse proxy** configuration
-2. **Load balancing** for multiple backend instances
-3. **SSL/TLS** termination
-4. **Static file serving** optimization
-5. **Health check** integration
+1. **`check interval=30s rise=2 fall=3;` is not stock nginx** — that
+   directive belongs to a third-party upstream-check patch; stock
+   `nginx:1.25-alpine` refuses to start with it. Passive health checking
+   (`max_fails` / `fail_timeout` on `server` entries) is the built-in
+   equivalent and is what we use.
+2. **Hardcoded `backend1/2/3:5001` upstreams are broken** — no such
+   containers exist. With one `backend` service in compose, `backend1`
+   doesn't resolve and nginx fails at startup ("host not found in
+   upstream"). Correct Docker-native form: `server backend:5001` — Docker's
+   embedded DNS returns ALL replica IPs and round-robins per resolution;
+   passive health checks drop dead replicas.
+3. **TLS/SSL dropped from this phase** — no domain, no certs, and Cloudflare
+   (phase 13) terminates TLS at the edge in the target architecture. The old
+   plan's self-signed certs + HTTP→HTTPS 301 + `ssllabs` test against a fake
+   domain would break every local workflow (Playwright, curl, dev server) for
+   zero real security. Nginx stays HTTP on the internal network — identical
+   trust domain to the app containers.
+4. **HSTS `preload` dropped** — contradicts the phase-5 decision ("no
+   preload; irreversible; revisit when a production domain exists"). The old
+   plan also added `X-XSS-Protection "1; mode=block"` — deprecated header
+   helmet 8 deliberately sends as `0`.
+5. **CSP at the proxy dropped** — untested CSP with `unsafe-inline` guesses
+   can break the SPA (Vite/Tailwind/leaflet asset origins), and headers are
+   already owned by the frontend nginx + backend helmet (phase 5). CSP is a
+   frontend-phase concern.
+6. **nginx-level `limit_req`/`limit_conn` dropped** — duplicates phase-4
+   Redis-backed rate limiting with a second, different limit set on a
+   different key. Two independent 429/503 layers make behavior unexplainable.
+   Abuse protection stays in the app (shared across replicas, which nginx
+   `limit_req` cannot offer per-instance anyway).
+7. **`/metrics` is NOT proxied at all** — the old plan proxied `/metrics`
+   through the public edge with `allow 172.16.0.0/12; deny all`. From a
+   published host port, host processes arrive from the bridge gateway and
+   would be allowed. Simpler and safer: no `/metrics` location on the edge.
+   Prometheus scrapes `backend:5001` directly on the internal network
+   (phase 9 config already does this) and never needs the proxy.
+8. **`/health` + `/ready` locations were wrong** — the backend mounts health
+   routes at `/api/health` and `/api/ready`; proxying bare `/health` 404s.
+   The nginx container healthcheck used that same dead route, so the edge
+   would report permanently unhealthy. Fixed to real routes.
+9. **The old edge config served `root /usr/share/nginx/html` from a stock
+   `nginx:1.25-alpine` with no dist copied** — the SPA would 404. Fixed by
+   making the edge a pure proxy: `/` → `frontend:80` (the phase-9 static
+   container), `/api/` → backend upstream. No second static-serving config
+   to maintain.
+10. **`nginx-dev.conf` variant dropped** — with proxy-only edge config there
+    is one config; nothing to fork for dev.
+11. **`setup-ssl.sh`, `nginx/ssl` volume, `scripts/nginx-reload.sh` dropped**
+    — TLS out of scope (see 3); reload script hardcodes a container name for
+    a `docker compose exec nginx nginx -s reload` one-liner (documented
+    instead). YAGNI.
+12. **`Upgrade`/`Connection: upgrade` proxy headers dropped** — the app has
+    no websockets; setting upgrade headers on every request is wrong, not
+    neutral.
+13. **`client_max_body_size 10m` raised to 50m** — media uploads are 10
+    files × 5 MB (same finding as phase 9; 10m would 413 legitimate
+    multi-image reports).
+14. **Logging: no `/var/log/nginx` volume** — the nginx image symlinks its
+    logs to stdout/stderr; a volume would hide them from `docker logs`. The
+    upstream-timing `log_format` (rt/uct/urt) is kept — it feeds phase-11
+    scaling and phase-15 k6 comparisons.
+15. **`server_name crimelens.example.com` → `server_name _;`** — no domain
+    exists; the edge is the default server.
+16. **Ports** — only `80` published (443 gone with TLS). The phase-9
+    frontend host publish (`8080`) is removed so ALL traffic enters through
+    the edge; backend keeps its host publish (override file) for direct
+    verification. Local port conflicts handled by the gitignored
+    `docker-compose.override.yml` as in phase 9.
+17. **`CORS_ORIGINS` updated to the edge origin** — browser API calls become
+    same-origin through the edge; the override moves from
+    `http://localhost:8080` to the edge's published origin.
+
+## Scope boundary
+
+- Backend replicas/scale comparison belong to Phase 11; this phase proves the
+  upstream works with a temporary `--scale backend=2` smoke (both replicas
+  receive traffic, failover on container kill), then returns to 1 replica.
+- TLS termination arrives with Cloudflare (Phase 13).
+- The frontend container's `docker/nginx.conf` keeps its `/api` location —
+  unreachable once the edge intercepts `/api/` first, left untouched
+  (minimal change; noted in the implementation log).
 
 ## Implementation Steps
 
-### Step 1: Create Nginx Main Configuration
+### Step 1: `docker/nginx-edge.conf` (new)
 
-**File: `nginx/nginx.conf`**
+Stock-nginx-safe, proxy-only edge:
 
-```nginx
-user nginx;
-worker_processes auto;
-error_log /var/log/nginx/error.log warn;
-pid /var/run/nginx.pid;
+- `upstream crimelens_backend { least_conn; server backend:5001 max_fails=3
+  fail_timeout=30s; }` (Docker DNS fan-out; no `check` directive)
+- `log_format` with `$request_time`/`$upstream_response_time` → stdout
+- `server_name _;` listen 80
+- `client_max_body_size 50m`
+- `location /` → `proxy_pass http://frontend:80` (static SPA container)
+- `location /api/` → `proxy_pass http://crimelens_backend;` with
+  `X-Real-IP` / `X-Forwarded-For` / `X-Forwarded-Proto` / `Host`
+  (real-client IP for TRUST_PROXY=1 rate limiting)
+- NO `/metrics`, NO TLS, NO nginx rate limiting, NO CSP/HSTS additions
+- `proxy_read_timeout 60s` (Cloudinary uploads run inside the request)
 
-events {
-    worker_connections 2048;
-    use epoll;
-    multi_accept on;
-}
+### Step 2: `docker-compose.yml` (edit)
 
-http {
-    include /etc/nginx/mime.types;
-    default_type application/octet-stream;
+- New `nginx` (edge) service: `nginx:1.25-alpine`, ports `80:80`,
+  mounts `./docker/nginx-edge.conf:/etc/nginx/nginx.conf:ro`,
+  `depends_on: backend + frontend`, healthcheck via
+  `wget -q -O /dev/null http://localhost/api/health` (real route)
+- `frontend`: remove `ports` (internal-only)
+- `backend`: unchanged (host publish already overridable)
+- Override file (gitignored, local): remap edge to `18000:80` since host
+  port 80 is likely taken on this machine
 
-    # Logging format
-    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
-                    '$status $body_bytes_sent "$http_referer" '
-                    '"$http_user_agent" "$http_x_forwarded_for" '
-                    'rt=$request_time uct="$upstream_connect_time" '
-                    'uht="$upstream_header_time" urt="$upstream_response_time"';
+### Step 3: Compose environment tweak
 
-    access_log /var/log/nginx/access.log main;
+- `backend` environment: `CORS_ORIGINS=http://localhost:18000` (edge origin;
+  same-origin browser calls make CORS mostly moot, kept consistent)
 
-    # Performance settings
-    sendfile on;
-    tcp_nopush on;
-    tcp_nodelay on;
-    keepalive_timeout 65;
-    types_hash_max_size 2048;
-    server_tokens off;
-
-    # Buffer sizes
-    client_body_buffer_size 128k;
-    client_max_body_size 10m;
-    client_header_buffer_size 1k;
-    large_client_header_buffers 4 16k;
-
-    # Timeouts
-    client_body_timeout 12;
-    client_header_timeout 12;
-    send_timeout 10;
-
-    # Gzip compression
-    gzip on;
-    gzip_vary on;
-    gzip_proxied any;
-    gzip_comp_level 6;
-    gzip_types text/plain text/css text/xml application/json application/javascript application/rss+xml application/atom+xml image/svg+xml;
-
-    # Upstream backend servers
-    upstream crimelens_backend {
-        # Load balancing method
-        least_conn;
-
-        # Backend servers (will be scaled in Phase 11)
-        server backend1:5001 max_fails=3 fail_timeout=30s;
-        server backend2:5001 max_fails=3 fail_timeout=30s;
-        server backend3:5001 max_fails=3 fail_timeout=30s;
-
-        # Health check
-        check interval=30s rise=2 fall=3;
-    }
-
-    # Upstream for development (single instance)
-    upstream crimelens_backend_dev {
-        server backend:5001;
-    }
-
-    # Rate limiting zones
-    limit_req_zone $binary_remote_addr zone=auth_limit:10m rate=5r/m;
-    limit_req_zone $binary_remote_addr zone=api_limit:10m rate=50r/m;
-    limit_req_zone $binary_remote_addr zone=write_limit:10m rate=10r/m;
-
-    # Connection limiting
-    limit_conn_zone $binary_remote_addr zone=addr:10m;
-
-    # SSL configuration
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384';
-    ssl_prefer_server_ciphers off;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 10m;
-
-    # Main server block
-    server {
-        listen 80;
-        listen [::]:80;
-        server_name crimelens.example.com;
-
-        # Redirect HTTP to HTTPS
-        return 301 https://$server_name$request_uri;
-    }
-
-    # HTTPS server block
-    server {
-        listen 443 ssl http2;
-        listen [::]:443 ssl http2;
-        server_name crimelens.example.com;
-
-        # SSL certificates (use Let's Encrypt in production)
-        ssl_certificate /etc/nginx/ssl/crimelens.crt;
-        ssl_certificate_key /etc/nginx/ssl/crimelens.key;
-
-        # Security headers
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-        add_header X-Frame-Options "DENY" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        add_header X-XSS-Protection "1; mode=block" always;
-        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none';" always;
-
-        # Client body size limit
-        client_max_body_size 10m;
-
-        # Root directory
-        root /usr/share/nginx/html;
-        index index.html;
-
-        # Frontend (SPA routing)
-        location / {
-            try_files $uri $uri/ /index.html;
-
-            # Cache static assets
-            location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-                expires 1y;
-                add_header Cache-Control "public, immutable";
-                access_log off;
-            }
-        }
-
-        # API proxy with rate limiting
-        location /api/auth/login {
-            limit_req zone=auth_limit burst=3 nodelay;
-            proxy_pass http://crimelens_backend;
-            include proxy_params;
-        }
-
-        location /api/citizens/login {
-            limit_req zone=auth_limit burst=3 nodelay;
-            proxy_pass http://crimelens_backend;
-            include proxy_params;
-        }
-
-        location /api/crimes/report {
-            limit_req zone=write_limit burst=5 nodelay;
-            proxy_pass http://crimelens_backend;
-            include proxy_params;
-        }
-
-        location /api/ {
-            limit_req zone=api_limit burst=20;
-            proxy_pass http://crimelens_backend;
-            include proxy_params;
-        }
-
-        # Metrics endpoint (no rate limiting)
-        location /metrics {
-            proxy_pass http://crimelens_backend;
-            include proxy_params;
-            allow 127.0.0.1;
-            allow 172.16.0.0/12;
-            deny all;
-        }
-
-        # Health checks (no rate limiting)
-        location /health {
-            proxy_pass http://crimelens_backend;
-            include proxy_params;
-            access_log off;
-        }
-
-        location /ready {
-            proxy_pass http://crimelens_backend;
-            include proxy_params;
-            access_log off;
-        }
-
-        # Connection limiting per IP
-        limit_conn addr 10;
-    }
-}
-```
-
-### Step 2: Create Proxy Parameters File
-
-**File: `nginx/proxy_params`**
-
-```nginx
-# Proxy parameters
-proxy_http_version 1.1;
-proxy_set_header Upgrade $http_upgrade;
-proxy_set_header Connection 'upgrade';
-proxy_set_header Host $host;
-proxy_cache_bypass $http_upgrade;
-
-# Forward real IP
-proxy_set_header X-Real-IP $remote_addr;
-proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-proxy_set_header X-Forwarded-Proto $scheme;
-
-# Timeouts
-proxy_connect_timeout 30s;
-proxy_send_timeout 30s;
-proxy_read_timeout 30s;
-
-# Buffering
-proxy_buffering on;
-proxy_buffer_size 4k;
-proxy_buffers 8 4k;
-proxy_busy_buffers_size 8k;
-
-# Redirect handling
-proxy_redirect off;
-
-# Request tracking
-proxy_set_header X-Request-ID $request_id;
-```
-
-### Step 3: Update Docker Compose for Nginx
-
-**File: `docker-compose.yml`** (add nginx service)
-
-```yaml
-services:
-  nginx:
-    image: nginx:1.25-alpine
-    container_name: crimelens-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/proxy_params:/etc/nginx/proxy_params:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-      - nginx_logs:/var/log/nginx
-    depends_on:
-      - backend
-    networks:
-      - crimelens-network
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-
-  # ... other services remain the same
-```
-
-### Step 4: Create Development Nginx Config
-
-**File: `nginx/nginx-dev.conf`**
-
-```nginx
-user nginx;
-worker_processes auto;
-error_log /var/log/nginx/error.log warn;
-pid /var/run/nginx.pid;
-
-events {
-    worker_connections 1024;
-}
-
-http {
-    include /etc/nginx/mime.types;
-    default_type application/octet-stream;
-
-    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
-                    '$status $body_bytes_sent "$http_referer" '
-                    '"$http_user_agent" "$http_x_forwarded_for"';
-
-    access_log /var/log/nginx/access.log main;
-
-    sendfile on;
-    tcp_nopush on;
-    tcp_nodelay on;
-    keepalive_timeout 65;
-    server_tokens off;
-
-    gzip on;
-    gzip_vary on;
-    gzip_proxied any;
-    gzip_comp_level 6;
-    gzip_types text/plain text/css text/xml application/json application/javascript;
-
-    server {
-        listen 80;
-        server_name localhost;
-
-        client_max_body_size 10m;
-
-        # Frontend
-        location / {
-            proxy_pass http://frontend:80;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-
-        # Backend API
-        location /api/ {
-            proxy_pass http://backend:5001;
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection 'upgrade';
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_cache_bypass $http_upgrade;
-        }
-    }
-}
-```
-
-### Step 5: Add SSL Certificate Setup Script
-
-**File: `nginx/setup-ssl.sh`**
+### Step 4: Live verification (all executed)
 
 ```bash
-#!/bin/bash
-
-# Setup SSL certificates for local development (self-signed)
-# For production, use Let's Encrypt
-
-SSL_DIR="./nginx/ssl"
-
-mkdir -p $SSL_DIR
-
-# Generate self-signed certificate
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout $SSL_DIR/crimelens.key \
-  -out $SSL_DIR/crimelens.crt \
-  -subj "/C=US/ST=State/L=City/O=Organization/CN=crimelens.example.com"
-
-# Set permissions
-chmod 600 $SSL_DIR/crimelens.key
-chmod 644 $SSL_DIR/crimelens.crt
-
-echo "SSL certificates generated in $SSL_DIR"
-echo "For production, use Let's Encrypt:"
-echo "  certbot certonly --webroot -w /var/www/html -d crimelens.example.com"
+docker compose build && docker compose up -d
+docker compose ps                       # edge + 5 services healthy
+curl -f http://localhost:18000/               # SPA through edge
+curl -f http://localhost:18000/api/health     # real health route via upstream
+curl -f http://localhost:18000/api/crimes/types
+# /metrics must NOT be reachable through the edge:
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:18000/metrics
+# Prometheus still scrapes internally (backend:5001 target UP):
+curl -s http://localhost:19090/api/v1/targets
 ```
 
-### Step 6: Create Nginx Reload Script
-
-**File: `scripts/nginx-reload.sh`**
+Load-balancing smoke (temporary, returned to 1 replica after):
 
 ```bash
-#!/bin/bash
-
-# Reload nginx configuration without downtime
-
-echo "Testing nginx configuration..."
-docker exec crimelens-nginx nginx -t
-
-if [ $? -eq 0 ]; then
-    echo "Configuration is valid. Reloading nginx..."
-    docker exec crimelens-nginx nginx -s reload
-    echo "Nginx reloaded successfully!"
-else
-    echo "Configuration test failed. Not reloading."
-    exit 1
-fi
+docker compose up -d --scale backend=2
+docker compose logs backend | ...       # both replicas serve requests
+docker stop <one backend container>     # failover: traffic continues
+                                        # (passive max_fails ejection)
+docker compose up -d --scale backend=1  # restore
 ```
 
-## Testing
-
-### Test Reverse Proxy
+Rate limit through edge (app-level, proves TRUST_PROXY over the new hop):
 
 ```bash
-# Test through nginx
-curl http://localhost/api/health
-
-# Test SSL (if configured)
-curl https://localhost/api/health --insecure
-
-# Test load balancing
-for i in {1..10}; do
-  curl -s http://localhost/api/health | grep -o '"request_id":"[^"]*"'
-done
-# Should show different backend instances responding
+# burst 51× http://localhost:18000/api/zones/severity → 429
 ```
 
-### Test Health Checks
+Upload-size check: `docker compose exec nginx nginx -T | grep client_max_body_size` → 50m.
 
-```bash
-# Check nginx health
-docker-compose ps nginx
+Playwright smoke through the edge: landing, map (markers), statistics,
+login page renders; console clean.
 
-# Check nginx logs
-docker-compose logs nginx | tail -20
-```
+### Step 5: Validation bookkeeping
 
-### Test SSL Configuration
+- `docker/nginx-edge.conf` syntax: `docker compose exec nginx nginx -t`
+- implementation-log.md + testing-log.md per Plans/CLAUDE.md
 
-```bash
-# Test SSL configuration
-curl -I https://crimelens.example.com/api/health
+## Out of Scope
 
-# Check SSL rating
-# https://www.ssllabs.com/ssltest/analyze.html?d=crimelens.example.com
-```
-
-## Expected Results
-
-- **Single entry point**: All traffic through nginx
-- **Load distribution**: Traffic balanced across backends
-- **SSL termination**: HTTPS at nginx, HTTP to backends
-- **Static file caching**: Frontend assets cached at edge
-- **Health checks**: Nginx checks backend health
-- **Rate limiting**: IP-based limits enforced
+- TLS/SSL (Phase 13 Cloudflare), HSTS
+- nginx rate limiting / connection limiting (app Redis limiter owns this)
+- Full replica scaling + 1/2/3-instance comparison (Phase 11)
+- Access logs aggregation/dashboards
 
 ## Success Criteria
 
-- [ ] Nginx reverse proxy operational
-- [ ] Load balancing working (Phase 11 will verify multiple instances)
-- [ ] SSL/TLS configured
-- [ ] Security headers present
-- [ ] Health checks functional
-- [ ] Static assets served efficiently
-- [ ] Configuration reload works without downtime
+- [ ] Edge nginx is the single published entrypoint (SPA + `/api` both
+      through :80; frontend container no longer host-published)
+- [ ] `/metrics` returns 404 through the edge; Prometheus still scrapes
+      `backend:5001` UP internally
+- [ ] `--scale backend=2` smoke: both replicas serve traffic; killing one
+      does not drop requests (passive health check failover)
+- [ ] 429 still enforced through the edge (TRUST_PROXY + XFF chain)
+- [ ] Uploads would not 413 (`client_max_body_size 50m` in effect)
+- [ ] Edge container healthcheck passes against `/api/health`
+- [ ] Playwright smoke through the edge passes with clean console
+- [ ] Host-run workflows unaffected (dev backend/dev server untouched)
 
-## Files Created
-
-```
-nginx/
-├── nginx.conf (new)
-├── nginx-dev.conf (new)
-├── proxy_params (new)
-├── ssl/
-│   └── (generated by setup script)
-└── logs/ (created by nginx)
-
-scripts/
-└── nginx-reload.sh (new)
-
-docker-compose.yml (modified - add nginx)
-```
-
-## Architecture
+## Files Created/Modified
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Nginx                                │
-│                   (Port 80 / 443)                          │
-└────────────┬────────────────────────────────────────────────┘
-             │
-    ┌────────┴────────┐
-    │                 │
-┌───▼───┐        ┌───▼────┐
-│Frontend│        │Backend │
-│ :80   │        │ Upstream│
-│       │        │         │
-└───────┘        │┌───────┐│
-                 ││Backend1││
-                 ││ :5001 ││
-                 │└───────┘│
-                 │┌───────┐│
-                 ││Backend2││ (Phase 11)
-                 ││ :5001 ││
-                 │└───────┘│
-                 │┌───────┐│
-                 ││Backend3││
-                 ││ :5001 ││
-                 │└───────┘│
-                 └─────────┘
+├── docker/nginx-edge.conf        (new — edge proxy + upstream)
+├── docker-compose.yml            (edit — nginx service, frontend internal-only,
+│                                  CORS_ORIGINS to edge origin)
+└── docker-compose.override.yml   (gitignored local — edge port remap)
+Plans/phase-10-nginx/implementation-log.md (new)
+Plans/phase-10-nginx/testing-log.md        (new)
 ```
 
-## Dependencies
+## Rollback
 
-- Phase 9 Docker (containers for nginx and backends)
-- Phase 2 health checks (for backend health)
-- Phase 4 rate limiting (complementary)
-
-## Rollback Procedure
-
-If nginx causes issues:
-1. Remove nginx service from docker-compose.yml
-2. Expose backend directly on port 5001
-3. Restart docker-compose
+Remove the `nginx` service + restore `frontend` ports in compose; delete
+`docker/nginx-edge.conf`. Backend/frontend images are untouched by this
+phase — no rebuild needed.
 
 ## Estimated Completion Time
 
-- Nginx configuration: 1.5 hours
-- Docker integration: 30 minutes
-- SSL setup: 30 minutes
-- Testing: 30 minutes
-- **Total: 3 hours**
+- Edge config + compose edits: 45 min
+- Live verification incl. scale/failover smoke: 1–1.5 h
+- **Total: ~2–2.5 h**
