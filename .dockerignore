@@ -1,0 +1,41 @@
+# Build-context exclusions (Phase 9).
+# Only THIS file (at the context root) is honored — per-subdirectory
+# .dockerignore files are ignored by Docker. Patterns without a leading
+# path match at the context root only; **/ patterns match at any depth.
+
+# Dependencies — installed fresh inside the images via npm ci
+**/node_modules
+
+# Build output — rebuilt inside the frontend image
+**/dist
+
+# Secrets must never enter the build context. db-project-backend/.env is
+# supplied at runtime via compose env_file. db-project-frontend/.env is
+# INTENTIONALLY kept in the context (it is NOT matched by the root-level
+# patterns below): Vite bakes VITE_* into the bundle at build time and its
+# values (Supabase URL + anon key) are public by design.
+.env
+.env.*
+db-project-backend/.env
+db-project-backend/.env.*
+
+# Version control and tooling
+.git
+.claude
+.agents
+.playwright-mcp
+temp
+
+# Docs, plans, logs — not needed inside images
+Plans
+docs
+*.md
+**/*.log
+
+# Tests and coverage — not part of the runtime images
+db-project-backend/tests
+tests
+coverage
+
+# Local-only compose overrides
+docker-compose.override.yml

@@ -1,0 +1,37 @@
+# CrimeLens API image (Phase 9).
+#
+# Build from the repository root (the build context is the whole repo so the
+# root .dockerignore governs what is sent to the daemon):
+#   docker build -f Dockerfile.backend -t crimelens-api .
+#
+# Single stage: the app has no build step (plain ESM JavaScript) and no
+# writable-directory needs (multer uses memory storage, pino logs to stdout).
+# node:22-alpine matches the Node version used in development (phases 0-8).
+# bcrypt (the native module) was removed in this phase — bcryptjs is used
+# everywhere — so no python3/make/g++ toolchain is required on Alpine.
+
+FROM node:22-alpine
+
+ENV NODE_ENV=production
+WORKDIR /app
+
+# Install production dependencies first (layer cached until the lockfile changes)
+COPY db-project-backend/package.json db-project-backend/package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+# App source. db-project-backend/.env is excluded from the build context by
+# .dockerignore — secrets are supplied at runtime via compose env_file.
+COPY db-project-backend/ ./
+
+# The app never writes to disk (memory-storage uploads, stdout logging), so
+# the stock non-root user needs no extra ownership changes.
+USER node
+
+EXPOSE 5001
+
+# Built-in fetch (Node 22) — no curl/wget package needed in the image.
+# Shell form so the PORT env var is honored at check time.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||5001)+'/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+
+CMD ["node", "server.js"]
