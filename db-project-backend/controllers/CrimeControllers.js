@@ -11,6 +11,7 @@ import { CacheKeys, CacheTTL } from "../config/redis.js";
 import cacheService from "../services/cacheService.js";
 import { withCacheInvalidation } from "../middleware/cacheDecorator.js";
 import { crimesReported, crimesVerified } from "../config/prometheus.js";
+import { enqueueMediaCleanup } from "../config/queue.js";
 const { Crime, CrimeSubmission, CrimeReportsSubmitter, CrimeType, Zone, CrimeMedia } = db;
 
 const parseRequiredCoordinates = (latitude, longitude) => {
@@ -1406,6 +1407,13 @@ export const deleteCrime = withCacheInvalidation([
     }
 
     await t.commit();
+
+    // Phase 12: Cloudinary cleanup moved to a background job (the deleted
+    // rows' publicIds would otherwise be orphaned). Fire-and-forget — a
+    // queue/Redis outage must never fail the deletion response.
+    enqueueMediaCleanup(mediaRows).catch((err) =>
+      req.log.error({ err: err }, "Failed to enqueue media cleanup")
+    );
 
     res.status(200).json({
       success: true,

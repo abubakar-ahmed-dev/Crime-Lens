@@ -2,720 +2,212 @@
 
 ## Objective
 
-Implement asynchronous background job processing using BullMQ and Redis to handle long-running operations without blocking API requests, improving user experience and system throughput.
+Move Cloudinary media cleanup off the request path into a BullMQ queue
+processed by a dedicated worker container — closing a real, existing gap
+(`deleteCrime` deletes `CrimeMedia` rows today and leaves the Cloudinary
+files orphaned; the code itself carries a TODO saying this should be a
+background job). Queue infrastructure, retries, graceful shutdown, admin
+status endpoints, and a cross-process queue-depth gauge. No API response
+contract changes.
 
-## What We'll Implement
+## Audit Corrections vs Previous Plan (why this rewrite)
 
-1. **BullMQ job queue** setup
-2. **Worker processes** for background tasks
-3. **Job retry logic** and failure handling
-4. **Job progress tracking**
-5. **UI feedback** for long-running operations
+1. **BullMQ cannot use the project's node-redis client.** The plan passed
+   `connection: redisClient` (node-redis v6) — BullMQ is built on **ioredis**
+   and will not work with it. Correct: add `ioredis`, create a dedicated
+   connection from `REDIS_URL` with `maxRetriesPerRequest: null` (required
+   for Workers).
+2. **The plan's `connection` export was incoherent** — `{ host, port,
+   connection: redisClient }` nests a client inside connection options.
+   Replaced by one ioredis instance (or URL) shared by queues/workers in a
+   process.
+3. **Email queue dropped entirely** — no email service exists in the app;
+   the plan's processor "simulates" sending with a sleep. CLAUDE.md:
+   no background jobs for resume value. If email ever lands, so does its
+   queue.
+4. **CSV async moved to an explicit follow-up, not this phase.** The current
+   upload returns `stats {total, inserted, duplicates, invalid}` which the
+   admin UI displays; switching to 202+jobId breaks that contract and
+   requires frontend work (out of scope for a backend phase). Worse: the
+   plan's CSV processor was a stub (`const rows = []; // Add CSV parsing
+   logic here`) — rerouting real traffic into it would silently drop
+   uploads. This phase ships the queue infrastructure the CSV follow-up
+   will reuse.
+5. **The real gap is Cloudinary deletion** — `deleteCrime` already deletes
+   media rows and comments "Cloudinary file deletion should be handled via
+   a background job". That is the honest, zero-contract-change candidate.
+6. **The plan's `deleteCrime` rewrite dropped the `withCacheInvalidation`
+   wrapper and restructured the 404 path.** Rewrite preserves the existing
+   handler wrapper, transaction, rollback, and 404 flow exactly; the only
+   change is enqueueing cleanup after commit.
+7. **Use the existing `deleteMultipleFiles` batch API** (single `uploader.destroy`
+   call with an array) instead of the plan's per-file loop.
+8. **Response stays byte-identical** — no `backgroundJobs` field added.
+   Phase-11's less_conn still applies: minimal, focused changes.
+9. **`console.error` re-introduced by plan snippets** — phase 7 removed
+   every console.* from the backend; all worker/queue code logs via pino.
+10. **Plan's `worker.js` leaked connections on shutdown** — closes workers
+    but never the queue connections. Correct shutdown: `worker.close()`
+    for each, then `queue.close()` + ioredis `quit()`, bounded by a
+    force-exit timer (same pattern as server.js).
+11. **Worker stays DB-free.** Cloudinary deletion needs no Sequelize — the
+    worker imports no models, adds zero DB pool pressure (phase-11 budget
+    untouched). The plan's worker only needed DB because of the (dropped)
+    CSV stub.
+12. **Compose worker service corrected** — no `env_file: .env` (root file
+    doesn't exist), no duplicated secret literals, no `container_name`;
+    mirrors the backend service (`env_file: db-project-backend/.env` +
+    in-compose `REDIS_URL` override), reuses the `crimelens-api` image
+    (same build; only the command differs) so no new Dockerfile.
+13. **Metrics: the plan ignored process boundaries.** Counters incremented
+    inside the worker are invisible to the API process's `/metrics`
+    register. Instead: queue-depth gauge (`waiting`/`active`/`completed`/
+    `failed` per queue) read cross-process by the API's existing 30s
+    updater via BullMQ's count APIs; the worker logs outcomes structurally.
+14. **Job-status endpoint trims exposure** — admin-only (as planned) but
+    returns id/name/queue/progress/attempts/failedReason/returnvalue/
+    timestamps; NOT raw `job.data` or stacktrace.
+15. **Idempotency noted where it belongs**: deletion jobs are naturally
+    idempotent (Cloudinary `destroy` on an already-deleted id returns ok/
+    not-found — treated as success), so retries are safe.
+
+## Scope boundary
+
+- CSV async processing: follow-up phase; will reuse this phase's queue
+  config + worker + status endpoints; requires frontend work for the
+  202/jobId flow.
+- Emails: none exist; no queue.
+- Frontend: unchanged (response contracts untouched).
 
 ## Implementation Steps
 
-### Step 1: Install BullMQ Dependencies
+### Step 1: Dependencies
 
 ```bash
-npm install bullmq
+cd db-project-backend && npm install bullmq ioredis
 ```
 
-### Step 2: Create Job Queue Configuration
+### Step 2: `db-project-backend/config/queue.js` (new; plan's `bullmq.js` renamed)
 
-**File: `db-project-backend/config/bullmq.js`**
+- ioredis connection from `REDIS_URL` (`maxRetriesPerRequest: null`)
+- `QUEUES = { CLOUDINARY_DELETION: 'cloudinary-deletion' }` (+ extension
+  point comment for the CSV follow-up)
+- `defaultJobOptions`: attempts 3, exponential backoff 2s,
+  `removeOnComplete { count: 100, age: 24h }`, `removeOnFail { count: 500 }`
+- Queue + worker factories; `initCloudinaryWorker()` with completed/failed/
+  error event logging (pino); `getQueueDepthCounts()` for the metrics gauge
+- `enqueueMediaCleanup(mediaRows)` helper: splits image/video publicIds,
+  adds one job per resource type (empty lists add nothing)
+
+### Step 3: `deleteCrime` integration (only change)
+
+After `t.commit()` and before the response:
 
 ```javascript
-import { Queue, Worker, Job } from 'bullmq';
-import { redisClient } from './redis.js';
-import { logger } from './logger.js';
-
-/**
- * BullMQ configuration for background job processing
- */
-
-// Connection options for BullMQ
-export const connection = {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  // Use Redis client if available
-  connection: redisClient.isOpen ? redisClient : undefined,
-};
-
-// Job queues
-export const QUEUES = {
-  CSV_PROCESSING: 'csv-processing',
-  CLOUDINARY_DELETION: 'cloudinary-deletion',
-  EMAIL_NOTIFICATIONS: 'email-notifications',
-};
-
-// Queue configurations
-export const queueConfig = {
-  connection: connection,
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 2000,
-    },
-    removeOnComplete: {
-      count: 100, // Keep last 100 completed jobs
-      age: 24 * 3600, // 24 hours
-    },
-    removeOnFail: {
-      count: 500, // Keep last 500 failed jobs
-    },
-  },
-};
-
-// Create queue factory
-export const createQueue = (name, config = {}) => {
-  return new Queue(name, { ...queueConfig, ...config });
-};
-
-// Create worker factory
-export const createWorker = (queueName, processor, config = {}) => {
-  return new Worker(queueName, processor, {
-    connection: connection,
-    concurrency: config.concurrency || 1,
-    limiter: config.limiter,
-  });
-};
-
-// Initialize queues
-export const csvQueue = createQueue(QUEUES.CSV_PROCESSING);
-export const cloudinaryQueue = createQueue(QUEUES.CLOUDINARY_DELETION);
-export const emailQueue = createQueue(QUEUES.EMAIL_NOTIFICATIONS);
-
-/**
- * Job processors
- */
-
-// CSV processing job processor
-export const processCSVJob = async (job) => {
-  const { filePath, userId } = job.data;
-
-  logger.info('Processing CSV job', { 
-    jobId: job.id, 
-    userId, 
-    filePath 
-  });
-
-  try {
-    // Import dynamically to avoid circular dependencies
-    const { bulkInsertHelper } = await import('../utils/bulkInsertHelper.js');
-    const fs = await import('fs');
-
-    // Update job progress
-    await job.updateProgress(10);
-
-    // Read and parse CSV
-    const fileContent = fs.readFileSync(filePath, 'utf8');
-    await job.updateProgress(30);
-
-    // Process CSV rows
-    const rows = []; // Add CSV parsing logic here
-    await job.updateProgress(50);
-
-    // Bulk insert to database
-    await job.updateProgress(80);
-
-    // Clean up file
-    fs.unlinkSync(filePath);
-    await job.updateProgress(100);
-
-    logger.info('CSV processing completed', { jobId: job.id });
-
-    return { success: true, recordsProcessed: rows.length };
-  } catch (error) {
-    logger.error('CSV processing failed', { 
-      jobId: job.id, 
-      error: error.message 
-    });
-    throw error; // Will trigger retry
-  }
-};
-
-// Cloudinary deletion job processor
-export const processCloudinaryDeletionJob = async (job) => {
-  const { publicIds, resourceType } = job.data;
-
-  logger.info('Processing Cloudinary deletion', { 
-    jobId: job.id, 
-    count: publicIds.length 
-  });
-
-  try {
-    const { deleteFile } = await import('../config/cloudinaryConfig.js');
-
-    let deleted = 0;
-    let failed = 0;
-
-    // Process deletions in batches
-    const batchSize = 10;
-    for (let i = 0; i < publicIds.length; i += batchSize) {
-      const batch = publicIds.slice(i, i + batchSize);
-      
-      for (const publicId of batch) {
-        try {
-          await deleteFile(publicId, resourceType);
-          deleted++;
-        } catch (error) {
-          logger.warn('Cloudinary deletion failed', { 
-            publicId, 
-            error: error.message 
-          });
-          failed++;
-        }
-      }
-
-      // Update progress
-      const progress = Math.round(((i + batch.length) / publicIds.length) * 100);
-      await job.updateProgress(Math.min(progress, 100));
-    }
-
-    logger.info('Cloudinary deletion completed', { 
-      jobId: job.id, 
-      deleted, 
-      failed 
-    });
-
-    return { success: true, deleted, failed };
-  } catch (error) {
-    logger.error('Cloudinary deletion job failed', { 
-      jobId: job.id, 
-      error: error.message 
-    });
-    throw error;
-  }
-};
-
-// Email notification job processor
-export const processEmailJob = async (job) => {
-  const { to, subject, template, data } = job.data;
-
-  logger.info('Processing email job', { jobId: job.id, to, subject });
-
-  try {
-    // Integrate with email service (SendGrid, AWS SES, etc.)
-    // For now, just log the email
-    logger.info('Email would be sent', { to, subject, template, data });
-
-    // Simulate email sending delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    return { success: true };
-  } catch (error) {
-    logger.error('Email job failed', { jobId: job.id, error: error.message });
-    throw error;
-  }
-};
-
-/**
- * Worker initialization
- */
-export const initWorkers = () => {
-  const workers = [];
-
-  // CSV processing worker (single concurrency for large files)
-  workers.push(createWorker(
-    QUEUES.CSV_PROCESSING, 
-    processCSVJob,
-    { concurrency: 1 }
-  ));
-
-  // Cloudinary deletion worker (parallel deletions)
-  workers.push(createWorker(
-    QUEUES.CLOUDINARY_DELETION,
-    processCloudinaryDeletionJob,
-    { concurrency: 5 }
-  ));
-
-  // Email worker (parallel emails)
-  workers.push(createWorker(
-    QUEUES.EMAIL_NOTIFICATIONS,
-    processEmailJob,
-    { concurrency: 10 }
-  ));
-
-  // Worker event handlers
-  workers.forEach(worker => {
-    worker.on('completed', (job) => {
-      logger.info('Job completed', { 
-        queue: worker.queueName, 
-        jobId: job.id 
-      });
-    });
-
-    worker.on('failed', (job, err) => {
-      logger.error('Job failed', { 
-        queue: worker.queueName, 
-        jobId: job?.id, 
-        error: err.message 
-      });
-    });
-  });
-
-  return workers;
-};
-
-/**
- * Job helpers
- */
-export const addCSVJob = async (filePath, userId, options = {}) => {
-  return csvQueue.add('process-csv', 
-    { filePath, userId }, 
-    { 
-      jobId: `csv-${userId}-${Date.now()}`,
-      ...options 
-    }
-  );
-};
-
-export const addCloudinaryDeletionJob = async (publicIds, resourceType = 'image') => {
-  return cloudinaryQueue.add('delete-cloudinary-files',
-    { publicIds, resourceType },
-    { 
-      jobId: `cloudinary-${Date.now()}`,
-      attempts: 3
-    }
-  );
-};
-
-export const addEmailJob = async (to, subject, template, data) => {
-  return emailQueue.add('send-email',
-    { to, subject, template, data },
-    {
-      priority: 1, // Higher priority for transactional emails
-      attempts: 5
-    }
-  );
-};
-
-/**
- * Queue status checker
- */
-export const getQueueStatus = async () => {
-  const queues = [
-    { name: 'CSV Processing', queue: csvQueue },
-    { name: 'Cloudinary Deletion', queue: cloudinaryQueue },
-    { name: 'Email Notifications', queue: emailQueue },
-  ];
-
-  const status = {};
-
-  for (const { name, queue } of queues) {
-    try {
-      const [waiting, active, completed, failed] = await Promise.all([
-        queue.getWaitingCount(),
-        queue.getActiveCount(),
-        queue.getCompletedCount(),
-        queue.getFailedCount(),
-      ]);
-
-      status[name] = { waiting, active, completed, failed };
-    } catch (error) {
-      status[name] = { error: error.message };
-    }
-  }
-
-  return status;
-};
-
-export default {
-  QUEUES,
-  csvQueue,
-  cloudinaryQueue,
-  emailQueue,
-  initWorkers,
-  addCSVJob,
-  addCloudinaryDeletionJob,
-  addEmailJob,
-  getQueueStatus,
-};
+// Fire-and-forget: never fail the response because cleanup enqueueing failed
+enqueueMediaCleanup(mediaRows).catch((err) =>
+  req.log.error({ err }, "Failed to enqueue media cleanup")
+);
 ```
 
-### Step 3: Update CSV Upload Controller
+Everything else (wrapper, transaction, 404, response shape) untouched.
 
-**File: `db-project-backend/controllers/adminControls/UploadControllers.js`**
+### Step 4: `db-project-backend/worker.js` (new)
 
-```javascript
-import { addCSVJob } from '../../config/bullmq.js';
+- Initializes the Cloudinary worker only (no DB, no express)
+- Graceful shutdown: bounded (`SHUTDOWN_TIMEOUT_MS`) close of worker →
+  queue → ioredis, mirroring server.js's force-exit pattern
+- pino logging only; `NODE_ENV`-aware log level
 
-export const uploadCrimesCSV = async (req, res) => {
-  let t;
-  try {
-    const filePath = req.file.path;
-    const userId = req.user.id;
+### Step 5: Admin job/queue status API
 
-    // Instead of processing synchronously, queue the job
-    const job = await addCSVJob(filePath, userId);
+- `routes/jobRoutes.js`: `GET /api/jobs/queues` (all queue counts),
+  `GET /api/jobs/status/:jobId` (searches this phase's queues)
+- Auth: `verifyToken` + `authorizeRoles("admin")` (names verified against
+  `middleware/authMiddleware.js`)
+- Mount in `server.js` with the other API routers
 
-    // Return immediately with job ID for tracking
-    return res.status(202).json({
-      success: true,
-      message: 'CSV upload queued for processing',
-      jobId: job.id,
-      status: 'pending',
-    });
+### Step 6: Metrics (cross-process-safe)
 
-  } catch (error) {
-    console.error('Upload error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Error uploading CSV',
-    });
-  }
-};
-```
+- `config/prometheus.js`: `crimelens_queue_depth` gauge
+  (labels: queue, state) refreshed by the existing 30s updater via
+  `getQueueDepthCounts()`; failure-safe like the other updaters
 
-### Step 4: Update Crime Deletion for Background Jobs
-
-**File: `db-project-backend/controllers/CrimeControllers.js`**
-
-```javascript
-import { addCloudinaryDeletionJob } from '../config/bullmq.js';
-
-export const deleteCrime = async (req, res) => {
-  let t;
-  try {
-    const { id } = req.params;
-
-    t = await sequelize.transaction();
-
-    // Get all media for this crime before deletion
-    const mediaRows = await sequelize.query(
-      `SELECT id, "publicId", "fileType" FROM "CrimeMedia" WHERE "CrimeId" = :crimeId;`,
-      { replacements: { crimeId: id }, type: QueryTypes.SELECT, transaction: t }
-    );
-
-    // Extract publicIds for background deletion
-    const imageIds = mediaRows
-      .filter(m => m.fileType === 'image')
-      .map(m => m.publicId);
-    const videoIds = mediaRows
-      .filter(m => m.fileType === 'video')
-      .map(m => m.publicId);
-
-    // Delete from database immediately
-    if (mediaRows.length > 0) {
-      await sequelize.query(
-        `DELETE FROM "CrimeMedia" WHERE "CrimeId" = :crimeId;`,
-        { replacements: { crimeId: id }, type: QueryTypes.DELETE, transaction: t }
-      );
-    }
-
-    await sequelize.query(
-      `UPDATE "Crime" SET status = 'deleted', "mediaCount" = 0, "thumbnailUrl" = NULL WHERE id = :id;`,
-      { replacements: { id }, type: QueryTypes.UPDATE, transaction: t }
-    );
-
-    await t.commit();
-
-    // Queue Cloudinary deletions as background job
-    if (imageIds.length > 0) {
-      await addCloudinaryDeletionJob(imageIds, 'image');
-    }
-    if (videoIds.length > 0) {
-      await addCloudinaryDeletionJob(videoIds, 'video');
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'Crime deleted successfully',
-      data: { id },
-      backgroundJobs: [
-        ...(imageIds.length ? [{ type: 'image_deletion', count: imageIds.length }] : []),
-        ...(videoIds.length ? [{ type: 'video_deletion', count: videoIds.length }] : []),
-      ],
-    });
-  } catch (error) {
-    if (t && !t.finished) await t.rollback();
-    
-    console.error('Delete Crime Error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting crime',
-    });
-  }
-};
-```
-
-### Step 5: Create Job Status Endpoint
-
-**File: `db-project-backend/controllers/jobController.js`**
-
-```javascript
-import { getQueueStatus } from '../config/bullmq.js';
-
-export const getJobStatus = async (req, res) => {
-  try {
-    const { jobId } = req.params;
-    
-    // Get job from all queues
-    const { csvQueue, cloudinaryQueue, emailQueue } = await import('../config/bullmq.js');
-    
-    let job = null;
-    const queues = [csvQueue, cloudinaryQueue, emailQueue];
-    
-    for (const queue of queues) {
-      try {
-        job = await queue.getJob(jobId);
-        if (job) break;
-      } catch (e) {
-        // Job not in this queue
-      }
-    }
-
-    if (!job) {
-      return res.status(404).json({
-        success: false,
-        message: 'Job not found',
-      });
-    }
-
-    return res.json({
-      success: true,
-      job: {
-        id: job.id,
-        name: job.name,
-        data: job.data,
-        progress: job.progress,
-        attemptsMade: job.attemptsMade,
-        failedReason: job.failedReason,
-        stacktrace: job.stacktrace,
-        returnvalue: job.returnvalue,
-        processedOn: job.processedOn,
-        finishedOn: job.finishedOn,
-      },
-    });
-  } catch (error) {
-    console.error('Job status error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching job status',
-    });
-  }
-};
-
-export const getAllQueueStatus = async (req, res) => {
-  try {
-    const status = await getQueueStatus();
-    res.json({ success: true, queues: status });
-  } catch (error) {
-    console.error('Queue status error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching queue status',
-    });
-  }
-};
-```
-
-### Step 6: Create Worker Entry Point
-
-**File: `db-project-backend/worker.js`**
-
-```javascript
-import { initWorkers } from './config/bullmq.js';
-import { logger } from './config/logger.js';
-
-logger.info('Starting BullMQ workers...');
-
-const workers = initWorkers();
-
-logger.info(`${workers.length} workers started`);
-
-// Graceful shutdown
-const gracefulShutdown = async (signal) => {
-  logger.info(`${signal} received. Closing workers...`);
-
-  await Promise.all(
-    workers.map(worker => worker.close())
-  );
-
-  logger.info('Workers closed');
-  process.exit(0);
-};
-
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-```
-
-### Step 7: Add Worker to Docker Compose
-
-**File: `docker-compose.yml`**
+### Step 7: Compose worker service
 
 ```yaml
-services:
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-    container_name: crimelens-worker
-    restart: unless-stopped
-    command: node worker.js
-    environment:
-      - NODE_ENV=production
-      - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=${DATABASE_URL}
-      - JWT_SECRET=${JWT_SECRET}
-    env_file:
-      - .env
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - crimelens-network
+worker:
+  image reuse of crimelens-api (same build), command: node worker.js
+  env_file: db-project-backend/.env + REDIS_URL/LOG_LEVEL/NODE_ENV overrides
+  depends_on: redis healthy
+  internal network only (no host port)
 ```
 
-### Step 8: Add Job Routes
-
-**File: `db-project-backend/routes/jobRoutes.js`**
-
-```javascript
-import express from 'express';
-import { getJobStatus, getAllQueueStatus } from '../controllers/jobController.js';
-import { verifyToken, authorizeRoles } from '../middleware/authMiddleware.js';
-
-const router = express.Router();
-
-const adminOnly = [verifyToken, authorizeRoles('admin')];
-
-// Get specific job status
-router.get('/status/:jobId', adminOnly, getJobStatus);
-
-// Get all queue status
-router.get('/queues', adminOnly, getAllQueueStatus);
-
-export default router;
-```
-
-### Step 9: Add Routes to Server
-
-**File: `db-project-backend/server.js`**
-
-```javascript
-import jobRoutes from './routes/jobRoutes.js';
-
-app.use('/api/jobs', jobRoutes);
-```
-
-## Testing
-
-### Test CSV Processing Job
+### Step 8: Validation
 
 ```bash
-# Upload CSV and get job ID
-curl -X POST http://localhost:5001/api/admin/upload-crimes \
-  -H "Authorization: Bearer <token>" \
-  -F "file=@test.csv"
-
-# Response includes jobId
-# Check job status
-curl http://localhost:5001/api/jobs/status/<jobId>
+node --check all touched files
+docker compose build backend && docker compose up -d          # worker included
+# unit-ish: enqueue a fake publicId job → worker claims it, completes,
+# job removable via admin endpoint
+# integration: create crime with media (or craft rows), delete via API,
+# observe job processed; queue depth gauge moves on /metrics
+# failure path: job for bogus-but-valid-format ids → Cloudinary 'not found'
+# treated as success; forced-throw path → retry with backoff then DLQ-ish
+# failed state visible in /api/jobs/queues
+# redis-down drill: enqueue fails gracefully (response unchanged), worker
+# retries connection with capped backoff (phase-3 pattern)
+# regression: deleteCrime response identical (curl before/after diff),
+# cache invalidation headers/behavior unchanged, admin endpoints 401/403
+# for non-admin roles
+# Playwright: not required (no user-visible change) — smoke only if time
 ```
 
-### Test Cloudinary Deletion Job
+## Out of Scope
 
-```bash
-# Delete a crime with media
-curl -X DELETE http://localhost:5001/api/crimes/delete/1 \
-  -H "Authorization: Bearer <token>"
-
-# Response includes backgroundJobs array
-```
-
-### Test Worker Process
-
-```bash
-# Start worker independently
-node db-project-backend/worker.js
-
-# Or via Docker
-docker-compose up worker
-```
-
-## Expected Results
-
-- **CSV Upload**: Returns 202 with job ID instead of waiting for processing
-- **Crime Deletion**: Returns immediately, media deleted in background
-- **Job Tracking**: Can query job status and progress
-- **Worker Process**: Processes jobs from Redis queue independently
+- CSV async processing (follow-up; needs frontend contract work)
+- Email queue (no email service exists)
+- Bull Board / UI dashboards (admin API endpoints suffice for now)
+- Multi-worker scaling config (compose `--scale worker=N` works when needed)
 
 ## Success Criteria
 
-- [ ] BullMQ queues created successfully
-- [ ] Worker process starts without errors
-- [ ] CSV processing moved to background
-- [ ] Cloudinary deletions moved to background
-- [ ] Job status endpoint functional
-- [ ] Queue status monitoring working
-- [ ] Failed jobs retry correctly
-- [ ] Workers can be scaled independently
+- [ ] Deleting a crime with media enqueues cleanup; worker deletes the
+      Cloudinary files (verified via job completion + logs)
+- [ ] `deleteCrime` response byte-identical to today (no new fields)
+- [ ] Failed deletions retry (3 attempts, exponential backoff) and land in
+      failed state visible via `/api/jobs/queues`
+- [ ] Idempotent: rerunning deletion on missing files completes cleanly
+- [ ] Worker shuts down gracefully (bounded) with no dangling Redis conns
+- [ ] Redis down: API responses unaffected (enqueue best-effort + logged)
+- [ ] Queue depth gauge appears on `/metrics`; admin status endpoints work
+      (401/403 for non-admins)
+- [ ] Host-run dev workflow unchanged (worker optional locally; without it
+      behavior matches today's — cleanup pending until a worker runs)
 
 ## Files Created/Modified
 
 ```
-db-project-backend/
-├── config/
-│   └── bullmq.js (new)
-├── worker.js (new)
-├── controllers/
-│   ├── jobController.js (new)
-│   ├── adminControls/
-│   │   └── UploadControllers.js (modified)
-│   └── CrimeControllers.js (modified)
-├── routes/
-│   └── jobRoutes.js (new)
-└── server.js (modified)
-
-docker-compose.yml (modified - add worker)
+db-project-backend/config/queue.js                    (new)
+db-project-backend/worker.js                          (new)
+db-project-backend/controllers/CrimeControllers.js    (edit — enqueue after commit)
+db-project-backend/routes/jobRoutes.js                (new)
+db-project-backend/controllers/jobController.js       (new)
+db-project-backend/server.js                          (edit — mount /api/jobs)
+db-project-backend/config/prometheus.js               (edit — queue gauge)
+db-project-backend/package.json + lock                (bullmq, ioredis)
+docker-compose.yml                                    (edit — worker service)
 ```
 
-## Background Job Architecture
+## Rollback
 
-```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   API #1     │     │   API #2     │     │   API #3     │
-└──────┬───────┘     └──────┬───────┘     └──────┬───────┘
-       │                     │                     │
-       └─────────────────────┴─────────────────────┘
-                              │
-                      ┌───────▼────────┐
-                      │      Redis     │
-                      │    Job Queue   │
-                      └───────┬────────┘
-                              │
-                      ┌───────▼────────┐
-                      │  BullMQ Worker │
-                      │  (Background)   │
-                      │                 │
-                      │  ┌────────────┐ │
-                      │  │ CSV Job    │ │
-                      │  │ Cloudinary │ │
-                      │  │ Email Job  │ │
-                      │  └────────────┘ │
-                      └─────────────────┘
-```
-
-## Dependencies
-
-- Phase 3 Redis (required for job queue)
-- Phase 7 Pino (worker logging)
-- Phase 8 Prometheus (job metrics)
-
-## Rollback Procedure
-
-If background jobs fail:
-1. Remove BullMQ logic from controllers
-2. Process operations synchronously (original implementation)
-3. Stop worker process
+Remove worker compose service, revert the `deleteCrime` enqueue lines and
+the `/api/jobs` mount, uninstall bullmq/ioredis. Deletion behavior reverts
+to today's (no cleanup) — no data or contract risk.
 
 ## Estimated Completion Time
 
-- BullMQ setup: 2 hours
-- Job processors: 2 hours
-- Controller integration: 1 hour
-- Worker process: 30 minutes
-- Testing: 1 hour
-- **Total: 6.5 hours**
+- Queue config + worker + shutdown: 1.5 h
+- deleteCrime integration + status API + gauge: 1 h
+- Compose + live validation incl. failure drills: 1.5 h
+- **Total: ~4 h**
