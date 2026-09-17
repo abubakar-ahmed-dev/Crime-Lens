@@ -68,7 +68,18 @@ export const applyRateLimit = (limiterType) => {
     }
 
     try {
-      const rateRes = await limiter.consume(getClientKey(req));
+      // Bound the store call: with Redis mid-outage a consume() can hang for
+      // seconds behind reconnect backoff (phase-12 drill). The race makes
+      // slow stores behave like failed ones — fail open fast. The trailing
+      // catch swallows the losing promise's late rejection so it can never
+      // become an unhandled rejection.
+      const key = getClientKey(req);
+      const consumePromise = limiter.consume(key);
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("rate limiter store timeout")), 1000)
+      );
+      consumePromise.catch(() => {}); // late rejection is already handled
+      const rateRes = await Promise.race([consumePromise, timeout]);
 
       setRateLimitHeaders(res, {
         limit: limiter.points,

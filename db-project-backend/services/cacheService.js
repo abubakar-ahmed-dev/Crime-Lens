@@ -18,7 +18,7 @@ class CacheService {
    */
   async get(key) {
     try {
-      if (!redisClient.isOpen) return null;
+      if (!redisClient.isReady) return null;
 
       const value = await redisClient.get(key);
       redisOperations.labels({ operation: "get", status: "ok" }).inc();
@@ -41,7 +41,7 @@ class CacheService {
    */
   async set(key, value, ttl = CacheTTL.MEDIUM) {
     try {
-      if (!redisClient.isOpen) return false;
+      if (!redisClient.isReady) return false;
 
       await redisClient.setEx(key, ttl, JSON.stringify(value));
       redisOperations.labels({ operation: "set", status: "ok" }).inc();
@@ -60,7 +60,7 @@ class CacheService {
    */
   async delete(key) {
     try {
-      if (!redisClient.isOpen) return false;
+      if (!redisClient.isReady) return false;
 
       await redisClient.del(key);
       redisOperations.labels({ operation: "delete", status: "ok" }).inc();
@@ -82,7 +82,7 @@ class CacheService {
    */
   async deletePattern(pattern) {
     try {
-      if (!redisClient.isOpen) return false;
+      if (!redisClient.isReady) return false;
 
       let deleted = 0;
       for await (const yielded of redisClient.scanIterator({ MATCH: pattern, COUNT: 100 })) {
@@ -105,7 +105,7 @@ class CacheService {
    * @returns {boolean}
    */
   isConnected() {
-    return redisClient.isOpen === true;
+    return redisClient.isReady === true;
   }
 
   /**
@@ -114,7 +114,7 @@ class CacheService {
    */
   async getMetrics() {
     try {
-      if (!redisClient.isOpen) {
+      if (!redisClient.isReady) {
         return { connected: false };
       }
 

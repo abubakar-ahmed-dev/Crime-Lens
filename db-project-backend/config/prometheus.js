@@ -107,6 +107,16 @@ export const systemHealth = new promClient.Gauge({
   registers: [register],
 });
 
+// Background job queues (Phase 12) — depth counts are read cross-process
+// from Redis via BullMQ count APIs, so the API process can expose worker
+// queue state even though workers run separately.
+export const queueDepth = new promClient.Gauge({
+  name: "crimelens_queue_depth",
+  help: "BullMQ queue depth by state",
+  labelNames: ["queue", "state"],
+  registers: [register],
+});
+
 // ---------------------------------------------------------------------------
 // Refresh helpers (interval-driven; NOT run inside the scrape path)
 // ---------------------------------------------------------------------------
@@ -178,12 +188,32 @@ let updaterTimer = null;
  * startup — never at module import — and unref'd so it can never keep the
  * process alive during shutdown.
  */
+export const updateQueueMetrics = async () => {
+  try {
+    // Lazy import avoids loading the queue stack (and its ioredis
+    // connection) into processes that never touch queues.
+    const { getQueueDepthCounts, QUEUES } = await import("./queue.js");
+    const counts = await getQueueDepthCounts();
+    for (const name of Object.values(QUEUES)) {
+      const c = counts[name] ?? {};
+      queueDepth.labels({ queue: name, state: "waiting" }).set(c.waiting ?? 0);
+      queueDepth.labels({ queue: name, state: "active" }).set(c.active ?? 0);
+      queueDepth.labels({ queue: name, state: "completed" }).set(c.completed ?? 0);
+      queueDepth.labels({ queue: name, state: "failed" }).set(c.failed ?? 0);
+      queueDepth.labels({ queue: name, state: "delayed" }).set(c.delayed ?? 0);
+    }
+  } catch {
+    // Redis/queues unavailable — gauges keep last known values
+  }
+};
+
 export const startMetricsUpdater = (intervalMs = 30000) => {
   if (updaterTimer) return;
   updaterTimer = setInterval(() => {
     updatePoolMetrics();
     updateHealthMetrics().catch(() => {});
     updateCacheMetrics().catch(() => {});
+    updateQueueMetrics().catch(() => {});
   }, intervalMs);
   updaterTimer.unref();
   // First refresh immediately so dashboards are not empty for 30s

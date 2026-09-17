@@ -9,6 +9,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.108.1",
     "bcryptjs": "^3.0.3",
+    "bullmq": "^6.3.6",
     "cloudinary": "^2.10.1",
     "compression": "^1.8.2",
     "cors": "^2.8.5",
@@ -17,6 +18,7 @@
     "express": "^5.1.0",
     "fast-csv": "^5.0.5",
     "helmet": "^8.3.0",
+    "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "pg": "^8.16.3",

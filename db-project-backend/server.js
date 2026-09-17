@@ -25,6 +25,7 @@ import zonesRoutes from "./routes/zoneRoutes.js";
 import crimeRoutes from "./routes/crimeRoutes.js";
 import citizenAuthRoutes from "./routes/citizenAuthRoutes.js";
 import mediaRoutes from "./routes/mediaRoutes.js";
+import jobRoutes from "./routes/jobRoutes.js";
 import healthRoutes from "./routes/healthRoutes.js";
 import { logger, httpLogger } from "./config/logger.js";
 
@@ -129,6 +130,7 @@ app.use("/api/zones", zonesRoutes);
 app.use("/api/crimes", crimeRoutes);
 app.use("/api/citizens", citizenAuthRoutes);
 app.use("/api/media", mediaRoutes);
+app.use("/api/jobs", jobRoutes);
 
 const { sequelize } = db;
 const PORT = process.env.PORT || 5001;
