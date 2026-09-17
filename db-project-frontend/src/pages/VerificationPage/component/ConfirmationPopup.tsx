@@ -1,7 +1,7 @@
 // VerificationPage/components/ConfirmationPopup.tsx
 import { useEffect, useState } from "react";
 import WhiteButton from "../../../components/WhiteButton";
-import { isValidLocation } from "../../../components/LocationPicker";
+import { isValidLocation } from "../../../components/locationValidation";
 import CrimeRecordForm from "../../../components/CrimeRecordForm";
 import AgentRecordForm, { type AgentBranchOption } from "../../../components/AgentRecordForm";
 import { API_BASE_URL } from "../../../config/constants";
@@ -41,7 +41,7 @@ interface ConfirmationPopupProps {
   latitude?: number | string;
   longitude?: number | string;
 
-  onApprove?: (updatedData: any) => void;
+  onApprove?: (updatedData: Record<string, string | number>) => void;
   onReject?: () => void;
 }
 
@@ -67,7 +67,8 @@ export default function ConfirmationPopup({
   isOpen,
   onClose,
   onApprove,
-  onReject,
+  // onReject is accepted from callers but the popup only approves/edits;
+  // rejection happens from the card, not this dialog.
   ...initialData
 }: ConfirmationPopupProps) {
   const [formData, setFormData] = useState(buildInitialFormData(initialData));

@@ -1,4 +1,7 @@
 // // MapViewPage/components/MapContext.tsx
+/* eslint-disable react-refresh/only-export-components -- Context module:
+   the context object and its provider are intentionally co-located (idiomatic
+   context-module pattern). Fast-refresh limitation accepted. */
 import React, { createContext, useState } from "react";
 import type { Crime } from "./types";
 import type { LatLngExpression } from "leaflet";

@@ -1,43 +1,45 @@
+import type { AllRecordsRow } from "./AllRecords";
+
 export const downloadCSV = (
     version: "admin" | "police" | "user" | null,
-    records: any[]
+    records: AllRecordsRow[]
   ) => {
-  
+
     if (version !== "admin" && version !== "police") {
       alert("CSV download is only available for admin or police.");
       return;
     }
-  
+
     if (!records || records.length === 0) {
       alert("No records available to download.");
       return;
     }
-  
+
     let headers: string[] = [];
     let rows: string[][] = [];
-  
+
     if (version === "admin") {
       headers = ["Agent ID", "Username", "Zone", "Branch ID", "Branch Contact #", "Date of Creation"];
-  
-      rows = records.map((r: any) => [
+
+      rows = records.map((r) => [
         String(r.agentId ?? ""),
         String(r.username ?? ""),
         String(r.zoneName ?? ""),
         String(r.branchId ?? ""),
         String(r.branchContact ?? ""),
-        String(new Date(r.createdAt).toLocaleDateString()),
+        String(new Date(r.createdAt ?? "").toLocaleDateString()),
       ]);
-  
+
     } else {
       headers = ["Crime ID", "Zone Name", "Reg. Branch ID", "Reporter CNIC", "Crime Type", "Date"];
-  
-      rows = records.map((r: any) => [
+
+      rows = records.map((r) => [
         String(r.id ?? ""),
         String(r.zoneName ?? ""),
         String(r.registeredBranchId ?? ""),
         String(r.submitterCnic ?? ""),
         String(r.crimeTypeName ?? ""),
-        String(new Date(r.incidentDate).toLocaleDateString()),
+        String(new Date(r.incidentDate ?? "").toLocaleDateString()),
       ]);
     }
   

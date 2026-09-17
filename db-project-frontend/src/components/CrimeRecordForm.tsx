@@ -1,4 +1,5 @@
-import LocationPicker, { isValidLocation } from "./LocationPicker";
+import LocationPicker from "./LocationPicker";
+import { isValidLocation } from "./locationValidation";
 
 export type CrimeRecordFormValue = {
   title: string;

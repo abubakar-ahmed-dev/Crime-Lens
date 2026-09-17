@@ -1,6 +1,7 @@
 ////VerificationPage/components/Verification.tsx
 import { useState, useEffect } from "react";
 import VerificationCard from "./VerificationCard";
+import type { CrimeMedia } from "../../MapViewPage/components/types";
 import { API_BASE_URL } from "../../../config/constants";
 import { getJwtAuthHeaders } from "../../../utils/authHeaders";
 
@@ -11,7 +12,7 @@ interface AllRecordsProps {
 const isValidStoredCoordinate = (
   value: unknown,
   field: "latitude" | "longitude"
-) => {
+): value is number | string => {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue)) return false;
 
@@ -20,8 +21,16 @@ const isValidStoredCoordinate = (
     : numericValue >= 65 && numericValue <= 68;
 };
 
+// Fields of a crime payload needed to resolve coordinates — top-level
+// latitude/longitude or the GeoJSON `location` column.
+interface CrimeLocationSource {
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  location?: string | { coordinates?: unknown[] } | null;
+}
+
 const getCrimeCoordinate = (
-  crime: any,
+  crime: CrimeLocationSource,
   field: "latitude" | "longitude"
 ) => {
   const explicitValue = crime[field];
@@ -34,16 +43,19 @@ const getCrimeCoordinate = (
     return explicitValue.toString();
   }
 
-  let location = crime.location;
-  if (typeof location === "string") {
+  let parsedLocation: { coordinates?: unknown[] } | null | undefined = null;
+  const rawLocation = crime.location;
+  if (typeof rawLocation === "string") {
     try {
-      location = JSON.parse(location);
+      parsedLocation = JSON.parse(rawLocation);
     } catch {
-      location = null;
+      parsedLocation = null;
     }
+  } else {
+    parsedLocation = rawLocation;
   }
   const coordinateIndex = field === "latitude" ? 1 : 0;
-  const coordinateValue = location?.coordinates?.[coordinateIndex];
+  const coordinateValue = parsedLocation?.coordinates?.[coordinateIndex];
 
   return coordinateValue !== null &&
     coordinateValue !== undefined &&
@@ -58,8 +70,36 @@ const formatDateForInput = (value: unknown) => {
   return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
 };
 
+// Admin rows are pending agent registrations; police rows are pending crime
+// reports with nested association payloads. Fields optional — version decides.
+export interface VerificationRecord {
+  id?: number;
+  submissionId?: number;
+  // admin (agent request)
+  PoliceBranch?: { id?: number; zoneName?: string; contactNumber?: string } | null;
+  PoliceAgentRequestsTemp?: { username?: string; createdAt?: string } | null;
+  // police (crime report)
+  title?: string;
+  fullName?: string;
+  contact?: string;
+  submitterCnic?: string;
+  crimeTypeId?: number | string;
+  CrimeType?: { id?: number; name?: string } | null;
+  incidentDate?: string;
+  address?: string;
+  description?: string;
+  zoneId?: number;
+  Zone?: { id?: number; name?: string } | null;
+  zoneName?: string;
+  media?: CrimeMedia[];
+  CrimeMedia?: CrimeMedia[];
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  location?: string | { coordinates?: unknown[] } | null;
+}
+
 export default function AllRecords({ version }: AllRecordsProps) {
-  const [records, setRecords] = useState<any[]>([]);
+  const [records, setRecords] = useState<VerificationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -168,8 +208,8 @@ export default function AllRecords({ version }: AllRecordsProps) {
                   <VerificationCard
                     key={record.id}
                     version="admin"
-                    requestId={record.id}
-                    branchId={record.PoliceBranch?.id || "N/A"}
+                    requestId={record.id!}
+                    branchId={String(record.PoliceBranch?.id || "N/A")}
                     branchZoneName={record.PoliceBranch?.zoneName || ""}
                     branchContact={record.PoliceBranch?.contactNumber || "N/A"}
                     username={record.PoliceAgentRequestsTemp?.username || ""}
@@ -192,7 +232,7 @@ export default function AllRecords({ version }: AllRecordsProps) {
                     key={record.id}
                     version="police"
 
-                    submissionId={record.submissionId}
+                    submissionId={record.submissionId!}
 
                     title={record.title || "No Title"}
 
@@ -209,7 +249,7 @@ export default function AllRecords({ version }: AllRecordsProps) {
                     latitude={getCrimeCoordinate(record, "latitude")}
                     longitude={getCrimeCoordinate(record, "longitude")}
 
-                    zone={record.Zone?.id || record.zoneId}
+                    zone={(record.Zone?.id || record.zoneId)!}
                     zoneName={record.Zone?.name || record.zoneName || ""}
 
                     media={media}

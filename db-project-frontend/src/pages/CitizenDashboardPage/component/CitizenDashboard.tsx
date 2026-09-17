@@ -6,11 +6,27 @@ import GreenButton from "../../../components/GreenButton";
 import WhiteButton from "../../../components/WhiteButton";
 import { API_BASE_URL } from "../../../config/constants";
 
+// One row of the citizen "my reports" table (GET /citizens/reports payload).
+interface CitizenReport {
+  id: number;
+  status: string;
+  title?: string;
+  description?: string;
+  thumbnailUrl?: string;
+  incidentDate?: string;
+  crimeType?: string;
+  crimetype?: string;
+  zoneName?: string;
+  zonename?: string;
+  zone?: string;
+  mediaCount?: number;
+}
+
 export default function CitizenDashboard() {
   const navigate = useNavigate();
   const { citizen, citizenToken, citizenLogout, isCitizenAuthenticated, refreshCitizenSession } = useAuth();
 
-  const [reports, setReports] = useState<any[]>([]);
+  const [reports, setReports] = useState<CitizenReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
@@ -121,9 +137,9 @@ export default function CitizenDashboard() {
       // Handle new standardized response format (data is wrapped in 'data' property)
       const reportsData = data.data || data;
       setReports(reportsData.reports || []);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Fetch reports error:", err);
-      setError(err.message || "Failed to load reports");
+      setError(err instanceof Error ? err.message : "Failed to load reports");
     } finally {
       setLoading(false);
     }
@@ -221,9 +237,9 @@ export default function CitizenDashboard() {
         console.error("No user data in response, full response:", data);
         setProfileUpdateError("Failed to get updated user data from server");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Profile update error:", err);
-      setProfileUpdateError(err.message || "Failed to update profile");
+      setProfileUpdateError(err instanceof Error ? err.message : "Failed to update profile");
     } finally {
       setProfileUpdateLoading(false);
     }
@@ -418,7 +434,7 @@ export default function CitizenDashboard() {
                           {report.crimeType || report.crimetype || "N/A"}
                         </td>
                         <td className="px-2 sm:px-4 py-3 border-b text-gray-600 whitespace-nowrap">
-                          {new Date(report.incidentDate).toLocaleDateString()}
+                          {new Date(report.incidentDate ?? "").toLocaleDateString()}
                         </td>
                         <td className="px-2 sm:px-4 py-3 border-b text-gray-600 whitespace-nowrap">
                           {report.zoneName || report.zonename || report.zone || "N/A"}

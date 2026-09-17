@@ -1,13 +1,18 @@
 // src/context/AuthContext.tsx
+/* eslint-disable react-refresh/only-export-components -- Auth module: the supabase
+   client, AuthProvider component, and useAuth hook are intentionally co-located
+   (idiomatic context-module pattern). Fast-refresh limitation accepted; splitting
+   would churn imports across every consumer for no runtime benefit. */
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type Session } from "@supabase/supabase-js";
+import { isAxiosError } from "axios";
 import { loginUser, setAuthToken } from "../services/api";
 import { API_BASE_URL } from "../config/constants";
 
 // Type definition for custom citizen update event
 declare global {
   interface WindowEventMap {
-    'citizen-updated': CustomEvent<any>;
+    'citizen-updated': CustomEvent<CitizenUserType>;
   }
 }
 
@@ -30,7 +35,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 type UserType = {
-  id: string;
+  id: number; // backend serial id (authControllers.login payload)
   username: string;
   role: string;
   role_id?: number;
@@ -60,7 +65,7 @@ type AuthContextType = {
   // Citizen auth state (Supabase)
   citizen: CitizenUserType | null;
   citizenToken: string | null;
-  citizenSession: any;
+  citizenSession: Session | null;
   isCitizenAuthenticated: boolean;
   citizenLogin: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   citizenRegister: (email: string, password: string, fullName: string) => Promise<{ success: boolean; message?: string; requiresEmailVerification?: boolean }>;
@@ -97,7 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [citizenToken, setCitizenToken] = useState<string | null>(() => localStorage.getItem("citizen_token"));
-  const [citizenSession, setCitizenSession] = useState<any>(() => {
+  const [citizenSession, setCitizenSession] = useState<Session | null>(() => {
     try {
       const s = localStorage.getItem("citizen_session");
       return s ? JSON.parse(s) : null;
@@ -145,7 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const syncCitizenSession = async (sessionData: any) => {
+  const syncCitizenSession = async (sessionData: Session) => {
     if (!sessionData?.access_token) return null;
     if (localStorage.getItem("authMode") === "staff") return null;
 
@@ -281,9 +286,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(receivedUser);
 
       return { success: true, user: receivedUser };
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.message || err?.response?.data?.error || "Login failed. Try again.";
+    } catch (err) {
+      let msg = "Login failed. Try again.";
+      if (isAxiosError(err)) {
+        msg = err.response?.data?.message || err.response?.data?.error || msg;
+      }
       return { success: false, message: msg };
     }
   };
@@ -338,9 +345,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await syncCitizenSession(sessionData);
 
       return { success: true };
-    } catch (err: any) {
+    } catch (err) {
       console.error("Login error:", err);
-      return { success: false, message: err?.message || "Login failed. Please try again." };
+      return {
+        success: false,
+        message: err instanceof Error ? err.message : "Login failed. Please try again.",
+      };
     }
   };
 
@@ -385,7 +395,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       return { success: true, requiresEmailVerification: !data.session };
-    } catch (err: any) {
+    } catch {
       return { success: false, message: "Registration failed. Please try again." };
     }
   };
@@ -408,7 +418,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Supabase will redirect to Google OAuth page
       return { success: true };
-    } catch (err: any) {
+    } catch {
       return { success: false, message: "Google login failed. Please try again." };
     }
   };
@@ -472,7 +482,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       return { success: true, message: "Verification email sent! Please check your inbox." };
-    } catch (err: any) {
+    } catch (err) {
       console.error("Resend verification error:", err);
       return { success: false, message: "Failed to resend verification email. Please try again." };
     }
@@ -533,7 +543,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem("citizen", JSON.stringify(data.user));
 
       return { success: true };
-    } catch (err: any) {
+    } catch {
       return { success: false, message: "Profile update failed. Please try again." };
     }
   };

@@ -5,12 +5,12 @@ import { API_BASE_URL } from "../../config/constants";
 
 // src/pages/UploadPage.tsx
 import React, { useState } from "react";
-import axios from "axios";
+import axios, { isAxiosError } from "axios";
 import UploadFile from "./component/UploadFile";
 import { toast, Toaster } from "react-hot-toast";
 import { getJwtAuthHeaders } from "../../utils/authHeaders";
 
-const UploadPage: React.FC<{ }> = ({ }) => {
+const UploadPage: React.FC = () => {
 
     const role = useSelector((state: RootState) => state.currentRole.role);
 
@@ -81,12 +81,12 @@ const UploadPage: React.FC<{ }> = ({ }) => {
 
       setResultStats(stats);
       toast.success("Upload completed successfully!");
-    } catch (err: any) {
+    } catch (err) {
       console.error("Upload error:", err);
       const msg =
-        err.response?.data?.message ||
-        err.response?.statusText ||
-        err.message ||
+        (isAxiosError(err) &&
+          (err.response?.data?.message || err.response?.statusText)) ||
+        (err instanceof Error ? err.message : "") ||
         "Upload failed. Please try again.";
       toast.error(msg);
     } finally {

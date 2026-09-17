@@ -20,8 +20,10 @@ const SearchBar: React.FC = () => {
 
   const [mode, setMode] = useState<"basic" | "radius">(
     () =>
-      (new URLSearchParams(window.location.search).get("mode") as any) ??
-      "basic"
+      (new URLSearchParams(window.location.search).get("mode") as
+        | "basic"
+        | "radius"
+        | null) ?? "basic"
   );
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -37,7 +39,7 @@ const SearchBar: React.FC = () => {
       try {
         const res = await fetch(`${API_BASE_URL}/crimes/types`);
         const data = await res.json();
-        setCrimeTypes(["All", ...data.map((ct: any) => ct.name)]);
+        setCrimeTypes(["All", ...data.map((ct: { name: string }) => ct.name)]);
       } catch (err) {
         console.error("Error fetching crime types:", err);
       }
@@ -58,7 +60,7 @@ const SearchBar: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    (window as any).searchBarRef = searchBarRef;
+    window.searchBarRef = searchBarRef;
   }, []);
 
   const pushUrlFromContext = (extra?: { mode?: string }) => {

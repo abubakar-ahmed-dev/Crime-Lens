@@ -112,7 +112,7 @@ const PoliceMediaEditor: React.FC<PoliceMediaEditorProps> = ({
       if (result.success) {
         // Call both callbacks if provided
         if (onMediaUpdate) {
-          onMediaUpdate(mediaId, { visibility: 'removed' } as any);
+          onMediaUpdate(mediaId, { visibility: 'removed' });
         }
         if (onMediaDelete) {
           onMediaDelete(mediaId);

@@ -64,7 +64,10 @@ export interface MediaUploadFile {
  * Note: mediaId is passed separately to updateMedia function, not part of MediaUpdate
  */
 export interface MediaUpdate {
-  visibility?: 'public' | 'police_only';
+  // 'removed' is a UI-only sentinel passed via onMediaUpdate when a media
+  // item was deleted (the actual delete goes through onMediaDelete / the
+  // DELETE endpoint). Never meaningful to the API.
+  visibility?: 'public' | 'police_only' | 'removed';
   caption?: string;
   evidenceMarked?: boolean;
 }

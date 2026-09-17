@@ -21,18 +21,19 @@ This document serves as the central hub for the CrimeLens system design upgrade 
 | 1 | PostgreSQL Optimization | Completed | `Plans/phase-1-postgresql-optimization/` |
 | 2 | Health Checks | Completed | `Plans/phase-2-health-checks/` |
 | 3 | Redis Caching | Completed | `Plans/phase-3-redis-caching/` |
-| 4 | Rate Limiting | Remaining | `Plans/phase-4-rate-limiting/` |
-| 5 | API Security | Remaining | `Plans/phase-5-api-security/` |
-| 6 | HTTP Compression | Remaining | `Plans/phase-6-http-compression/` |
-| 7 | Pino Logging | Remaining | `Plans/phase-7-pino-logging/` |
-| 8 | Prometheus + Grafana | Remaining | `Plans/phase-8-prometheus-grafana/` |
-| 9 | Docker | Remaining | `Plans/phase-9-docker/` |
-| 10 | Nginx | Remaining | `Plans/phase-10-nginx/` |
-| 11 | Horizontal Scaling | Remaining | `Plans/phase-11-horizontal-scaling/` |
-| 12 | BullMQ Workers | Remaining | `Plans/phase-12-bullmq-workers/` |
-| 13 | Cloudflare | Remaining | `Plans/phase-13-cloudflare/` |
-| 14 | GitHub Actions | Remaining | `Plans/phase-14-cicd/` |
-| 15 | k6 Final Testing | Remaining | `Plans/phase-15-k6-final/` |
+| 4 | Rate Limiting | Completed | `Plans/phase-4-rate-limiting/` |
+| 5 | API Security | Completed | `Plans/phase-5-api-security/` |
+| 6 | HTTP Compression | Completed | `Plans/phase-6-http-compression/` |
+| 7 | Pino Logging | Completed | `Plans/phase-7-pino-logging/` |
+| 8 | Prometheus + Grafana | Completed | `Plans/phase-8-prometheus-grafana/` |
+| 9 | Docker | Completed | `Plans/phase-9-docker/` |
+| 10 | Nginx | Completed | `Plans/phase-10-nginx/` |
+| 11 | Horizontal Scaling | Completed (single host; multi-host deferred) | `Plans/phase-11-horizontal-scaling/` |
+| 12 | BullMQ Workers | Completed | `Plans/phase-12-bullmq-workers/` |
+| 13 | Cloudflare | Deferred (needs a domain) | `Plans/phase-13-cloudflare/` |
+| 14 | GitHub Actions | Completed | `Plans/phase-14-cicd/` |
+| 15 | Frontend Lint Cleanup + CI Enforcement | Remaining | `Plans/phase-15-frontend-lint-cleanup/` |
+| 16 | k6 Final Testing | Remaining | `Plans/phase-16-k6-final/` |
 
 ### Dependency Graph
 
@@ -67,7 +68,9 @@ Phase 13 (Cloudflare)
     ↓
 Phase 14 (CI/CD)
     ↓
-Phase 15 (Final Testing)
+Phase 15 (Frontend Lint Cleanup)
+    ↓
+Phase 16 (Final Testing)
 ```
 
 ### Key Design Decisions
@@ -119,9 +122,10 @@ Update this file as phases are completed:
 - [ ] Phase 10: Reverse proxy configured
 - [ ] Phase 11: Multiple instances verified
 - [ ] Phase 12: Background jobs operational
-- [ ] Phase 13: CDN configured
-- [ ] Phase 14: CI/CD pipeline active
-- [ ] Phase 15: Final scalability report generated
+- [ ] Phase 13: CDN configured (deferred — needs a domain)
+- [x] Phase 14: CI/CD pipeline active
+- [ ] Phase 15: Frontend lint debt cleared, CI lint enforcing
+- [ ] Phase 16: Final scalability report generated
 
 ---
 
@@ -149,7 +153,8 @@ Plans/
 ├── phase-12-bullmq-workers/plan.md
 ├── phase-13-cloudflare/plan.md
 ├── phase-14-cicd/plan.md
-└── phase-15-k6-final/plan.md
+├── phase-15-frontend-lint-cleanup/plan.md
+└── phase-16-k6-final/plan.md
 ```
 
 ### Estimated Total Implementation Time
@@ -171,11 +176,12 @@ Plans/
 | Phase 12 | 6.5 hours | 50.5 hours |
 | Phase 13 | 4 hours* | 54.5 hours |
 | Phase 14 | 6.5 hours | 61 hours |
-| Phase 15 | 7 hours | 68 hours |
+| Phase 15 | 5 hours | 66 hours |
+| Phase 16 | 7 hours | 73 hours |
 
 *Plus DNS propagation time (24-48 hours waiting)
 
-**Total Estimated Time: ~68 hours (excluding DNS propagation)**
+**Total Estimated Time: ~73 hours (excluding DNS propagation)**
 
 ---
 
