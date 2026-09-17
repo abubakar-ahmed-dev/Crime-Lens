@@ -115,12 +115,13 @@ export const updatePoolMetrics = () => {
   try {
     const pool = sequelize.connectionManager?.pool;
     if (!pool) return;
-    // tarn exposes used/available/waiting as live resource arrays;
-    // the configured cap comes from the sequelize pool config (tarn's own
-    // `max` property is not part of its public surface)
-    dbPoolConnections.labels({ state: "used" }).set(pool.used?.length ?? 0);
-    dbPoolConnections.labels({ state: "available" }).set(pool.available?.length ?? 0);
-    dbPoolConnections.labels({ state: "waiting" }).set(pool.waiting?.length ?? 0);
+    // Verified against the running sequelize v6 Pool (phase 11): the live
+    // counters are numeric getters (size/available/using/waiting) — NOT
+    // arrays and NOT tarn num*() methods, so the previous `.length` reads
+    // silently reported 0 for every state.
+    dbPoolConnections.labels({ state: "used" }).set(pool.using ?? 0);
+    dbPoolConnections.labels({ state: "available" }).set(pool.available ?? 0);
+    dbPoolConnections.labels({ state: "waiting" }).set(pool.waiting ?? 0);
     dbPoolConnections.labels({ state: "max" }).set(sequelize.config?.pool?.max ?? 0);
   } catch {
     // pool internals unavailable — leave gauges at last known values
