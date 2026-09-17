@@ -22,3 +22,11 @@ scrape_configs:
       - targets:
           - "backend:5001"              # compose-network API service
           - "host.docker.internal:5001" # host-run API (Docker Desktop)
+      # Per-replica targets (Phase 11): the local override publishes each
+      # backend replica on 15001-15003, so scaled instances appear as
+      # distinct `instance` labels. Targets that are not running scrape as
+      # DOWN — expected and harmless when fewer replicas are up.
+      - targets:
+          - "host.docker.internal:15001"
+          - "host.docker.internal:15002"
+          - "host.docker.internal:15003"
