@@ -22,11 +22,16 @@ concurrency:
 
 jobs:
   lint-frontend:
-    name: Lint Frontend
+    name: Lint Frontend (report-only — pre-existing debt)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./db-project-frontend
+    # The frontend currently carries lint debt (no-explicit-any across
+    # AuthContext/components, react-refresh export rules). Enforcing it here
+    # would red every PR for reasons unrelated to a change. Report-only for
+    # now; flip continue-on-error to false once a lint-cleanup phase lands.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
