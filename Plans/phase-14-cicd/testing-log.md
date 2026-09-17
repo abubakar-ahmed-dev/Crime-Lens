@@ -41,9 +41,17 @@ dispatch, and tag events).
   be used to list the packages — push verified through run logs.
 - Tag event (`v0.1.0-ci-test`): Release workflow SUCCESS — GitHub Release
   created with the correct generated changelog. The tag's Docker Build run
-  record was lost when the test tag was deleted immediately after the
-  check, so the semver-tag push path was NOT fully observed end-to-end
-  (same build steps proven on other events). Test release + tag deleted.
+  (35233361040) shows scan-job "failures" that are self-inflicted by the
+  cleanup order: the test tag was deleted while the runs were finishing,
+  so `upload-sarif` failed to attach results to the now-missing
+  `refs/tags/v0.1.0-ci-test`. Trivy scans themselves completed; the builds
+  and pushes were fine. Real releases keep their tags, so this failure
+  mode cannot occur outside of this deliberate cleanup. The semver-tag
+  push path was otherwise NOT fully observed end-to-end (same build steps
+  proven on other events). Test release + tag deleted.
+- Post-cleanup re-run on the branch (35234585679, docs commit): SUCCESS —
+  all four Docker Build jobs green including both Trivy scans, confirming
+  the failure above was cleanup-order-specific.
 
 ## DB_SSL toggle
 
