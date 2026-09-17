@@ -13,7 +13,7 @@ const MapClickHandler = () => {
             // Prevent clicks coming from overlay controls: check if target is inside a known UI
             // (You already block propagation; this is extra safety.)
             // Set selected point
-            const searchBar = (window as any).searchBarRef?.current;
+            const searchBar = window.searchBarRef?.current;
             if (searchBar && searchBar.contains(e.originalEvent.target as Node)) {
                 return;
             }

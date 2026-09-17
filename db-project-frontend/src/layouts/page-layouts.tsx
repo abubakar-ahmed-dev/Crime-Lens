@@ -3,12 +3,15 @@ import Sidebar from "../components/Sidebar";
 import { useSelector, useDispatch } from "react-redux";
 import { useEffect, useState } from "react";
 import { setRole } from "../store/features/current_role";
+import type { RootState } from "../store";
 import LogowithText from "../assets/LogowithText.svg";
 
 const PageLayout = () => {
   const location = useLocation();
   const dispatch = useDispatch();
-  const { role, roleLoaded } = useSelector((state: any) => state.currentRole);
+  const { role, roleLoaded } = useSelector(
+    (state: RootState) => state.currentRole
+  );
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const authMode = localStorage.getItem("authMode");

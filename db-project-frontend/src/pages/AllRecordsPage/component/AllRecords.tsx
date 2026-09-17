@@ -3,6 +3,7 @@ import RecordsTable from "./RecordsTable";
 import GreenButton from "../../../components/GreenButton";
 import AllRecordsSearch from "./AllRecordsSearch";
 import DetailsPopup from "./DetailsPopup"
+import type { MediaOperations } from "./DetailsPopup";
 import { downloadCSV } from "./downloadCSV";
 import { API_BASE_URL } from "../../../config/constants";
 import { getJwtAuthHeaders } from "../../../utils/authHeaders";
@@ -20,6 +21,7 @@ export interface AgentRecord {
   branchContact: string | null;
   createdAt: string; // YYYY-MM-DD
 }
+
 export interface CrimeRecord {
   id: number;
   zoneName: string;
@@ -34,6 +36,11 @@ export interface CrimeRecord {
   mediaCount?: number;
   media?: CrimeMediaItem[];
 }
+
+// A row of the records table: crime records (police version) or agent
+// records (admin version). All fields optional because the version decides
+// which shape is actually present.
+export type AllRecordsRow = Partial<CrimeRecord & AgentRecord>;
 
 export interface CrimeMediaItem {
   id: number;
@@ -52,7 +59,7 @@ export interface CrimeMediaItem {
 const isValidStoredCoordinate = (
   value: unknown,
   field: "latitude" | "longitude"
-) => {
+): value is number | string => {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue)) return false;
 
@@ -61,8 +68,16 @@ const isValidStoredCoordinate = (
     : numericValue >= 65 && numericValue <= 68;
 };
 
+// Fields of a crime payload needed to resolve coordinates — top-level
+// latitude/longitude (get-crime response) or the GeoJSON `location` column.
+interface CrimeLocationSource {
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  location?: string | { coordinates?: unknown[] } | null;
+}
+
 const getCrimeCoordinate = (
-  crime: any,
+  crime: CrimeLocationSource,
   field: "latitude" | "longitude"
 ) => {
   const explicitValue = crime[field];
@@ -75,16 +90,19 @@ const getCrimeCoordinate = (
     return explicitValue.toString();
   }
 
-  let location = crime.location;
-  if (typeof location === "string") {
+  let parsedLocation: { coordinates?: unknown[] } | null | undefined = null;
+  const rawLocation = crime.location;
+  if (typeof rawLocation === "string") {
     try {
-      location = JSON.parse(location);
+      parsedLocation = JSON.parse(rawLocation);
     } catch {
-      location = null;
+      parsedLocation = null;
     }
+  } else {
+    parsedLocation = rawLocation;
   }
   const coordinateIndex = field === "latitude" ? 1 : 0;
-  const coordinateValue = location?.coordinates?.[coordinateIndex];
+  const coordinateValue = parsedLocation?.coordinates?.[coordinateIndex];
 
   return coordinateValue !== null &&
     coordinateValue !== undefined &&
@@ -93,29 +111,36 @@ const getCrimeCoordinate = (
     : "";
 };
 
+// Full crime details fetched for the update modal (police version).
+export interface FullCrimeDetails {
+  id: number;
+  title: string;
+  description: string;
+  address: string;
+  crimeTypeId: number | string;
+  incidentDate: string;
+  zoneId: number;
+  latitude: string;
+  longitude: string;
+  media?: CrimeMediaItem[];
+}
+
+// Shape of the update-modal form bag: starts as FullCrimeDetails (police) or
+// AgentRecord (admin) and accumulates edited fields + media operations.
+export type UpdateModalData = Partial<FullCrimeDetails & AgentRecord> & {
+  mediaOperations?: MediaOperations;
+};
+
 export default function AllRecords({ version }: AllRecordsProps) {
 
-  const [records, setRecords] = useState<CrimeRecord[]>([]);
-  const [backupRecords, setBackupRecords] = useState<CrimeRecord[]>([]);
+  const [records, setRecords] = useState<AllRecordsRow[]>([]);
+  const [backupRecords, setBackupRecords] = useState<AllRecordsRow[]>([]);
   const [selectedRecords, setSelectedRecords] = useState<number[]>([]);
 
   // Modal state
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   // const [updateRecord, setUpdateRecord] = useState<CrimeRecord | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<AgentRecord | null>(null);
-  // For full crime details
-  interface FullCrimeDetails {
-    id: number;
-    title: string;
-    description: string;
-    address: string;
-    crimeTypeId: number | string;
-    incidentDate: string;
-    zoneId: number;
-    latitude: string;
-    longitude: string;
-    media?: CrimeMediaItem[];
-  }
 
   const [fullCrime, setFullCrime] = useState<FullCrimeDetails | null>(null);
 
@@ -189,13 +214,13 @@ export default function AllRecords({ version }: AllRecordsProps) {
       return;
     }
 
-    const filtered = backupRecords.filter((item: any) => {
-      const fieldValue = item[searchBy];
+    const filtered = backupRecords.filter((item) => {
+      const fieldValue = (item as Record<string, unknown>)[searchBy];
       if (fieldValue === null || fieldValue === undefined) return false;
 
       // DATE SEARCH
       if (searchBy === "incidentDate" || searchBy === "createdAt") {
-        const itemDate = new Date(fieldValue);
+        const itemDate = new Date(fieldValue as string);
         const searchDate = new Date(value);
         return (
           itemDate.getFullYear() === searchDate.getFullYear() &&
@@ -224,7 +249,13 @@ export default function AllRecords({ version }: AllRecordsProps) {
     );
   };
   const handleSelectAll = (checked: boolean) => {
-    setSelectedRecords(checked ? records.map((r: any) => r.id ?? r.agentId) : []);
+    setSelectedRecords(
+      checked
+        ? records
+            .map((r) => r.id ?? r.agentId)
+            .filter((id): id is number => id !== undefined)
+        : []
+    );
   };
 
   const handleBulkDelete = async () => {
@@ -246,9 +277,10 @@ export default function AllRecords({ version }: AllRecordsProps) {
         })
       );
 
-      const newRecords = records.filter(
-        (r: any) => !(selectedRecords.includes(r.id ?? r.agentId))
-      );
+      const newRecords = records.filter((r) => {
+        const id = r.id ?? r.agentId;
+        return id === undefined || !selectedRecords.includes(id);
+      });
       setRecords(newRecords);
       setBackupRecords(newRecords);
       setSelectedRecords([]);
@@ -311,7 +343,7 @@ export default function AllRecords({ version }: AllRecordsProps) {
   // ---------------------------
   // HANDLE UPDATE SUBMIT
   // ---------------------------
-  const handleUpdateSubmit = async (updatedData: any) => {
+  const handleUpdateSubmit = async (updatedData: UpdateModalData) => {
     try {
       if (version === "admin" && selectedAgent) {
         const res = await fetch(

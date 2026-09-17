@@ -1,7 +1,9 @@
 // AllRecordsPage/components/RecordsTable.tsx
+import type { AllRecordsRow } from "./AllRecords";
+
 interface RecordsTableProps {
   version: "admin" | "police" | "user" | null;
-  records?: any[];
+  records?: AllRecordsRow[];
   selectedRecords?: number[];
   onCheckboxChange?: (id: number, checked: boolean) => void;
   onSelectAll?: (checked: boolean) => void;
@@ -48,14 +50,16 @@ function RecordsTable({
           <tbody>
             {records.length > 0 ? (
               records.map((record) => {
-                const isChecked = selectedRecords.includes(record.id || record.agentId);
+                const recordId = record.id || record.agentId;
+                const isChecked =
+                  recordId !== undefined && selectedRecords.includes(recordId);
 
                 if (version === "admin") {
                   return (
                     <tr
                       key={record.agentId}
                       className={`text-sm hover:bg-gray-100 ${
-                        record.agentId % 2 === 0 ? "bg-white" : "bg-gray-50"
+                        (record.agentId ?? 0) % 2 === 0 ? "bg-white" : "bg-gray-50"
                       }`}
                     >
                       <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">
@@ -64,7 +68,7 @@ function RecordsTable({
                             type="checkbox"
                             checked={isChecked}
                             onChange={(e) =>
-                              onCheckboxChange?.(record.agentId, e.target.checked)
+                              onCheckboxChange?.(record.agentId!, e.target.checked)
                             }
                           />
                         )}
@@ -75,7 +79,7 @@ function RecordsTable({
                       <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">{record.branchId ?? "-"}</td>
                       <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">{record.branchContact ?? "-"}</td>
                       <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">
-                        {new Date(record.createdAt).toLocaleDateString()}
+                        {new Date(record.createdAt ?? "").toLocaleDateString()}
                       </td>
                     </tr>
                   );
@@ -86,7 +90,7 @@ function RecordsTable({
                   <tr
                     key={record.id}
                     className={`text-sm hover:bg-gray-100 ${
-                      record.id % 2 === 0 ? "bg-white" : "bg-gray-50"
+                      (record.id ?? 0) % 2 === 0 ? "bg-white" : "bg-gray-50"
                     }`}
                   >
                     <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">
@@ -95,7 +99,7 @@ function RecordsTable({
                           type="checkbox"
                           checked={isChecked}
                           onChange={(e) =>
-                            onCheckboxChange?.(record.id, e.target.checked)
+                            onCheckboxChange?.(record.id!, e.target.checked)
                           }
                         />
                       )}
@@ -106,7 +110,7 @@ function RecordsTable({
                     <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">{record.submitterCnic ?? "-"}</td>
                     <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">{record.crimeTypeName}</td>
                     <td className="px-2 sm:px-4 py-3 border-b whitespace-nowrap">
-                      {new Date(record.incidentDate).toLocaleDateString()}
+                      {new Date(record.incidentDate ?? "").toLocaleDateString()}
                     </td>
                   </tr>
                 );

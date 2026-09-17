@@ -31,7 +31,7 @@ const ZonePolygon: React.FC = () => {
       {zoneSeverityData.map(zone => (
         <Polygon
           key={zone.zoneId}
-          positions={zone.cordinates as any}
+          positions={zone.cordinates}
           pathOptions={{ color: getColor(zone.zoneId), fillOpacity: 0.5, weight: 1 }}
         >
           <Tooltip sticky>

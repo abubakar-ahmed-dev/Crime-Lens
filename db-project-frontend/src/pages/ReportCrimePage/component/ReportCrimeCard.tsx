@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../../config/constants";
 import { supabase, useAuth } from "../../../context/AuthContext";
-import LocationPicker, { isValidLocation } from "../../../components/LocationPicker";
+import LocationPicker from "../../../components/LocationPicker";
+import { isValidLocation } from "../../../components/locationValidation";
 import GreenButton from "../../../components/GreenButton";
 import MediaUploader from "../../../components/MediaUploader";
+import { isAxiosError } from "axios";
 import { uploadMedia } from "../../../services/api";
 
 type ZoneOption = {
@@ -120,7 +122,7 @@ export default function ReportCrimeCard() {
     setError("");
   };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
     setSuccessMsg("");
@@ -209,9 +211,12 @@ export default function ReportCrimeCard() {
             setUploadProgress(0);
             return;
           }
-        } catch (uploadError: any) {
+        } catch (uploadError) {
           console.error("Error uploading media:", uploadError);
-          const errorMessage = uploadError?.response?.data?.message || uploadError?.message || "Failed to upload media. Please try again.";
+          const errorMessage =
+            (isAxiosError(uploadError) && uploadError.response?.data?.message) ||
+            (uploadError instanceof Error ? uploadError.message : "") ||
+            "Failed to upload media. Please try again.";
           setError(errorMessage);
           setSuccessMsg("");
           setLoading(false);

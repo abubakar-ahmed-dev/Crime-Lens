@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../context/AuthContext";
+import type { Session, User } from "@supabase/supabase-js";
 import { API_BASE_URL } from "../../config/constants";
 
 const clearStaffAuth = () => {
@@ -16,7 +17,11 @@ const clearStaffAuth = () => {
   }
 };
 
-const storeCitizenAuth = (citizen: any, sessionData: any, accessToken: string) => {
+const storeCitizenAuth = (
+  citizen: unknown,
+  sessionData: Session | null,
+  accessToken: string
+) => {
   clearStaffAuth();
   localStorage.setItem("authMode", "citizen");
   localStorage.setItem("userRole", "user");
@@ -71,8 +76,8 @@ export default function AuthCallback() {
         const type = hashParams.get("type"); // 'signup' for email verification, or missing for OAuth
         const hasMode = queryParams.has("mode");
         const mode = queryParams.get("mode") === "signup" ? "signup" : "login";
-        let sessionData: any = null;
-        let sessionUser: any = null;
+        let sessionData: Session | null = null;
+        let sessionUser: User | null = null;
 
         if (!accessToken && !code) {
           setError("No access token found in callback");

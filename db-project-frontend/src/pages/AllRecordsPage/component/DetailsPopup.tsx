@@ -1,6 +1,6 @@
 import WhiteButton from "../../../components/WhiteButton";
 import { useState, useEffect } from "react";
-import { isValidLocation } from "../../../components/LocationPicker";
+import { isValidLocation } from "../../../components/locationValidation";
 import CrimeRecordForm from "../../../components/CrimeRecordForm";
 import AgentRecordForm, { type AgentBranchOption } from "../../../components/AgentRecordForm";
 import GreenButton from "../../../components/GreenButton";
@@ -9,6 +9,8 @@ import PoliceMediaEditor from "../../../components/PoliceMediaEditor";
 import { API_BASE_URL } from "../../../config/constants";
 import { checkLocationInsideZone } from "../../../utils/zoneValidation";
 import { getJwtAuthHeaders } from "../../../utils/authHeaders";
+import type { CrimeMedia, MediaUpdate } from "../../MapViewPage/components/types";
+import type { UpdateModalData } from "./AllRecords";
 
 type ZoneOption = {
   id: number;
@@ -23,15 +25,15 @@ type CrimeTypeOption = {
 interface UpdateModalProps {
   version: "admin" | "police";
   isOpen: boolean;
-  data: any; // FullCrimeDetails for police, AgentDetails for admin
+  data: UpdateModalData | null; // FullCrimeDetails for police, AgentRecord for admin
   onClose: () => void;
-  onSubmit: (updatedData: any) => Promise<string | void> | string | void;
+  onSubmit: (updatedData: UpdateModalData) => Promise<string | void> | string | void;
 }
 
-interface MediaOperations {
+export interface MediaOperations {
   toAdd?: Array<{ file: File; caption: string }>;
   toRemove?: number[];
-  toUpdate?: Record<number, { visibility?: 'public' | 'police_only'; caption?: string; evidenceMarked?: boolean }>;
+  toUpdate?: Record<number, MediaUpdate>;
 }
 
 export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }: UpdateModalProps) {
@@ -45,8 +47,11 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
   const [mediaEditMode, setMediaEditMode] = useState(false);
   const [mediaOperations, setMediaOperations] = useState<MediaOperations>({});
 
-  // Get media data for police version
-  const crimeMedia = version === "police" ? (data?.media || []) : [];
+  // Get media data for police version. FullCrimeDetails.media is typed as
+  // CrimeMediaItem[] (an under-modeled row shape); the gallery/editor expect
+  // the richer CrimeMedia model.
+  const crimeMedia: CrimeMedia[] =
+    version === "police" ? ((data?.media ?? []) as CrimeMedia[]) : [];
 
   // Sync local state when data changes
   useEffect(() => {
@@ -96,8 +101,8 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
 
   if (!isOpen || !formData) return null;
 
-  const handleChange = (field: string, value: any) => {
-    setFormData((prev: any) => ({ ...prev, [field]: value }));
+  const handleChange = (field: string, value: string | number) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
     setLocationError("");
     setSubmitError("");
   };
@@ -110,7 +115,7 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
     }));
   };
 
-  const handleMediaUpdate = (mediaId: number, updates: { visibility?: 'public' | 'police_only'; caption?: string; evidenceMarked?: boolean }) => {
+  const handleMediaUpdate = (mediaId: number, updates: MediaUpdate) => {
     setMediaOperations(prev => ({
       ...prev,
       toUpdate: {
@@ -168,10 +173,11 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
     }
 
     if (version === "police") {
+      // Guards above already returned when zone/location are missing.
       const zoneCheck = await checkLocationInsideZone(
-        formData.zoneId,
-        formData.latitude,
-        formData.longitude
+        formData.zoneId!,
+        formData.latitude!,
+        formData.longitude!
       );
 
       if (!zoneCheck.inside) {
@@ -212,13 +218,13 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
           <>
             <CrimeRecordForm
               value={{
-                title: formData.title,
-                description: formData.description,
-                crimeTypeId: formData.crimeTypeId,
-                incidentDate: formData.incidentDate,
-                zoneId: formData.zoneId,
-                latitude: String(formData.latitude),
-                longitude: String(formData.longitude),
+                title: formData.title ?? "",
+                description: formData.description ?? "",
+                crimeTypeId: formData.crimeTypeId ?? "",
+                incidentDate: formData.incidentDate ?? "",
+                zoneId: formData.zoneId ?? "",
+                latitude: String(formData.latitude ?? ""),
+                longitude: String(formData.longitude ?? ""),
               }}
               zones={zones}
               crimeTypes={crimeTypes}
@@ -226,7 +232,7 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
               submitError={submitError}
               onChange={(field, value) => handleChange(field, value)}
               onLocationChange={(location) => {
-                setFormData((prev: any) => ({ ...prev, ...location }));
+                setFormData((prev) => ({ ...prev, ...location }));
                 setLocationError("");
                 setSubmitError("");
               }}
@@ -248,7 +254,7 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
 
                 {mediaEditMode ? (
                   <PoliceMediaEditor
-                    crimeId={data?.id}
+                    crimeId={data!.id!}
                     media={crimeMedia}
                     onMediaUpdate={handleMediaUpdate}
                     onMediaDelete={handleMediaRemove}
@@ -278,8 +284,8 @@ export default function UpdateModal({ version, isOpen, data, onClose, onSubmit }
           <>
             <AgentRecordForm
               value={{
-                username: formData.username,
-                branchId: formData.branchId,
+                username: formData.username ?? "",
+                branchId: formData.branchId ?? "",
               }}
               branches={branches}
               onChange={(field, value) => handleChange(field, value)}

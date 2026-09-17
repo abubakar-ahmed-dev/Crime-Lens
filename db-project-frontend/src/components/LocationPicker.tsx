@@ -7,10 +7,9 @@ import markerIcon2x from "../assets/leaflet/marker-icon-2x.png";
 import markerIcon from "../assets/leaflet/marker-icon.png";
 import markerShadow from "../assets/leaflet/marker-shadow.png";
 
-export type LocationValue = {
-  latitude: string;
-  longitude: string;
-};
+import { isValidLocation, type LocationValue } from "./locationValidation";
+
+export type { LocationValue } from "./locationValidation";
 
 type LocationMode = "manual" | "current" | "map";
 
@@ -35,21 +34,6 @@ const pickerIcon = new L.Icon({
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
 });
-
-const isValidLocation = (value: LocationValue) => {
-  const lat = Number(value.latitude);
-  const lng = Number(value.longitude);
-  return (
-    value.latitude !== "" &&
-    value.longitude !== "" &&
-    Number.isFinite(lat) &&
-    Number.isFinite(lng) &&
-    lat >= 23 &&
-    lat <= 26 &&
-    lng >= 65 &&
-    lng <= 68
-  );
-};
 
 const formatCoord = (value: number) => value.toFixed(6);
 
@@ -247,4 +231,3 @@ export default function LocationPicker({
   );
 }
 
-export { isValidLocation };

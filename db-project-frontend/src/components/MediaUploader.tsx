@@ -86,7 +86,7 @@ const MediaUploader: React.FC<MediaUploaderProps> = ({
           preview,
           fileType: fileType as 'image' | 'video'
         });
-      } catch (error) {
+      } catch {
         newErrors.push(`Failed to process file "${file.name}".`);
       }
     }

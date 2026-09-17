@@ -6,6 +6,7 @@ import MediaGallery from "../../../components/MediaGallery";
 import PoliceMediaEditor from "../../../components/PoliceMediaEditor";
 import { API_BASE_URL } from "../../../config/constants";
 import { getJwtAuthHeaders } from "../../../utils/authHeaders";
+import type { UploadedMedia } from "../../../services/api";
 import { addMediaToCrime } from "../../../services/api";
 import type { CrimeMedia } from "../../../pages/MapViewPage/components/types";
 
@@ -46,7 +47,7 @@ type VerificationCardProps =
 
 interface MediaChanges {
   toRemove?: number[];
-  visibilityChanges?: Record<number, 'public' | 'police_only'>;
+  visibilityChanges?: Record<number, 'public' | 'police_only' | 'removed'>; // 'removed' = UI sentinel from PoliceMediaEditor delete path
   captionUpdates?: Record<number, string>;
   evidenceMarkedChanges?: Record<number, boolean>;
 }
@@ -61,13 +62,18 @@ export default function VerificationCard(props: VerificationCardProps) {
   const [editMediaMode, setEditMediaMode] = useState(false);
 
   // Get media for police version - computed from props
-  const crimeMedia = props.version === "police" ? (props as any).media || [] : [];
+  const crimeMedia = props.version === "police" ? props.media || [] : [];
 
   // Local state for newly uploaded media items
   const [newlyAddedMedia, setNewlyAddedMedia] = useState<CrimeMedia[]>([]);
 
   // Local state ONLY for optimistic updates during edit mode - starts empty
-  const [optimisticMediaChanges, setOptimisticMediaChanges] = useState<Record<number, Partial<CrimeMedia>>>({});
+  // Optimistic mirror of media edits; 'removed' is the delete sentinel passed
+  // through onMediaUpdate (the delete itself goes through onMediaDelete).
+  type OptimisticMediaChange = Partial<Omit<CrimeMedia, "visibility">> & {
+    visibility?: CrimeMedia["visibility"] | "removed";
+  };
+  const [optimisticMediaChanges, setOptimisticMediaChanges] = useState<Record<number, OptimisticMediaChange>>({});
   const [editModeActive, setEditModeActive] = useState(false);
 
   // Combine crimeMedia with newly added media and optimistic changes
@@ -79,7 +85,9 @@ export default function VerificationCard(props: VerificationCardProps) {
     if (editModeActive && Object.keys(optimisticMediaChanges).length > 0) {
       combinedMedia = combinedMedia.map((m: CrimeMedia) => {
         const changes = optimisticMediaChanges[m.id];
-        return changes ? { ...m, ...changes } : m;
+        // A 'removed' sentinel may transiently mark visibility during the
+        // delete flow before the item is dropped from the list.
+        return changes ? ({ ...m, ...changes } as CrimeMedia) : m;
       });
     }
 
@@ -88,12 +96,9 @@ export default function VerificationCard(props: VerificationCardProps) {
 
   // Copy contact number to clipboard and show snackbar
   const handleContactCopy = async () => {
+    // Discriminated union: each variant carries its own contact field.
     const num =
-      props.version === "admin"
-        ? // @ts-ignore - branchContact exists on admin variant
-        (props as any).branchContact
-        : // @ts-ignore - contact exists on police variant
-        (props as any).contact;
+      props.version === "admin" ? props.branchContact : props.contact;
 
     if (num) {
       try {
@@ -123,7 +128,7 @@ export default function VerificationCard(props: VerificationCardProps) {
     }));
   };
 
-  const handleVisibilityChange = (mediaId: number, newVisibility: 'public' | 'police_only') => {
+  const handleVisibilityChange = (mediaId: number, newVisibility: 'public' | 'police_only' | 'removed') => {
     setMediaChanges(prev => ({
       ...prev,
       visibilityChanges: {
@@ -174,7 +179,8 @@ export default function VerificationCard(props: VerificationCardProps) {
   const handleMediaAdd = async (files: Array<{ file: File; caption: string }>) => {
     if (files.length === 0) return;
 
-    const submissionId = (props as any).submissionId;
+    const submissionId =
+      props.version === "police" ? props.submissionId : undefined;
     if (!submissionId) {
       console.error('Cannot upload media: submissionId not found');
       return;
@@ -190,7 +196,7 @@ export default function VerificationCard(props: VerificationCardProps) {
 
       if (result.success && result.data?.media) {
         // Create new CrimeMedia items from response - include all required fields
-        const newMediaItems: CrimeMedia[] = result.data.media.map((m: any) => ({
+        const newMediaItems: CrimeMedia[] = result.data.media.map((m: UploadedMedia) => ({
           id: m.id,
           CrimeId: m.CrimeId || Number(submissionId),
           publicId: m.publicId,
@@ -231,7 +237,9 @@ export default function VerificationCard(props: VerificationCardProps) {
   };
 
   // Handle Approve
-  const handleApproveSubmit = async (updatedValues: any) => {
+  const handleApproveSubmit = async (
+    updatedValues: Record<string, string | number>
+  ) => {
     setLoading(true);
     setError("");
 
@@ -240,7 +248,6 @@ export default function VerificationCard(props: VerificationCardProps) {
       let body = {};
 
       if (props.version === "admin") {
-        // @ts-ignore
         endpoint = `${API_BASE_URL}/agent/verify/${props.requestId}`;
         body = {
           roleId: 2,
@@ -248,7 +255,6 @@ export default function VerificationCard(props: VerificationCardProps) {
           branchId: Number(updatedValues.branchId),
         }; // Default to police officer role
       } else {
-        // @ts-ignore
         endpoint = `${API_BASE_URL}/user/approve/${props.submissionId}`;
         body = {
           address: updatedValues.address || "",
@@ -299,10 +305,8 @@ export default function VerificationCard(props: VerificationCardProps) {
       let endpoint = "";
 
       if (props.version === "admin") {
-        // @ts-ignore
         endpoint = `${API_BASE_URL}/agent/reject/${props.requestId}`;
       } else {
-        // @ts-ignore
         endpoint = `${API_BASE_URL}/user/reject/${props.submissionId}`;
       }
 
