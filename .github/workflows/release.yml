@@ -1,0 +1,41 @@
+name: Release
+
+# Tag-triggered GitHub Release with an auto-generated changelog.
+# Guarded for the first-tag case (git describe with no prior tag fails).
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          if [ -n "$PREV" ]; then
+            RANGE="$PREV..${GITHUB_REF_NAME}"
+          else
+            RANGE="${GITHUB_REF_NAME}"
+          fi
+          {
+            echo "## What's Changed"
+            git log --pretty=format:"- %s" "$RANGE"
+          } > CHANGELOG.md
+          cat CHANGELOG.md
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false

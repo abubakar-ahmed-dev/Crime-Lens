@@ -17,16 +17,23 @@ const poolConfig = {
 
 const isDevelopment = process.env.NODE_ENV === "development";
 
+// SSL is required for Supabase. DB_SSL=false opts out for local/CI Postgres
+// (phase 14) — plain Postgres servers reject SSL-with-require connections.
+// Default stays ON so production behavior is unchanged.
+const useSsl = process.env.DB_SSL !== "false";
+
 const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: "postgres",
   logging: false,
   benchmark: isDevelopment,
-  dialectOptions: {
-    ssl: {
-      require: true,
-      rejectUnauthorized: false,
-    },
-  },
+  dialectOptions: useSsl
+    ? {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false,
+        },
+      }
+    : {},
   pool: poolConfig,
 });
 
