@@ -1,0 +1,6 @@
+== max(crimelens_db_pool_waiting)
+[]
+== max(crimelens_db_pool_connections)
+[('', '10')]
+== sum(rate(crimelens_http_requests_total[5m]))
+[('', '112.7184257860442')]
