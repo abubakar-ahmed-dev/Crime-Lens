@@ -1,0 +1,10 @@
+queue: cloudinary-deletion waiting = 0
+queue: cloudinary-deletion active = 0
+queue: cloudinary-deletion completed = 3
+queue: cloudinary-deletion failed = 1
+queue: cloudinary-deletion delayed = 0
+queue: cloudinary-deletion waiting = 0
+queue: cloudinary-deletion active = 0
+queue: cloudinary-deletion completed = 3
+queue: cloudinary-deletion failed = 1
+queue: cloudinary-deletion delayed = 0

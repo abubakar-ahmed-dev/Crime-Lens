@@ -1,0 +1,496 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: rate-limit-final.js
+        output: -
+
+     scenarios: (100.00%) 3 scenarios, 3 max VUs, 11m45s max duration (incl. graceful stop):
+              * write_lane: 11 iterations for each of 1 VUs (maxDuration: 10m0s, exec: writeLane, startTime: 5s, gracefulStop: 30s)
+              * public_lane: 51 iterations for each of 1 VUs (maxDuration: 10m0s, exec: publicLane, startTime: 40s, gracefulStop: 30s)
+              * auth_lane: 6 iterations for each of 1 VUs (maxDuration: 10m0s, exec: authLane, startTime: 1m15s, gracefulStop: 30s)
+
+
+Run           [ 100% ] setup()
+write_lane    [   0% ]
+public_lane   [   0% ]
+auth_lane     [   0% ]
+
+running (00m02.0s), 0/3 VUs, 0 complete and 0 interrupted iterations
+write_lane  • [   0% ] waiting  4.5s
+public_lane • [   0% ] waiting  39.5s
+auth_lane   • [   0% ] waiting  1m14.5s
+
+running (00m03.0s), 0/3 VUs, 0 complete and 0 interrupted iterations
+write_lane  • [   0% ] waiting  3.5s
+public_lane • [   0% ] waiting  38.5s
+auth_lane   • [   0% ] waiting  1m13.5s
+
+running (00m04.0s), 0/3 VUs, 0 complete and 0 interrupted iterations
+write_lane  • [   0% ] waiting  2.5s
+public_lane • [   0% ] waiting  37.5s
+auth_lane   • [   0% ] waiting  1m12.5s
+
+running (00m05.0s), 0/3 VUs, 0 complete and 0 interrupted iterations
+write_lane  • [   0% ] waiting  1.5s
+public_lane • [   0% ] waiting  36.5s
+auth_lane   • [   0% ] waiting  1m11.5s
+
+running (00m06.0s), 0/3 VUs, 0 complete and 0 interrupted iterations
+write_lane  • [   0% ] waiting  0.5s
+public_lane • [   0% ] waiting  35.5s
+auth_lane   • [   0% ] waiting  1m10.5s
+
+running (00m07.0s), 1/3 VUs, 0 complete and 0 interrupted iterations
+write_lane    [   0% ] 1 VUs    00m00.5s/10m0s  00/11 iters, 11 per VU
+public_lane • [   0% ] waiting  34.5s          
+auth_lane   • [   0% ] waiting  1m09.5s        
+
+running (00m08.0s), 1/3 VUs, 1 complete and 0 interrupted iterations
+write_lane    [   9% ] 1 VUs    00m01.5s/10m0s  01/11 iters, 11 per VU
+public_lane • [   0% ] waiting  33.5s          
+auth_lane   • [   0% ] waiting  1m08.5s        
+
+running (00m09.0s), 1/3 VUs, 2 complete and 0 interrupted iterations
+write_lane    [  18% ] 1 VUs    00m02.5s/10m0s  02/11 iters, 11 per VU
+public_lane • [   0% ] waiting  32.5s          
+auth_lane   • [   0% ] waiting  1m07.5s        
+
+running (00m10.0s), 1/3 VUs, 2 complete and 0 interrupted iterations
+write_lane    [  18% ] 1 VUs    00m03.5s/10m0s  02/11 iters, 11 per VU
+public_lane • [   0% ] waiting  31.5s          
+auth_lane   • [   0% ] waiting  1m06.5s        
+
+running (00m11.0s), 1/3 VUs, 3 complete and 0 interrupted iterations
+write_lane    [  27% ] 1 VUs    00m04.5s/10m0s  03/11 iters, 11 per VU
+public_lane • [   0% ] waiting  30.5s          
+auth_lane   • [   0% ] waiting  1m05.5s        
+
+running (00m12.0s), 1/3 VUs, 4 complete and 0 interrupted iterations
+write_lane    [  36% ] 1 VUs    00m05.5s/10m0s  04/11 iters, 11 per VU
+public_lane • [   0% ] waiting  29.5s          
+auth_lane   • [   0% ] waiting  1m04.5s        
+
+running (00m13.0s), 1/3 VUs, 5 complete and 0 interrupted iterations
+write_lane    [  45% ] 1 VUs    00m06.5s/10m0s  05/11 iters, 11 per VU
+public_lane • [   0% ] waiting  28.5s          
+auth_lane   • [   0% ] waiting  1m03.5s        
+
+running (00m14.0s), 1/3 VUs, 6 complete and 0 interrupted iterations
+write_lane    [  55% ] 1 VUs    00m07.5s/10m0s  06/11 iters, 11 per VU
+public_lane • [   0% ] waiting  27.5s          
+auth_lane   • [   0% ] waiting  1m02.5s        
+
+running (00m15.0s), 1/3 VUs, 7 complete and 0 interrupted iterations
+write_lane    [  64% ] 1 VUs    00m08.5s/10m0s  07/11 iters, 11 per VU
+public_lane • [   0% ] waiting  26.5s          
+auth_lane   • [   0% ] waiting  1m01.5s        
+
+running (00m16.0s), 1/3 VUs, 7 complete and 0 interrupted iterations
+write_lane    [  64% ] 1 VUs    00m09.5s/10m0s  07/11 iters, 11 per VU
+public_lane • [   0% ] waiting  25.5s          
+auth_lane   • [   0% ] waiting  1m00.5s        
+
+running (00m17.0s), 1/3 VUs, 8 complete and 0 interrupted iterations
+write_lane    [  73% ] 1 VUs    00m10.5s/10m0s  08/11 iters, 11 per VU
+public_lane • [   0% ] waiting  24.5s          
+auth_lane   • [   0% ] waiting  0m59.5s        
+
+running (00m18.0s), 1/3 VUs, 9 complete and 0 interrupted iterations
+write_lane    [  82% ] 1 VUs    00m11.5s/10m0s  09/11 iters, 11 per VU
+public_lane • [   0% ] waiting  23.5s          
+auth_lane   • [   0% ] waiting  0m58.5s        
+
+running (00m19.0s), 1/3 VUs, 10 complete and 0 interrupted iterations
+write_lane    [  91% ] 1 VUs    00m12.5s/10m0s  10/11 iters, 11 per VU
+public_lane • [   0% ] waiting  22.5s          
+auth_lane   • [   0% ] waiting  0m57.5s        
+
+running (00m20.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  21.5s          
+auth_lane   • [   0% ] waiting  0m56.5s        
+
+running (00m21.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  20.5s          
+auth_lane   • [   0% ] waiting  0m55.5s        
+
+running (00m22.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  19.5s          
+auth_lane   • [   0% ] waiting  0m54.5s        
+
+running (00m23.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  18.5s          
+auth_lane   • [   0% ] waiting  0m53.5s        
+
+running (00m24.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  17.5s          
+auth_lane   • [   0% ] waiting  0m52.5s        
+
+running (00m25.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  16.5s          
+auth_lane   • [   0% ] waiting  0m51.5s        
+
+running (00m26.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  15.5s          
+auth_lane   • [   0% ] waiting  0m50.5s        
+
+running (00m27.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  14.5s          
+auth_lane   • [   0% ] waiting  0m49.5s        
+
+running (00m28.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  13.5s          
+auth_lane   • [   0% ] waiting  0m48.5s        
+
+running (00m29.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  12.5s          
+auth_lane   • [   0% ] waiting  0m47.5s        
+
+running (00m30.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  11.5s          
+auth_lane   • [   0% ] waiting  0m46.5s        
+
+running (00m31.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  10.5s          
+auth_lane   • [   0% ] waiting  0m45.5s        
+
+running (00m32.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  09.5s          
+auth_lane   • [   0% ] waiting  0m44.5s        
+
+running (00m33.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  08.5s          
+auth_lane   • [   0% ] waiting  0m43.5s        
+
+running (00m34.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  07.5s          
+auth_lane   • [   0% ] waiting  0m42.5s        
+
+running (00m35.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  06.5s          
+auth_lane   • [   0% ] waiting  0m41.5s        
+
+running (00m36.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  05.5s          
+auth_lane   • [   0% ] waiting  0m40.5s        
+
+running (00m37.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  04.4s          
+auth_lane   • [   0% ] waiting  0m39.4s        
+
+running (00m38.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  03.5s          
+auth_lane   • [   0% ] waiting  0m38.5s        
+
+running (00m39.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  02.5s          
+auth_lane   • [   0% ] waiting  0m37.5s        
+
+running (00m40.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  01.5s          
+auth_lane   • [   0% ] waiting  0m36.5s        
+
+running (00m41.0s), 0/3 VUs, 11 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane • [   0% ] waiting  00.5s          
+auth_lane   • [   0% ] waiting  0m35.5s        
+
+running (00m42.0s), 1/3 VUs, 61 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane   [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m34.5s        
+
+running (00m43.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m33.5s        
+
+running (00m44.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m32.5s        
+
+running (00m45.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m31.5s        
+
+running (00m46.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m30.5s        
+
+running (00m47.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m29.5s        
+
+running (00m48.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m28.5s        
+
+running (00m49.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m27.5s        
+
+running (00m50.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m26.5s        
+
+running (00m51.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m25.5s        
+
+running (00m52.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m24.5s        
+
+running (00m53.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m23.5s        
+
+running (00m54.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m22.5s        
+
+running (00m55.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m21.5s        
+
+running (00m56.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m20.5s        
+
+running (00m57.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m19.5s        
+
+running (00m58.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m18.5s        
+
+running (00m59.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m17.5s        
+
+running (01m00.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m16.5s        
+
+running (01m01.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m15.5s        
+
+running (01m02.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m14.5s        
+
+running (01m03.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m13.5s        
+
+running (01m04.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m12.5s        
+
+running (01m05.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m11.5s        
+
+running (01m06.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m10.5s        
+
+running (01m07.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m09.5s        
+
+running (01m08.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m08.5s        
+
+running (01m09.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m07.5s        
+
+running (01m10.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m06.5s        
+
+running (01m11.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m05.5s        
+
+running (01m12.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m04.5s        
+
+running (01m13.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m03.5s        
+
+running (01m14.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m02.5s        
+
+running (01m15.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m01.5s        
+
+running (01m16.0s), 0/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs    00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs    00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   • [   0% ] waiting  0m00.5s        
+
+running (01m17.0s), 1/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs  00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs  00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane     [   0% ] 1 VUs  00m00.5s/10m0s  0/6 iters, 6 per VU
+
+running (01m18.0s), 1/3 VUs, 62 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs  00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs  00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane     [   0% ] 1 VUs  00m01.5s/10m0s  0/6 iters, 6 per VU
+
+running (01m19.0s), 1/3 VUs, 63 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs  00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs  00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane     [  17% ] 1 VUs  00m02.5s/10m0s  1/6 iters, 6 per VU
+
+running (01m20.0s), 1/3 VUs, 64 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs  00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs  00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane     [  33% ] 1 VUs  00m03.5s/10m0s  2/6 iters, 6 per VU
+
+running (01m21.0s), 1/3 VUs, 65 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs  00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs  00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane     [  50% ] 1 VUs  00m04.5s/10m0s  3/6 iters, 6 per VU
+
+running (01m22.0s), 1/3 VUs, 66 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs  00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs  00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane     [  67% ] 1 VUs  00m05.5s/10m0s  4/6 iters, 6 per VU
+
+running (01m23.0s), 1/3 VUs, 66 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs  00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs  00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane     [  67% ] 1 VUs  00m06.5s/10m0s  4/6 iters, 6 per VU
+
+running (01m24.0s), 1/3 VUs, 67 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs  00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs  00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane     [  83% ] 1 VUs  00m07.5s/10m0s  5/6 iters, 6 per VU
+
+
+  █ THRESHOLDS 
+
+    auth_429s
+    ✓ 'count==1' count=1
+
+    lane_failures
+    ✗ 'rate==0' rate=7.35%
+
+    public_429s
+    ✓ 'count==1' count=1
+
+    write_429s
+    ✓ 'count==1' count=1
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 69     0.819835/s
+    checks_succeeded...: 92.75% 64 out of 69
+    checks_failed......: 7.24%  5 out of 69
+
+    ✓ citizen login 200
+    ✓ write probe 400|429
+    ✓ public probe 200|429
+    ✗ auth probe 401|429
+      ↳  16% — ✓ 1 / ✗ 5
+
+    CUSTOM
+    auth_429s......................: 1      0.011882/s
+    lane_failures..................: 7.35%  5 out of 68
+    public_429s....................: 1      0.011882/s
+    write_429s.....................: 1      0.011882/s
+
+    HTTP
+    http_req_duration..............: avg=82.27ms  min=4.87ms med=8.82ms max=1.45s p(90)=171.75ms p(95)=227.72ms
+      { expected_response:true }...: avg=38.1ms   min=5.03ms med=7.61ms max=1.45s p(90)=18.48ms  p(95)=22.33ms 
+    http_req_failed................: 26.08% 18 out of 69
+    http_reqs......................: 69     0.819835/s
+
+    EXECUTION
+    iteration_duration.............: avg=312.81ms min=5.42ms med=8.93ms max=1.98s p(90)=1.17s    p(95)=1.21s   
+    iterations.....................: 68     0.807953/s
+    vus............................: 1      min=0        max=1
+    vus_max........................: 3      min=3        max=3
+
+    NETWORK
+    data_received..................: 99 kB  1.2 kB/s
+    data_sent......................: 19 kB  229 B/s
+
+
+
+
+running (01m24.2s), 0/3 VUs, 68 complete and 0 interrupted iterations
+write_lane  ✓ [ 100% ] 1 VUs  00m13.1s/10m0s  11/11 iters, 11 per VU
+public_lane ✓ [ 100% ] 1 VUs  00m00.5s/10m0s  51/51 iters, 51 per VU
+auth_lane   ✓ [ 100% ] 1 VUs  00m07.7s/10m0s  6/6 iters, 6 per VU
+time="2026-09-18T10:32:36+05:00" level=error msg="thresholds on metrics 'lane_failures' have been crossed"
