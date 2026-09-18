@@ -1,0 +1,12 @@
+endpoint | count | p50 | p95 | p99 | max | err%
+---|---|---|---|---|---|---
+/api/citizens/login | 1 | 6218 | 6218 | 6218 | 6218 | 0.00
+/api/user/report-crime | 263 | 1191 | 3095 | 3924 | 6278 | 0.76
+/api/auth/login | 1159 | 485 | 2265 | 3739 | 4609 | 0.09
+/api/stats/summary | 7507 | 15 | 1104 | 2295 | 5629 | 0.00
+/api/crimes/ | 7507 | 132 | 583 | 1193 | 3526 | 0.00
+/api/stats/crime-trend | 7507 | 20 | 524 | 1216 | 3172 | 0.00
+/api/stats/crime-type-distribution | 7507 | 18 | 479 | 928 | 3110 | 0.00
+/api/stats/zone-crime-count | 7507 | 19 | 464 | 955 | 2899 | 0.00
+/api/crimes/types | 7507 | 12 | 457 | 1132 | 4577 | 0.00
+/api/zones | 7507 | 15 | 439 | 1090 | 3444 | 0.00

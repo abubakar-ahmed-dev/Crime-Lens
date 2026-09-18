@@ -1,0 +1,9 @@
+endpoint | count | p50 | p95 | p99 | max | err%
+---|---|---|---|---|---|---
+/api/crimes/ | 41303 | 1747 | 4171 | 5586 | 11424 | 0.00
+/api/stats/crime-type-distribution | 41303 | 109 | 406 | 2732 | 9395 | 0.00
+/api/stats/zone-crime-count | 41303 | 108 | 397 | 2869 | 8180 | 0.00
+/api/zones | 41303 | 109 | 390 | 1745 | 8048 | 0.00
+/api/stats/crime-trend | 41303 | 106 | 358 | 1594 | 9193 | 0.00
+/api/stats/summary | 41303 | 88 | 309 | 19198 | 23168 | 0.00
+/api/crimes/types | 41303 | 102 | 285 | 495 | 6903 | 0.00

@@ -6,8 +6,16 @@ Desktop host — nginx edge (:18000) → 1 API replica → Redis (cache + limite
 BullMQ worker. k6 v0.2x open/closed model runs against the edge, exactly the
 shape production traffic would traverse.
 
-Every number below is measured. Nothing is extrapolated from a phase-0
-baseline that was never executed (see plan audit, correction #1).
+Every number below is measured.
+
+**Correction (2026-09-18):** an earlier version of this report claimed the
+Phase 0 baseline was never executed. That was wrong: Phase 0's testing log
+records baseline, stress, and spike executions on 2026-08-26, summarized
+in `Plans/phase-0-k6-baseline/testing-log.md` — only the large raw JSON
+files were deleted after aggregation. The plan's audit correction #1
+repeated the same error. A controlled like-for-like rerun of the unmodified
+Phase 0 suite against the current stack now lives in
+`results/baseline-comparison/` (see its `comparison-report.md`).
 
 ---
 
@@ -104,7 +112,7 @@ of phase-12 failure-path testing, not from this session).
 
 | Phase | Scope | Status | Verified by |
 |---|---|---|---|
-| 0 | k6 baseline infrastructure | Done (lib + scripts; execution deferred, closed here) | this phase's runs reuse the lib |
+| 0 | k6 baseline infrastructure | Done (executed 2026-08-26; raw JSONs deleted after aggregation; rerun against the current stack in `baseline-comparison/`) | this phase's runs reuse the lib |
 | 1 | Postgres/Sequelize optimization + pagination | Done | phase-1 logs; pool env-driven (max 10) measured here |
 | 2 | Health checks | Done | `/health` live in every run here |
 | 3 | Redis caching | Done | **100% hit ratio measured (§1.3)** |

@@ -1,0 +1,36 @@
+== BASELINE start: 2026-09-18 11:40:17 PST
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+
+  █ THRESHOLDS 
+
+    http_req_duration
+    ✓ 'p(95)<500' p(95)=0s
+    ✓ 'p(99)<1000' p(99)=0s
+
+    http_req_failed
+    ✓ 'rate<0.05' rate=0.00%
+
+
+  █ TOTAL RESULTS 
+
+    HTTP
+    http_req_duration...: avg=0s min=0s med=0s max=0s p(90)=0s p(95)=0s
+    http_req_failed.....: 0.00% 0 out of 0
+
+
+
+time="2026-09-18T11:40:17+05:00" level=error msg="failed to handle the end-of-test summary" error="Could not save some summary information:\n\t- could not open 'C:/Users/Admin/Desktop/FAST/Duplicates/CrimeLens-main/Plans/phase-16-k6-final/results/baseline-comparison/raw/baseline-summary.json': open C:/Users/Admin/Desktop/FAST/Duplicates/CrimeLens-main/Plans/phase-16-k6-final/results/baseline-comparison/raw/baseline-summary.json: The system cannot find the path specified."
+
+Init             [   0% ] Starting outputs
+auth_traffic     [   0% ]
+public_traffic   [   0% ]
+write_traffic    [   0% ]
+time="2026-09-18T11:40:17+05:00" level=error msg="open C:/Users/Admin/Desktop/FAST/Duplicates/CrimeLens-main/Plans/phase-16-k6-final/results/baseline-comparison/raw/baseline-results.json: The system cannot find the path specified."
+== BASELINE end: 2026-09-18 11:40:17 PST, exit=127
