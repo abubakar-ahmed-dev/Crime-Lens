@@ -1,0 +1,7 @@
+Test wall-clock span: 425s
+
+scenario | requests | failures | p50 | p90 | p95 | p99 | max
+---|---|---|---|---|---|---|---
+normal_load | 8050 | 0 | 18 | 122 | 154 | 1506 | 9852
+spike | 51198 | 31 | 181 | 1393 | 2964 | 9386 | 13238
+recovery | 10941 | 0 | 19 | 134 | 202 | 1720 | 8277

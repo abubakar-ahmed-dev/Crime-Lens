@@ -1,0 +1,5 @@
+== POST-SUITE @ 2026-09-18 12:54:33: limiter restored ON, 1 replica
+crimelens-main-backend-1 Up About a minute (healthy)
+"rateLimiting":{"enabled":true,"mode":"redis"}
+
+reports created by write lane: 261 (263 attempts, 2 failed); status=pending in shared Supabase; none deleted

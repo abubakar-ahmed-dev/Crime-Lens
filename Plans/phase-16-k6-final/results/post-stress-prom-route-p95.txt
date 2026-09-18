@@ -1,0 +1,4 @@
+   10000 ms p95  /api/crimes
+      18 ms p95  /api/crimes/types
+      17 ms p95  /api/stats/summary
+db_pool_max: 10

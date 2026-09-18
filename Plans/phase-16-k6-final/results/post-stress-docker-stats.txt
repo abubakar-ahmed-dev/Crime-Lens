@@ -1,0 +1,8 @@
+crimelens-main-backend-1: cpu=1.17% mem=66.7MiB / 3.782GiB
+crimelens-main-frontend-1: cpu=0.00% mem=8.098MiB / 3.782GiB
+crimelens-main-nginx-1: cpu=0.00% mem=6.496MiB / 3.782GiB
+crimelens-main-grafana-1: cpu=0.41% mem=47.87MiB / 3.782GiB
+crimelens-main-prometheus-1: cpu=0.00% mem=37.72MiB / 3.782GiB
+crimelens-main-worker-1: cpu=0.06% mem=29.8MiB / 3.782GiB
+crimelens-main-redis-1: cpu=0.97% mem=13.78MiB / 3.782GiB
+crimelens-redis-host: cpu=0.73% mem=3.734MiB / 3.782GiB
