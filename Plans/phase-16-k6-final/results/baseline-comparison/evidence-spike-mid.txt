@@ -1,0 +1,5 @@
+== evidence @ 2026-09-18 12:33:39 (spike window)
+pool used max: 10
+pool used max: 0
+crimelens-main-backend-1: cpu=106.80%
+crimelens-main-nginx-1: cpu=16.21%

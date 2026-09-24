@@ -1,0 +1,59 @@
+== SMOKE start: 2026-09-18 11:38:59 PST
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: tests/k6/smoke-test.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 1 max VUs, 10m30s max duration (incl. graceful stop):
+              * default: 1 iterations shared among 1 VUs (maxDuration: 10m0s, gracefulStop: 30s)
+
+
+running (00m01.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+default   [   0% ] 1 VUs  00m01.0s/10m0s  0/1 shared iters
+
+running (00m02.0s), 1/1 VUs, 0 complete and 0 interrupted iterations
+default   [   0% ] 1 VUs  00m02.0s/10m0s  0/1 shared iters
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 6       2.236197/s
+    checks_succeeded...: 100.00% 6 out of 6
+    checks_failed......: 0.00%   0 out of 6
+
+    ✓ crime types 200
+    ✓ zones 200
+    ✓ stats summary 200
+    ✓ map crimes (radius) 200
+    ✓ login status 200
+    ✓ login has token
+
+    HTTP
+    http_req_duration..............: avg=330.72ms min=150.32ms med=281.49ms max=559.2ms p(90)=535.47ms p(95)=547.34ms
+      { expected_response:true }...: avg=330.72ms min=150.32ms med=281.49ms max=559.2ms p(90)=535.47ms p(95)=547.34ms
+    http_req_failed................: 0.00%  0 out of 5
+    http_reqs......................: 5      1.863497/s
+
+    EXECUTION
+    iteration_duration.............: avg=2.68s    min=2.68s    med=2.68s    max=2.68s   p(90)=2.68s    p(95)=2.68s   
+    iterations.....................: 1      0.372699/s
+    vus............................: 1      min=1      max=1
+    vus_max........................: 1      min=1      max=1
+
+    NETWORK
+    data_received..................: 7.6 kB 2.8 kB/s
+    data_sent......................: 579 B  216 B/s
+
+
+
+
+running (00m02.7s), 0/1 VUs, 1 complete and 0 interrupted iterations
+default ✓ [ 100% ] 1 VUs  00m02.7s/10m0s  1/1 shared iters
+== SMOKE end: 2026-09-18 11:39:03 PST, exit=0
