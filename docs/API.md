@@ -1,9 +1,10 @@
 # API
 
-Base URL in local development:
+Base URLs:
 
 ```text
-http://localhost:5001/api
+Docker stack (nginx edge):  http://localhost:18000/api
+Manual development:         http://localhost:5001/api
 ```
 
 The backend is an Express application. Routes are mounted in `server.js`.
@@ -23,6 +24,33 @@ Authorization: Bearer <supabase_access_token>
 ```
 
 Common response fields include `success`, `message`, `data`, and sometimes `error`.
+
+## Conventions
+
+### Rate limiting (all routes, per IP, Redis-backed and shared across replicas)
+
+| Tier | Limit | Applies to |
+|---|---|---|
+| AUTH | 5/min + 5-min lockout | `POST /auth/login` |
+| Citizen auth | separate tier | `/citizens/register`, `/citizens/login`, `/citizens/google-auth` |
+| WRITE | 10/min | `POST /user/report-crime`, `PUT /crimes/update/:id` |
+| SENSITIVE | 3/h | admin CSV upload |
+| PUBLIC | 50/min (shared bucket across public read routes) | map, stats, zones, types reads |
+
+Every response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and
+`X-RateLimit-Reset`. Exceeding a tier returns `429` with `Retry-After`.
+Clients should honor it instead of retrying aggressively.
+
+### Pagination
+
+List-style reads (`GET /crimes`, `/agent/all`, `/user/pending`, ...) accept
+`page` and `limit` (defaults and caps configured via `DEFAULT_PAGE_SIZE` /
+`MAX_PAGE_SIZE`, max 200) and return a paginated envelope with total counts.
+
+### Caching and compression
+
+Cacheable public reads return an `X-Cache: HIT|MISS` header (5-min TTL).
+Responses are gzip-compressed when the client sends `Accept-Encoding: gzip`.
 
 ## Staff Authentication
 
@@ -420,7 +448,45 @@ Body:
 }
 ```
 
-## Unknowns
+## Health And Readiness
 
-- The repository does not provide a generated OpenAPI specification.
+### `GET /api/health`
+
+Liveness: process is up. Reports rate-limiter mode and uptime. No auth.
+
+### `GET /api/ready`
+
+Readiness: verifies PostgreSQL and Redis connectivity with response times.
+Returns `503` when a required dependency is down.
+
+## Metrics (ops)
+
+### `GET /metrics`
+
+Prometheus exposition (request rates, latency histograms, DB pool state,
+cache hit rate, queue depth). Intended for the Prometheus scraper — the
+nginx edge returns `404` for it by design.
+
+## Media
+
+| Method + path | Auth | Purpose |
+|---|---|---|
+| `POST /media/upload` | citizen (Supabase token) or staff | Upload image/video evidence with captions |
+| `GET /media/crime/:crimeId` | role-aware | Media for a crime (police-only items filtered by role) |
+| `PUT /media/:id` | staff | Update visibility / caption / evidence flag |
+| `DELETE /media/:id` | staff | Delete media (Cloudinary cleanup is queued to the worker) |
+| `POST /media/crimes/:crimeId/media` | staff | Attach more media to an existing crime |
+| `DELETE /media/crimes/:crimeId/media/:mediaId` | staff | Detach media from a crime |
+| `GET /media/:id/thumbnail` | public | Thumbnail for approved/public media |
+
+## Job Queue (admin)
+
+| Method + path | Auth | Purpose |
+|---|---|---|
+| `GET /jobs/queues` | admin | Queue depth counters (waiting/active/completed/failed/delayed) |
+| `GET /jobs/status/:jobId` | admin | Single job status (trimmed payload — no job data or stack traces) |
+
+## Notes
+
+- No generated OpenAPI specification exists; this document is the reference.
 - Some controller response bodies are not centralized and may differ by endpoint.
