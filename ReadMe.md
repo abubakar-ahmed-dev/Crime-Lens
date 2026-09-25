@@ -5,188 +5,314 @@
 [![Release](https://github.com/abubakar-ahmed-dev/Crime-Lens/actions/workflows/release.yml/badge.svg)](https://github.com/abubakar-ahmed-dev/Crime-Lens/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-CrimeLens is a crime mapping, reporting, verification, and analytics platform.
-Citizens report incidents, police verify and manage them, and the public
-explores approved data through maps and statistics — backed by a
-production-style architecture: a stateless containerized API behind an nginx
-edge, Redis caching and rate limiting, background workers, and full
-observability.
+CrimeLens is a full-stack crime reporting, verification, mapping, and analytics platform. It connects citizens, police personnel, administrators, and the public through role-specific workflows while maintaining one verified source of crime data.
 
-| Crime Map | Statistics |
-|---|---|
-| ![Crime map](docs/screenshots/crime-map.jpg) | ![Statistics](docs/screenshots/statistics.jpg) |
+Citizens can submit incident reports with location and media evidence. Police personnel review and manage reports, administrators oversee users and operational data, and approved incidents become available through interactive maps, geospatial searches, and statistical dashboards.
 
-## Features
+The platform is built as a modular PERN application with PostGIS-based geospatial processing, Redis-backed caching and rate limiting, background job processing, containerized services, and application observability.
 
-- **Public** — interactive crime map (Leaflet + marker clustering), radius
-  search, zone overlays with severity, statistics dashboards
-- **Citizens** — registration (email + Google OAuth via Supabase Auth),
-  profile completion, crime reporting with manual/device/map location and
-  media evidence, report-status tracking
-- **Police** — verification queue, approve/reject, record editing with
-  zone-boundary validation, media management (visibility/caption/evidence)
-- **Admin** — agent verification, branch management, direct agent creation,
-  CSV bulk import, job-queue visibility
-- **Cross-cutting** — JWT (staff) + Supabase Auth (citizens) dual
-  authentication, role-based access, request validation, structured logging,
-  metrics, distributed rate limiting
+| Crime map | Statistics |
+| --- | --- |
+| ![Crime map](docs/screenshots/crime-map.jpg) | ![Crime statistics](docs/screenshots/statistics.jpg) |
 
-## Architecture
+## Core Capabilities
+
+### Public crime intelligence
+
+- Explore approved incidents on an interactive Leaflet map.
+- Group dense map data through marker clustering.
+- Search for incidents within a selected radius.
+- View crime zones, severity information, trends, and statistical summaries.
+- Access public crime data without exposing restricted report or user information.
+
+### Citizen reporting
+
+- Register with email and password or Google through Supabase Auth.
+- Complete and maintain a citizen profile.
+- Submit crime reports with incident details, location, and supporting media.
+- Select a location manually, from the device, or directly from the map.
+- Track the verification status of submitted reports.
+
+### Police operations
+
+- Review submitted incidents through a verification queue.
+- Approve or reject reports according to verification outcomes.
+- Edit crime records while enforcing zone-boundary validation.
+- Review and manage uploaded evidence, visibility, and captions.
+- Access operational data according to assigned role and branch permissions.
+
+### Administration
+
+- Verify and manage police personnel.
+- Create staff accounts and maintain branch information.
+- Import structured records in bulk through CSV files.
+- Monitor background processing jobs and operational state.
+- Manage platform data through role-protected administrative workflows.
+
+## How CrimeLens Works
+
+1. A citizen records an incident and provides its location and any available evidence.
+2. CrimeLens validates the request and stores the report for authorized review.
+3. Police personnel examine the submission and approve or reject it.
+4. Approved records become part of the public geospatial and statistical dataset.
+5. Cache invalidation keeps public maps and dashboards consistent with verified data.
+
+Only approved incidents are included in public crime intelligence. Administrative details, private media, and protected user data remain behind authenticated and role-authorized endpoints.
+
+## Technology Stack
+
+| Area | Technologies |
+| --- | --- |
+| Frontend | React, TypeScript, Vite, Redux Toolkit, TanStack Query, Tailwind CSS, shadcn/ui |
+| Mapping | Leaflet, marker clustering, GeoJSON |
+| Backend | Node.js, Express, Sequelize |
+| Database | PostgreSQL, PostGIS, Supabase |
+| Authentication | Supabase Auth, Google OAuth, JWT, role-based access control |
+| Cache and queues | Redis, BullMQ |
+| Media | Cloudinary |
+| Edge and containers | Nginx, Docker, Docker Compose |
+| Observability | Prometheus, Grafana, Pino |
+| Testing and delivery | k6, ESLint, TypeScript, GitHub Actions, CodeQL, Trivy |
+
+## System Architecture
 
 ```mermaid
-flowchart LR
-    C[Browser client] --> N[nginx edge<br/>reverse proxy + LB]
-    N --> F[Frontend<br/>React + Vite]
-    N --> A1[API replica 1<br/>Express + Sequelize]
-    N --> A2[API replica N<br/>stateless]
-    A1 --> R[(Redis<br/>cache + rate limits<br/>+ BullMQ)]
-    A2 --> R
-    A1 --> P[(PostgreSQL + PostGIS<br/>Supabase)]
-    A2 --> P
-    W[Background worker<br/>BullMQ] --> R
-    W --> CL[Cloudinary<br/>media cleanup]
-    A1 --> M[/metrics/]
-    M --> PR[Prometheus]
-    PR --> G[Grafana]
+flowchart TD
+    U["Web client"] --> N["Nginx reverse proxy"]
+    N --> F["React application"]
+    N --> A["Stateless Express API replicas"]
+    A --> D[("PostgreSQL + PostGIS")]
+    A --> R[("Redis")]
+    A --> Q["BullMQ jobs"]
+    Q --> W["Background worker"]
+    W --> R
+    W --> C["Cloudinary"]
+    A --> P["Prometheus metrics"]
+    P --> G["Grafana dashboards"]
 ```
 
-- **Stateless API** — any replica can serve any request; shared state lives in
-  Redis/Postgres
-- **Redis cache-aside** — stats/reference reads served from cache (measured
-  100% hit ratio under sustained load, 5-min TTL, explicit invalidation)
-- **Redis-backed rate limiting** — per-IP tiers: AUTH 5/min (5-min lockout),
-  WRITE 10/min, SENSITIVE 3/h, PUBLIC 50/min, shared across all replicas
-- **BullMQ worker** — Cloudinary media cleanup out of the request lifecycle,
-  retries + idempotency
-- **Observability** — Prometheus metrics (request rate/latency histograms,
-  pool state, cache hit rate, queue depth), Grafana dashboards, pino
-  structured logs, `/health` + `/ready`
+The application is organized as a modular monolith: domain logic remains within one backend codebase, while runtime responsibilities are separated across the API, worker, database, cache, frontend, edge, and monitoring services.
 
-## System-design upgrades (16 phases)
+### Stateless API layer
 
-Measured — not aspirational. Full evidence in [`Plans/`](Plans/SYSTEM-DESIGN-IMPLEMENTATION.md).
+API instances do not depend on process-local session state. Shared application state is stored in PostgreSQL or Redis, allowing Nginx to distribute requests across multiple replicas.
 
-| # | Phase | Delivers |
-|---|---|---|
-| 0 | k6 baseline infrastructure | Reusable load-test lib + suites (executed 2026-08-26) |
-| 1 | PostgreSQL/Sequelize optimization | Pagination, env-driven pool (max 10), query work |
-| 2 | Health checks | `/health` (liveness) + `/ready` (DB/Redis dependency checks) |
-| 3 | Redis caching | Cache-aside for stats/reference; ~15 ms cached reads vs 100s of ms DB round trips |
-| 4 | Rate limiting | Redis-backed tiers + lockouts, verified live (429 at exactly N+1 per tier) |
-| 5 | API security | Helmet, schema validation, strict CORS, request limits |
-| 6 | HTTP compression | gzip for API responses |
-| 7 | Pino logging | Structured logs with request IDs |
-| 8 | Prometheus + Grafana | Request/latency/pool/cache/queue metrics + dashboards |
-| 9 | Docker | Compose stack: edge, API, worker, Redis, monitoring |
-| 10 | Nginx edge | Reverse proxy + load balancing, upstream timing logs, metrics hardening |
-| 11 | Horizontal scaling | 1/2/3-instance verification; shared-host finding documented |
-| 12 | BullMQ workers | Async Cloudinary cleanup with retries; admin queue endpoints |
-| 13 | Cloudflare/TLS/CDN | **Deferred** — needs a domain |
-| 14 | CI/CD | GitHub Actions: lint, build, smoke boot vs real Postgres/Redis, CodeQL, audits, GHCR image publishing, releases |
-| 15 | Frontend lint cleanup | 83 → 0 ESLint errors; CI lint enforcing |
-| 16 | Final scalability testing | Controlled before/after rerun of the phase-0 suite — results below |
+### Geospatial data model
 
-## Performance (measured)
+PostgreSQL with PostGIS stores incident coordinates and crime-zone geometry. Spatial queries support radius searches, zone assignment, boundary validation, and location-based analysis.
 
-Controlled like-for-like rerun of the unmodified Phase 0 k6 suite against the
-upgraded stack, same machine and workload
-([full report](Plans/phase-16-k6-final/results/baseline-comparison/comparison-report.md)):
+### Cache-aside reads
 
-| Run (identical workload) | Before (2026-08-26) | After | Δ |
-|---|---|---|---|
-| Baseline 16 min, 115 VUs — throughput | 25.5 req/s | **55.4 req/s** | **2.2×** |
-| Baseline — p95 latency | 5,130 ms | **655 ms** | **−87%** |
-| Stress 17 min, 500 VUs — throughput | 32.3 req/s | **282 req/s** | **8.7×** |
-| Stress — p95 latency | 36,640 ms | **2,800 ms** | **−92%** |
-| Spike (50→500→50 VUs) | queued everything | **10.2× requests absorbed**, recovery p50 18→19 ms | resilient |
-| `/api/stats/summary` p50 (cache) | 4,804 ms | **15 ms** | **−99.7%** |
-| HTTP errors (baseline) | 0.10% | **0.006%** | fewer |
+Frequently requested statistics and reference data are served through Redis using a cache-aside strategy. Mutating operations explicitly invalidate affected keys so public results do not remain stale until the time-to-live expires.
 
-Known ceiling: the Postgres connection pool is the binding resource — cached
-routes hold ~15 ms at every load level while DB-bound map reads saturate the
-pool first. Analysis and next levers in the
-[final report](Plans/phase-16-k6-final/results/final-scalability-report.md).
+### Shared rate limiting
 
-## Quickstart (Docker)
+Rate-limit counters are stored in Redis rather than individual API processes. Limits therefore remain consistent when the backend is running with multiple replicas.
 
-Prerequisites: Docker Desktop, a Supabase project (Postgres + PostGIS + Auth)
-and a Cloudinary account for media.
+| Request class | Limit |
+| --- | --- |
+| Authentication | 5 requests per minute with a 5-minute lockout |
+| Write operations | 10 requests per minute |
+| Sensitive operations | 3 requests per hour |
+| Public reads | 50 requests per minute |
 
-```bash
-# 1. Configure
-cp db-project-backend/.env-sample db-project-backend/.env   # fill in values
-# (frontend VITE_* vars are public-by-design and baked at build time)
+### Background processing
 
-# 2. Build and start the full stack
-docker compose up -d --build
+BullMQ moves Cloudinary cleanup work out of the request lifecycle. Jobs support retry behavior and idempotent processing, while authorized administrators can inspect queue state.
 
-# 3. Verify
-curl http://localhost/api/health   # {"status":"healthy",...}
-```
+### Observability
 
-Committed defaults: app on :80, API on :5001, Prometheus :9090, Grafana
-:3000. (Local development on this repo adds a gitignored
-`docker-compose.override.yml` that remaps ports — edge :18000, replicas
-:15001-15003, Prometheus :19090, Grafana :13300; see
-[docs/SETUP.md](docs/SETUP.md).)
+- Pino produces structured application logs with request identifiers.
+- Prometheus collects request rate, latency, connection-pool, cache, and queue metrics.
+- Grafana provides dashboards for runtime and performance monitoring.
+- Liveness and readiness endpoints separate process health from dependency availability.
 
-## Manual development
+## Authentication and Security
 
-```bash
-cd db-project-backend && npm ci && npm start     # API on :5001
-cd db-project-frontend && npm ci && npm run dev  # Vite dev server
-```
+CrimeLens uses separate authentication flows for its two main identity groups:
 
-Full setup (Supabase schema/PostGIS, auth providers, Cloudinary, env
-variables): [`docs/SETUP.md`](docs/SETUP.md).
+- Citizens authenticate through Supabase Auth using email/password or Google OAuth.
+- Police and administrative users authenticate through the staff JWT flow.
 
-## Testing
+Authorization is enforced through role-based middleware so each user can access only the routes and records required by their responsibilities. Additional API protections include request-schema validation, Helmet security headers, strict CORS configuration, payload-size limits, and Redis-backed rate limiting.
+
+Environment secrets are supplied at runtime and must not be committed to source control.
+
+## Performance and Scalability
+
+CrimeLens has been evaluated with reusable k6 suites covering ordinary traffic, gradually increasing load, sudden spikes, authentication, report submission, statistics, and geospatial endpoints.
+
+The following results were recorded on the tested containerized stack using the documented workload and environment:
+
+| Scenario | Workload | Result |
+| --- | --- | --- |
+| Sustained load | 16 minutes, up to 115 virtual users | 55.4 requests/second; 655 ms p95 latency |
+| Stress test | 17 minutes, up to 500 virtual users | 282 requests/second; 2.8 s p95 latency |
+| Traffic spike | 50 → 500 → 50 virtual users | Stable recovery; p50 returned from 18 ms to 19 ms |
+| Cached statistics | `/api/stats/summary` | 15 ms p50 latency |
+| Sustained-load reliability | Baseline workload | 0.006% HTTP error rate |
+
+Cached routes remained responsive under load, while database-bound map queries reached the PostgreSQL connection-pool limit first. This identifies database concurrency and geospatial query cost as the primary scaling boundary for the tested environment.
+
+Detailed methodology and raw comparisons are available in [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
+
+> Benchmark results describe the documented test environment and workload; they are not a production service-level guarantee.
+
+## Getting Started
+
+### Prerequisites
+
+- Docker Desktop with Docker Compose
+- A Supabase project with PostgreSQL, PostGIS, and Auth configured
+- A Cloudinary account for report media
+- Git
+
+### Run with Docker
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/abubakar-ahmed-dev/Crime-Lens.git
+   cd Crime-Lens
+   ```
+
+2. Create the backend environment file:
+
+   ```bash
+   cp db-project-backend/.env-sample db-project-backend/.env
+   ```
+
+3. Add the required Supabase, database, authentication, Redis, and Cloudinary values. Frontend variables prefixed with `VITE_` are included at build time and must also be configured before building the frontend image.
+
+4. Build and start the application:
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+5. Check the API health endpoint:
+
+   ```bash
+   curl http://localhost/api/health
+   ```
+
+The default Compose configuration exposes the application through Nginx on port `80`, the API on `5001`, Prometheus on `9090`, and Grafana on `3000`.
+
+For database schema, authentication-provider, environment-variable, and local port configuration, see [`docs/SETUP.md`](docs/SETUP.md).
+
+### Manual development
+
+Start the backend:
 
 ```bash
 cd db-project-backend
-node --check server.js                                   # syntax
-k6 run tests/k6/smoke-test.js                            # endpoint smoke
-k6 run tests/k6/runs/baseline.js                         # load suite
+npm ci
+npm start
 ```
 
-CI runs on every PR: frontend lint (enforcing) + build (tsc), backend syntax
-check, a live smoke boot against real Postgres/Redis service containers
-(health/ready/metrics + worker SIGTERM), CodeQL, and npm audit at
-critical-only threshold. Docker builds + Trivy scans publish to GHCR on
-`dev`/`main`/tags. See [`.github/workflows/`](.github/workflows/).
+Start the frontend in another terminal:
 
-## Project structure
-
+```bash
+cd db-project-frontend
+npm ci
+npm run dev
 ```
-├── docker-compose.yml           # full stack: edge, API, worker, redis, prometheus, grafana
-├── Dockerfile.backend           # API + worker image
-├── Dockerfile.frontend          # nginx-served SPA image
-├── db-project-backend/          # Express + Sequelize API (see its README)
-│   ├── config/                  # db, redis, queue, rate limiter, prometheus, logger
-│   ├── controllers/ routes/     # domain logic + routing
-│   ├── middleware/              # auth, rate limit, validation
-│   └── tests/k6/                # load-test suites + shared lib
-├── db-project-frontend/         # React + TypeScript + Vite SPA (see its README)
-├── docs/                        # setup, architecture, API, operations, observability
-├── infra/                       # prometheus + grafana provisioning
-├── scripts/                     # ops helpers (scaling, pool analysis, cleanup)
-└── Plans/                       # 16-phase engineering record: plans, logs, measured results
+
+Manual development requires accessible PostgreSQL and Redis services plus correctly configured backend and frontend environment files.
+
+## API and Service Endpoints
+
+| Endpoint | Purpose |
+| --- | --- |
+| `/api/health` | Liveness check for the API process |
+| `/api/ready` | Readiness check for required dependencies |
+| `/metrics` | Prometheus-format application metrics |
+| `/api/crimes` | Approved crime records and map data |
+| `/api/stats/*` | Crime statistics and analytical summaries |
+
+The platform also provides authenticated route groups for citizen reports, police verification, administrative management, media operations, branches, and background jobs. Request formats, authentication requirements, pagination, and rate-limit classes are documented in [`docs/API.md`](docs/API.md).
+
+## Testing
+
+### Static checks and frontend build
+
+```bash
+cd db-project-frontend
+npm ci
+npm run lint
+npm run build
+```
+
+### Backend syntax check
+
+```bash
+cd db-project-backend
+node --check server.js
+```
+
+### k6 smoke and load tests
+
+```bash
+cd db-project-backend
+k6 run tests/k6/smoke-test.js
+k6 run tests/k6/runs/baseline.js
+```
+
+Load tests require a running application, suitable test data, and dedicated test credentials. Do not run stress or spike suites against an environment that is not intended for performance testing.
+
+## Continuous Integration and Delivery
+
+GitHub Actions validates changes and automates container delivery:
+
+- Frontend linting and TypeScript build validation
+- Backend syntax validation
+- Application smoke startup with PostgreSQL and Redis service containers
+- Health, readiness, metrics, and worker-shutdown checks
+- CodeQL analysis and critical-level dependency auditing
+- Docker image builds and Trivy vulnerability scanning
+- GHCR image publishing for configured branches and tags
+- Release workflow automation
+
+Workflow definitions are available in [`.github/workflows`](.github/workflows/).
+
+## Project Structure
+
+```text
+.
+├── .github/workflows/          # CI, security, image, and release workflows
+├── db-project-backend/         # Express and Sequelize application
+│   ├── config/                 # Database, Redis, queue, metrics, and logging
+│   ├── controllers/            # Request and domain orchestration
+│   ├── middleware/             # Authentication, authorization, validation, limits
+│   ├── routes/                 # Public and protected API routes
+│   └── tests/k6/               # Smoke, load, stress, and spike tests
+├── db-project-frontend/        # React and TypeScript client
+├── docs/                       # Setup, architecture, API, and operations guides
+├── infra/                      # Prometheus and Grafana configuration
+├── scripts/                    # Operational and analysis utilities
+├── Dockerfile.backend          # Backend and worker image
+├── Dockerfile.frontend         # Nginx-served frontend image
+└── docker-compose.yml          # Complete local service stack
 ```
 
 ## Documentation
 
-| Doc | Contents |
-|---|---|
-| [docs/SETUP.md](docs/SETUP.md) | Environment setup (Docker + manual), all env variables |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design, caching/rate-limit/queue design, scaling findings |
-| [docs/API.md](docs/API.md) | Endpoint reference (auth + rate limits) |
-| [docs/DATABASE.md](docs/DATABASE.md) | Schema, PostGIS, connection-pool budget |
-| [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) | Metrics, dashboards, logs, health checks |
-| [docs/OPERATIONS.md](docs/OPERATIONS.md) | Runbook: scaling, pool analysis, cache/queue ops, failure drills |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Images, deploy path, what is deferred |
-| [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Methodology + measured results summary |
-| [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) | Known limits + deferred work |
+| Document | Description |
+| --- | --- |
+| [`docs/SETUP.md`](docs/SETUP.md) | Environment variables, Supabase setup, Docker, and manual development |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Runtime architecture and design decisions |
+| [`docs/API.md`](docs/API.md) | Endpoint contracts, authentication, pagination, and rate limits |
+| [`docs/DATABASE.md`](docs/DATABASE.md) | PostgreSQL schema, PostGIS usage, and connection-pool configuration |
+| [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md) | Metrics, dashboards, logs, health, and readiness checks |
+| [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | Scaling, cache, queue, pool analysis, and failure-response procedures |
+| [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Load-test methodology and measured results |
+
+## Contributing
+
+Contributions and issue reports are welcome. For substantial changes, open an issue first to discuss the problem, proposed behavior, and any effect on the API or database schema. Keep pull requests focused and include relevant tests or verification steps.
 
 ## License
 
-[MIT](LICENSE) © 2025-2026 abubakar-ahmed-dev
+CrimeLens is available under the [MIT License](LICENSE).
+
+© 2025–2026 [abubakar-ahmed-dev](https://github.com/abubakar-ahmed-dev)
