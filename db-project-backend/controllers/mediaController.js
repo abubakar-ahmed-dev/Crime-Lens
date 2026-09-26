@@ -42,7 +42,11 @@ export const uploadMedia = async (req, res) => {
 
   try {
     const { files } = req;
-    const { captions = [], crimeId: existingCrimeId } = req.body;
+    // captions must be an array — a tampered string/scalar value is treated
+    // as "no captions" (CodeQL js/type-confusion-through-parameter-tampering)
+    const rawCaptions = req.body.captions;
+    const captions = Array.isArray(rawCaptions) ? rawCaptions : [];
+    const { crimeId: existingCrimeId } = req.body;
     const userId = req.user?.id;
     const uploadedBy = req.user?.role ? "police" : "citizen";
 

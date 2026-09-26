@@ -22,11 +22,9 @@ export const registerCitizen = asyncHandler(async (req, res) => {
     return validationError(res, ['email', 'password', 'fullName'], 'Missing required fields');
   }
 
-  // Email validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return validationError(res, 'email', 'Invalid email format');
-  }
+  // Email format is validated by citizenRegisterSchema (zod z.email) on the
+  // route — the former manual regex here was redundant (CodeQL flagged it as
+  // js/polynomial-redos) and could drift from the schema.
 
   // Password validation (min 6 characters)
   if (password.length < 6) {
