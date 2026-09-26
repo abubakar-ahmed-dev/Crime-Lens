@@ -142,9 +142,13 @@ const stripInlineEventHandlers = (input) => {
 
 const sanitizeValue = (value) => {
   if (typeof value !== "string") return { value, changed: false };
-  let out = stripScriptBlocks(value);
-  out = out.replace(/javascript:/gi, "");
-  out = stripInlineEventHandlers(out);
+  // Note: the former `/javascript:/gi` substring strip was removed — a
+  // single-pass substring replace cannot fully remove a scheme
+  // ("javajavascript:script:" reassembles after one pass; CodeQL
+  // js/incomplete-url-substring-sanitization) and only created a false
+  // sense of coverage. Primary XSS defenses remain React escaping + Helmet
+  // CSP + zod schema constraints.
+  const out = stripInlineEventHandlers(stripScriptBlocks(value));
   return out === value ? { value, changed: false } : { value: out, changed: true };
 };
 

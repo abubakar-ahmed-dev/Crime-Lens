@@ -93,10 +93,12 @@ const stripInlineEventHandlers = (input) => {
 };
 
 const newSanitize = (value) => {
-  let out = stripScriptBlocks(value);
-  out = out.replace(/javascript:/gi, "");
-  out = stripInlineEventHandlers(out);
-  return out;
+  // Intentional delta vs the old implementation: the single-pass
+  // `/javascript:/gi` substring strip was REMOVED — it is reassemblable
+  // ("javajavascript:script:" survives one replace) and CodeQL flags it as
+  // js/incomplete-url-substring-sanitization. React escaping + CSP remain
+  // the primary defenses.
+  return stripInlineEventHandlers(stripScriptBlocks(value));
 };
 
 let failures = 0;
@@ -131,8 +133,9 @@ check("unquoted handler", newSanitize("<a onerror=boom>"), "<a >");
 check("handler without value kept (matches old)", newSanitize("onclick=>"), "onclick=>");
 check("'on=' with no word kept (matches old)", newSanitize("on=1"), "on=1");
 
-// 4. javascript: URIs
-check("javascript uri", newSanitize("click javascript:alert(1)"), "click alert(1)");
+// 4. javascript: URIs — DELTA: old stripped them (bypassably), new keeps the
+// text; rendering-time escaping is the defense, not stored-string mutation
+check("javascript uri kept by design", newSanitize("click javascript:alert(1)"), "click javascript:alert(1)");
 
 // 5. Adversarial timing — the ReDoS shapes CodeQL flagged
 const time = (fn, s) => {
