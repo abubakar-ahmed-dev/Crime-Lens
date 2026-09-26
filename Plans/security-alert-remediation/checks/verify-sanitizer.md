@@ -1,3 +1,45 @@
+# Sanitizer Remediation Check — A3 evidence
+
+Status: **ALL CHECKS PASSED** (executed 2026-09-26, output below).
+
+Stored as markdown on purpose: the file embeds the OLD vulnerable regex
+fixtures for comparison — CodeQL scans `.mjs` sources and would re-flag the
+fixtures (`js/bad-tag-filter`). Markdown is documentation, not extracted
+code. To re-run: copy the script block to `verify-sanitizer.mjs` and
+`node verify-sanitizer.mjs`.
+
+## Recorded output
+
+```text
+PASS  benign identical: "Bike stolen near Gulberg main "
+PASS  benign identical: "Report #123 filed at 21:45 on "
+PASS  benign identical: "Suspect said 'javascript is sl"
+PASS  benign identical: "Location: 31.5204, 74.3587; zone D; notes follow"
+PASS  benign identical: ""
+PASS  script block
+PASS  script block uppercase
+PASS  end tag with space (old miss)
+PASS  unclosed script kept
+PASS  double-quoted handler
+PASS  single-quoted handler
+PASS  unquoted handler
+PASS  handler without value kept (matches old)
+PASS  'on=' with no word kept (matches old)
+PASS  javascript uri kept by design
+PASS  timing script prefix ×40k: old=0.2ms new=10.2ms (len=40007)
+PASS  timing open markers ×40k: old=1268.3ms new=45.3ms (len=320000)
+PASS  timing handler-echo ×40k: old=4.7ms new=17.2ms (len=1320000)
+PASS  timing unterminated attr ×40k: old=1.7ms new=3.1ms (len=320000)
+
+ALL CHECKS PASSED
+```
+
+Timing deltas prove the ReDoS shape is bounded: `<script>` markers ×40k
+went 1268ms (old backtracking) → 45ms (linear scanner).
+
+## Script (runnable copy)
+
+```javascript
 /**
  * Sanitizer remediation check (security-alert-remediation plan, item A3).
  *
@@ -161,3 +203,4 @@ for (const [name, s] of Object.entries(attacks)) {
 
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} CHECK(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
+```

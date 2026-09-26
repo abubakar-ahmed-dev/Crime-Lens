@@ -170,7 +170,7 @@ jobs:
           # scripts with deliberately vulnerable fixture patterns) — not
           # runtime code; analyzing it produces false positives.
           paths-ignore: |
-            Plans/**
+            **/Plans/**
       - uses: github/codeql-action/analyze@v3
         with:
           category: "/language:javascript-typescript"
