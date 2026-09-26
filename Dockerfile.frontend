@@ -18,7 +18,10 @@ RUN npm ci
 COPY db-project-frontend/ ./
 RUN npm run build
 
-FROM nginx:1.25-alpine
+# nginx:1.25-alpine went EOL (May 2024) and carried ~100 Trivy CVEs in its
+# base packages (libxml2/libxslt/musl/curl/openssl/busybox); 1.28-alpine is
+# the current stable line with those patched.
+FROM nginx:1.28-alpine
 
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
