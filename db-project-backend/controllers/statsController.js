@@ -2,8 +2,13 @@
 
 import { Op, fn, col, literal, QueryTypes } from "sequelize";
 import db from "../models/index.js";
+import { CacheKeys, CacheTTL } from "../config/redis.js";
+import { withCache } from "../middleware/cacheDecorator.js";
 
-export const getStatsSummary = async (req, res) => {
+export const getStatsSummary = withCache({
+  keyGenerator: () => CacheKeys.STATS_SUMMARY,
+  ttl: CacheTTL.SHORT, // 5 minutes
+})(async (req, res) => {
   try {
     const { Crime, CrimeType, Zone } = db;
 
@@ -21,71 +26,37 @@ export const getStatsSummary = async (req, res) => {
       }
     });
 
-    // Top Crime Type (approved only)
-    const topCrimeType = await CrimeType.findOne({
-      attributes: [
-        "id",
-        "name",
-        [
-          literal(`
-            (
-              SELECT COUNT(*) 
-              FROM "Crime" AS c 
-              WHERE c."crimeTypeId" = "CrimeType"."id"
-              AND c."status" = 'approved'
-            )
-          `),
-          "crimeCount"
-        ]
-      ],
-      order: [
-        [
-          literal(`
-            (
-              SELECT COUNT(*) 
-              FROM "Crime" AS c 
-              WHERE c."crimeTypeId" = "CrimeType"."id"
-              AND c."status" = 'approved'
-            )
-          `),
-          "DESC"
-        ]
-      ],
-      limit: 1
-    });
+    // Top crime type / zone via single GROUP BY joins instead of per-row
+    // correlated subqueries (worst endpoint in Phase 0 baseline).
+    // crimeCount stays a pg COUNT (string) to match the previous response shape.
+    const topCrimeTypeRows = await db.sequelize.query(
+      `
+      SELECT ct.id, ct.name, COUNT(c.id) AS "crimeCount"
+      FROM "CrimeType" ct
+      LEFT JOIN "Crime" c
+        ON c."crimeTypeId" = ct.id AND c.status = 'approved'
+      GROUP BY ct.id, ct.name
+      ORDER BY "crimeCount" DESC
+      LIMIT 1;
+      `,
+      { type: QueryTypes.SELECT }
+    );
 
-    // Top Zone (approved only)
-    const topZone = await Zone.findOne({
-      attributes: [
-        "id",
-        "name",
-        [
-          literal(`
-            (
-              SELECT COUNT(*) 
-              FROM "Crime" AS c 
-              WHERE c."zoneId" = "Zone"."id"
-              AND c."status" = 'approved'
-            )
-          `),
-          "crimeCount"
-        ]
-      ],
-      order: [
-        [
-          literal(`
-            (
-              SELECT COUNT(*) 
-              FROM "Crime" AS c 
-              WHERE c."zoneId" = "Zone"."id"
-              AND c."status" = 'approved'
-            )
-          `),
-          "DESC"
-        ]
-      ],
-      limit: 1
-    });
+    const topZoneRows = await db.sequelize.query(
+      `
+      SELECT z.id, z.name, COUNT(c.id) AS "crimeCount"
+      FROM "Zone" z
+      LEFT JOIN "Crime" c
+        ON c."zoneId" = z.id AND c.status = 'approved'
+      GROUP BY z.id, z.name
+      ORDER BY "crimeCount" DESC
+      LIMIT 1;
+      `,
+      { type: QueryTypes.SELECT }
+    );
+
+    const topCrimeType = topCrimeTypeRows[0] || null;
+    const topZone = topZoneRows[0] || null;
 
     res.json({
       totalZones,
@@ -95,17 +66,22 @@ export const getStatsSummary = async (req, res) => {
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to load summary" });
+    req.log.error({ err }, "Stats summary query failed");
+    res.status(500).json({ error: "Failed to load summary" })
   }
-};
-
+});
 
 // -----------------------------
 // 📌 PIE CHART — Crimes by Type
 // -----------------------------
 
-export const getCrimesByType = async (req, res) => {
+export const getCrimesByType = withCache({
+  keyGenerator: (req) => {
+    const { start, end } = req.query;
+    return `${CacheKeys.STATS_BY_TYPE}:${start || "all"}:${end || "all"}`;
+  },
+  ttl: CacheTTL.SHORT,
+})(async (req, res) => {
   try {
     const { start, end } = req.query;
 
@@ -147,16 +123,21 @@ export const getCrimesByType = async (req, res) => {
     res.json(rows);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Pie chart failed" });
+    req.log.error({ err }, "Crimes-by-type query failed");
+    res.status(500).json({ error: "Pie chart failed" })
   }
-};
-
+});
 
 // -----------------------------
 // 📌 BAR CHART — Crimes by Zone
 // -----------------------------
-export const getCrimesByZone = async (req, res) => {
+export const getCrimesByZone = withCache({
+  keyGenerator: (req) => {
+    const { start, end } = req.query;
+    return `${CacheKeys.STATS_BY_ZONE}:${start || "all"}:${end || "all"}`;
+  },
+  ttl: CacheTTL.SHORT,
+})(async (req, res) => {
   try {
     const { start, end } = req.query;
 
@@ -198,15 +179,21 @@ export const getCrimesByZone = async (req, res) => {
     res.json(rows);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Bar chart failed" });
+    req.log.error({ err }, "Crimes-by-zone query failed");
+    res.status(500).json({ error: "Bar chart failed" })
   }
-};
+});
 
 // -----------------------------
 // 📌 LINE CHART — Monthly Trend
 // -----------------------------
-export const getCrimeTrend = async (req, res) => {
+export const getCrimeTrend = withCache({
+  keyGenerator: (req) => {
+    const { crimeTypeId, start, end } = req.query;
+    return `${CacheKeys.STATS_TREND}:${crimeTypeId || "all"}:${start || "all"}:${end || "all"}`;
+  },
+  ttl: CacheTTL.MEDIUM, // 10 minutes for trend data
+})(async (req, res) => {
   try {
     const { crimeTypeId, start, end } = req.query;
 
@@ -256,7 +243,7 @@ export const getCrimeTrend = async (req, res) => {
     res.json(rows);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Line chart failed" });
+    req.log.error({ err }, "Crime trend query failed");
+    res.status(500).json({ error: "Line chart failed" })
   }
-};
+});

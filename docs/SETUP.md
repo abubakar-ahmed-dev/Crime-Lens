@@ -1,22 +1,37 @@
 # Setup
 
-This document describes the current setup flow for the CrimeLens repository.
+Two supported paths: **Docker** (recommended — full production shape) or
+**manual** local development.
 
 ## Project Layout
 
+- `docker-compose.yml` + `Dockerfile.backend` / `Dockerfile.frontend` - the containerized stack (nginx edge, API replicas, worker, Redis, Prometheus, Grafana).
 - `db-project-backend/` - Express API, Sequelize models, Supabase/PostgreSQL connection, route controllers, SQL scripts.
 - `db-project-frontend/` - Vite React application.
+- `infra/` - Prometheus scrape config and Grafana provisioning.
 - `docs/` - Project documentation.
-- `tests/` - Present in the repository, but no verified automated test flow is documented in code.
+- `db-project-backend/tests/k6/` - load-testing suites (see the backend README).
+
+## Quickstart (Docker)
+
+```bash
+cp db-project-backend/.env-sample db-project-backend/.env   # then fill in real values
+docker compose up -d --build
+curl http://localhost/api/health                            # {"status":"healthy"}
+```
+
+Committed ports: app :80, API :5001, Prometheus :9090, Grafana :3000.
+A local (gitignored) `docker-compose.override.yml` may remap them — on this
+repo's dev machine it maps edge :18000, replicas :15001-15003, Prometheus
+:19090, Grafana :13300; with that file present, invoke compose with both
+`-f` flags and use the remapped ports.
 
 ## Prerequisites
 
-- Node.js and npm.
-- A Supabase project with PostgreSQL.
-- PostGIS enabled in the database. The setup SQL enables `postgis`.
+- Docker Desktop (Docker path), or Node.js 22 + npm (manual path).
+- A Supabase project with PostgreSQL and PostGIS (the setup SQL enables `postgis`).
 - Supabase Auth configured for citizen email/password auth. Google OAuth is supported by the code, but provider setup is done in Supabase.
-
-Exact Node.js version is not specified in the repository.
+- A Cloudinary account for media storage.
 
 ## Backend Setup
 
@@ -137,8 +152,22 @@ Email/password registration calls Supabase `signUp`, then creates a local `Crime
 
 Google OAuth callback handling is implemented in the frontend and then linked to a local citizen profile through `POST /api/citizens/google-auth`.
 
+## Load-Testing Credentials
+
+The k6 suites read credentials from environment (never hardcode/commit them):
+
+```bash
+# db-project-backend/tests/k6/.k6.env (gitignored)
+API_BASE_URL=http://localhost:18000
+ADMIN_USERNAME=...
+ADMIN_PASSWORD=...
+CITIZEN_EMAIL=...
+CITIZEN_PASSWORD=...
+```
+
 ## Unknowns
 
-- Production deployment target is not specified.
+- A hosted deployment target does not exist yet — images are published to
+  GHCR by CI and are ready to pull when a host exists (see DEPLOYMENT.md).
 - Required Supabase redirect URLs are not fully inferable from code alone.
 - Seed data for zones is not included in `supabase-setup.sql`; zones must exist for zone-based features.

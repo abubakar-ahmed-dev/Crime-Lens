@@ -1,6 +1,7 @@
 // src/services/api.ts
 import axios,  { type AxiosInstance } from "axios";
 import { API_BASE_URL } from "../config/constants";
+import type { StaffLoginResponse } from "../types/api";
 
 // ===================================================
 // TYPE DEFINITIONS
@@ -14,7 +15,11 @@ interface MediaUploadOptions {
 }
 
 interface MediaUpdate {
-  visibility?: 'public' | 'police_only';
+  // 'removed' is a UI-only sentinel PoliceMediaEditor passes to its parent's
+  // onMediaUpdate when a media item was deleted (the delete itself goes
+  // through the separate onMediaDelete / DELETE endpoint). Never send it to
+  // the API.
+  visibility?: 'public' | 'police_only' | 'removed';
   caption?: string;
   evidenceMarked?: boolean;
 }
@@ -37,8 +42,9 @@ interface FileWithCaption {
   fileType?: 'image' | 'video';
 }
 
-interface UploadedMedia {
+export interface UploadedMedia {
   id: number;
+  CrimeId?: number; // present on rows returned by upload/add-media endpoints
   publicId: string;
   originalName: string;
   mimeType: string;
@@ -56,7 +62,7 @@ interface UploadedMedia {
   evidenceMarked: boolean;
 }
 
-interface ApiResponse<T = any> {
+interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   message?: string;
@@ -90,7 +96,7 @@ export const loginUser = async (
   username: string,
   password: string,
   verify_role: string
-): Promise<any> => {
+): Promise<StaffLoginResponse> => {
   const res = await api.post("/auth/login", { username, password, verify_role });
   return res.data;
 };

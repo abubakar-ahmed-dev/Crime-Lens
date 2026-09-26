@@ -1,0 +1,32 @@
+# Prometheus scrape configuration (Phase 8, compose targets Phase 9).
+#
+# Compose run: `docker compose up` — the `backend:5001` target resolves via
+# the compose network. (Phase 9 full-stack mode.)
+#
+# Host-run API + containerized Prometheus (phase-8 workflow):
+#   docker run -d --name crimelens-prom -p 9090:9090 \
+#     -v "$(pwd)/infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
+#     prom/prometheus
+#   The API is reached at `host.docker.internal:5001` from inside Docker
+#   Desktop. The other target will be DOWN in whichever mode is not active —
+#   that is expected and harmless.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "crimelens-api"
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "backend:5001"              # compose-network API service
+          - "host.docker.internal:5001" # host-run API (Docker Desktop)
+      # Per-replica targets (Phase 11): the local override publishes each
+      # backend replica on 15001-15003, so scaled instances appear as
+      # distinct `instance` labels. Targets that are not running scrape as
+      # DOWN — expected and harmless when fewer replicas are up.
+      - targets:
+          - "host.docker.internal:15001"
+          - "host.docker.internal:15002"
+          - "host.docker.internal:15003"

@@ -1,0 +1,6 @@
+    5704 ms p95  /api/crimes
+     nan ms p95  /api/citizens/login
+      19 ms p95  /api/stats/summary
+      14 ms p95  /api/stats/crime-trend
+      14 ms p95  /api/zones
+      13 ms p95  /api/crimes/types

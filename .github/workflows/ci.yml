@@ -1,0 +1,188 @@
+name: CI
+
+# Phase 14 — checks that actually exist in this repo:
+#   frontend: eslint + production build (includes tsc -b typecheck)
+#   backend:  node --check syntax sweep + live smoke boot against real
+#             Postgres/Redis service containers (health/ready/metrics +
+#             worker boot + clean SIGTERM)
+# plus CodeQL and npm audit at critical-only threshold.
+# No backend lint/typecheck/unit jobs: the repo has no ESLint config,
+# no tsconfig, and no test runner — fiction would just fail day one.
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-frontend:
+    name: Lint Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./db-project-frontend
+    # Enforcing since phase 15 (frontend lint debt cleared: no-explicit-any,
+    # ts-ignore, unused vars, react-refresh exports). A new lint error fails
+    # this job and the run like every other check.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: ./db-project-frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+
+  build-frontend:
+    name: Build Frontend (includes tsc typecheck)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./db-project-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: ./db-project-frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: db-project-frontend/dist/
+          retention-days: 7
+
+  backend-syntax:
+    name: Backend Syntax (node --check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax-check all backend sources
+        run: |
+          cd db-project-backend
+          find server.js worker.js config controllers routes services \
+               middleware validators models -name '*.js' -type f -print0 \
+            | xargs -0 -n1 node --check
+
+  backend-smoke:
+    name: Backend Smoke (boot + health + worker)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./db-project-backend
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: crimelens_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 6379:6379
+
+    env:
+      NODE_ENV: test
+      PORT: '5001'
+      DB_SSL: 'false'
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/crimelens_test
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci_only_secret_not_a_real_credential
+      SUPABASE_URL: https://ci-placeholder.supabase.co
+      SUPABASE_ANON_KEY: ci_placeholder_key
+      SUPABASE_SERVICE_ROLE_KEY: ci_placeholder_key
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: ./db-project-backend/package-lock.json
+      - run: npm ci
+
+      - name: Boot API and verify health/ready/metrics
+        run: |
+          node server.js > server.log 2>&1 &
+          API_PID=$!
+          ok=""
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:5001/api/health > /dev/null 2>&1; then ok=1; break; fi
+            sleep 1
+          done
+          if [ -z "$ok" ]; then echo "::error::API did not become healthy"; cat server.log; kill $API_PID 2>/dev/null; exit 1; fi
+          echo "--- /api/health ---"; curl -sf http://localhost:5001/api/health | tee health.json
+          grep -q '"mode":"redis"' health.json || { echo "::error::rate limiting not in redis mode"; exit 1; }
+          echo "--- /api/ready ---"; curl -sf http://localhost:5001/api/ready
+          echo
+          curl -sf http://localhost:5001/metrics | grep -q 'crimelens_' || { echo "::error::metrics missing crimelens_ series"; exit 1; }
+          echo "--- SIGTERM API ---"
+          kill -TERM $API_PID
+          wait $API_PID
+          echo "API exited cleanly (code $?)"
+
+      - name: Boot worker and verify clean shutdown
+        run: |
+          node worker.js > worker.log 2>&1 &
+          WORKER_PID=$!
+          sleep 6
+          kill -0 $WORKER_PID 2>/dev/null || { echo "::error::worker died at boot"; cat worker.log; exit 1; }
+          grep -q "Workers started" worker.log || { echo "::error::worker start log missing"; cat worker.log; exit 1; }
+          kill -TERM $WORKER_PID
+          wait $WORKER_PID
+          echo "Worker exited cleanly (code $?)"
+
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
+
+  npm-audit:
+    name: Dependency Audit (criticals only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Audit backend
+        working-directory: ./db-project-backend
+        # Report always; fail only on criticals (known advisories exist in
+        # the tree — a blanket audit would sit permanently red)
+        run: npm audit --omit=dev --audit-level=critical
+      - name: Audit frontend
+        working-directory: ./db-project-frontend
+        run: npm audit --omit=dev --audit-level=critical

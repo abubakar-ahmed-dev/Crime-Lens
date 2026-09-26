@@ -1,0 +1,14 @@
+# Grafana dashboard loader auto-provisioning (Phase 8).
+# Mounted at /etc/grafana/provisioning/dashboards inside the container.
+
+apiVersion: 1
+
+providers:
+  - name: CrimeLens
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards

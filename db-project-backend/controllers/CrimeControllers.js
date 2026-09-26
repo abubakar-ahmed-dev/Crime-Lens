@@ -2,6 +2,16 @@
 import { Op, fn, col, literal, QueryTypes, } from "sequelize";
 import sequelize from "../config/db.js";
 import db from "../models/index.js";
+import {
+  parsePaginationParams,
+  buildPaginationMeta,
+  buildPaginatedResponse,
+} from "../utils/pagination.js";
+import { CacheKeys, CacheTTL } from "../config/redis.js";
+import cacheService from "../services/cacheService.js";
+import { withCacheInvalidation } from "../middleware/cacheDecorator.js";
+import { crimesReported, crimesVerified } from "../config/prometheus.js";
+import { enqueueMediaCleanup } from "../config/queue.js";
 const { Crime, CrimeSubmission, CrimeReportsSubmitter, CrimeType, Zone, CrimeMedia } = db;
 
 const parseRequiredCoordinates = (latitude, longitude) => {
@@ -63,6 +73,11 @@ const validateLocationInsideZone = async (zoneId, latitude, longitude, transacti
 export const getCrimesForMap = async (req, res) => {
   try {
     const { mode, crimeType, zoneId, startDate, endDate, lat, lng, radius } = req.query;
+
+    // Pagination is OPT-IN: only activate when page/limit params are supplied.
+    // Without them the legacy (unpaginated, full-media) response is returned.
+    const paginated = req.query.page !== undefined || req.query.limit !== undefined;
+    const pagination = paginated ? parsePaginationParams(req.query) : null;
 
     // Determine user role for visibility filtering
     const userRole = req.user?.role || 'citizen'; // Default to citizen if no user
@@ -133,7 +148,26 @@ export const getCrimesForMap = async (req, res) => {
       sql += " AND " + conditions.join(" AND ");
     }
 
-    sql += ";";
+    // Total count for pagination metadata (shares the same JOINs/filters as the
+    // data query so totals stay correct under crimeType/zone/date/radius filters)
+    let total = null;
+    if (paginated) {
+      const countResult = await db.sequelize.query(
+        `SELECT COUNT(*) AS total FROM (${sql}) AS filtered;`,
+        { type: db.sequelize.QueryTypes.SELECT, replacements }
+      );
+      total = countResult[0].total;
+    }
+
+    // Deterministic ordering is required for LIMIT/OFFSET to be stable.
+    // Only added in paginated mode so the legacy response path stays unchanged.
+    if (paginated) {
+      sql += ` ORDER BY c."reportedAt" DESC, c.id DESC LIMIT :limit OFFSET :offset;`;
+      replacements.limit = pagination.limit;
+      replacements.offset = pagination.offset;
+    } else {
+      sql += ";";
+    }
 
     // Execute the query
     const crimes = await db.sequelize.query(sql, {
@@ -148,20 +182,22 @@ export const getCrimesForMap = async (req, res) => {
 
         const loc = typeof c.geom === "string" ? JSON.parse(c.geom) : c.geom;
 
-        // Fetch media for this crime
+        // Fetch media for this crime. In paginated mode media is capped at 3
+        // per crime (map preview); legacy mode returns all media as before.
         let media = [];
         if (c.mediaCount > 0) {
+          const mediaLimit = paginated ? " LIMIT 3" : "";
           const mediaQuery = userRole === 'citizen'
             ? `SELECT id, "fileType", "url", "thumbnailUrl", "caption",
                       "visibility", "evidenceMarked", "originalName", "fileSize"
                FROM "CrimeMedia"
                WHERE "CrimeId" = :crimeId AND "visibility" = 'public'
-               ORDER BY id ASC;`
+               ORDER BY id ASC${mediaLimit};`
             : `SELECT id, "fileType", "url", "thumbnailUrl", "caption",
                       "visibility", "evidenceMarked", "originalName", "fileSize"
                FROM "CrimeMedia"
                WHERE "CrimeId" = :crimeId
-               ORDER BY id ASC;`;
+               ORDER BY id ASC${mediaLimit};`;
 
           const mediaRows = await db.sequelize.query(mediaQuery, {
             replacements: { crimeId: c.id },
@@ -191,16 +227,36 @@ export const getCrimesForMap = async (req, res) => {
     );
 
     const formatted = crimesWithMedia.filter(Boolean);
+
+    if (paginated) {
+      const meta = buildPaginationMeta(pagination.page, pagination.limit, total);
+      return res.json(buildPaginatedResponse(formatted, meta));
+    }
+
     return res.json(formatted);
 
   } catch (err) {
-    console.error("Map Crime Error:", err);
-    res.status(500).json([]);
+    req.log.error({ err }, "Map Crime Error");
+    // Preserve legacy error shape in unpaginated mode; envelope in paginated mode
+    if (req.query.page !== undefined || req.query.limit !== undefined) {
+      res.status(500).json({ success: false, message: "Internal server error" });
+    } else {
+      res.status(500).json([]);
+    }
   }
 };
 
 export const getAllCrimeTypes = async (req, res) => {
   try {
+    const cacheKey = CacheKeys.CRIME_TYPES;
+
+    // Cache-aside: reference data rarely changes (1h TTL)
+    const cached = await cacheService.get(cacheKey);
+    if (cached) {
+      res.setHeader("X-Cache", "HIT");
+      return res.json(cached);
+    }
+
     const crimeTypes = await sequelize.query(
       `
       SELECT id, name
@@ -212,9 +268,11 @@ export const getAllCrimeTypes = async (req, res) => {
       }
     );
 
+    await cacheService.set(cacheKey, crimeTypes, CacheTTL.LONG);
+    res.setHeader("X-Cache", "MISS");
     res.json(crimeTypes);
   } catch (err) {
-    console.error("Error fetching crime types:", err);
+    req.log.error({ err }, "Error fetching crime types");
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -289,7 +347,7 @@ export const getPendingSubmissions = async (req, res) => {
 
     res.status(200).json({ success: true, data: crimesWithMedia });
   } catch (error) {
-    console.error("Fetch Pending Crimes Error:", error);
+    req.log.error({ err: error }, "Fetch Pending Crimes Error");
     res.status(500).json({
       success: false,
       message: "Error fetching pending submissions",
@@ -298,7 +356,10 @@ export const getPendingSubmissions = async (req, res) => {
 };
 
 
-export const approveCrimeReport = async (req, res) => {
+export const approveCrimeReport = withCacheInvalidation([
+  CacheKeys.PATTERN_STATS, // approved crimes feed all statistics
+  CacheKeys.PATTERN_CRIMES,
+])(async (req, res) => {
   let t;
   try {
     const { submissionId } = req.params;
@@ -505,6 +566,7 @@ export const approveCrimeReport = async (req, res) => {
 
     const updatedCrime = updatedCrimeRows[0][0];
     await t.commit();
+    crimesVerified.labels({ decision: "approved" }).inc();
     // ---------------------------
     // 4️⃣ Response
     // ---------------------------
@@ -519,15 +581,19 @@ export const approveCrimeReport = async (req, res) => {
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("Approve Crime Error:", error);
+    crimesVerified.labels({ decision: "failed" }).inc();
+    req.log.error({ err: error }, "Approve Crime Error");
     res.status(500).json({
       success: false,
       message: "Error approving crime report",
     });
   }
-};
+});
 
-export const rejectCrimeReport = async (req, res) => {
+export const rejectCrimeReport = withCacheInvalidation([
+  CacheKeys.PATTERN_STATS,
+  CacheKeys.PATTERN_CRIMES,
+])(async (req, res) => {
   let t;
   try {
     const { submissionId } = req.params;
@@ -624,17 +690,19 @@ export const rejectCrimeReport = async (req, res) => {
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("Reject Crime Error:", error);
+    req.log.error({ err: error }, "Reject Crime Error");
     res.status(500).json({
       success: false,
       message: "Error rejecting crime report",
     });
   }
-};
+});
 
 
 
-export const reportCrime = async (req, res) => {
+export const reportCrime = withCacheInvalidation([
+  CacheKeys.PATTERN_STATS,
+])(async (req, res) => {
   let t;
   try {
     const {
@@ -810,6 +878,7 @@ export const reportCrime = async (req, res) => {
     }
 
     await t.commit();
+    crimesReported.labels({ status: "submitted", zone_id: String(zone || "unknown") }).inc();
     // ---------------------------
     // Response
     // ---------------------------
@@ -824,17 +893,20 @@ export const reportCrime = async (req, res) => {
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("Report Crime Error:", error);
+    crimesReported.labels({ status: "failed", zone_id: "unknown" }).inc();
+    req.log.error({ err: error }, "Report Crime Error");
     res.status(500).json({ success: false, message: "Error adding crime" });
   }
-};
+});
 
 
 export const getAllCrimes = async (req, res) => {
   try {
-    // Base query with media fields added
-    const crimes = await sequelize.query(
-      `
+    // Pagination is OPT-IN: only active when page/limit params are supplied.
+    const paginated = req.query.page !== undefined || req.query.limit !== undefined;
+    const pagination = paginated ? parsePaginationParams(req.query) : null;
+
+    let sql = `
       SELECT c.id AS id,
              c.title AS title,
              c.description AS description,
@@ -869,9 +941,33 @@ export const getAllCrimes = async (req, res) => {
       ) cs_latest ON true
       LEFT JOIN "CrimeReportsSubmitter" crs ON crs.id = cs_latest."submitterId"
       WHERE c.status = 'approved'
-      ORDER BY c."incidentDate" DESC, c.id DESC;
-      `,
-      { type: QueryTypes.SELECT }
+    `;
+
+    // Total count for pagination metadata
+    let total = null;
+    if (paginated) {
+      const countResult = await sequelize.query(
+        `SELECT COUNT(*) AS total FROM "Crime" WHERE status = 'approved';`,
+        { type: QueryTypes.SELECT }
+      );
+      total = countResult[0].total;
+    }
+
+    // ORDER BY is pre-existing (deterministic); LIMIT/OFFSET only in paginated mode
+    if (paginated) {
+      sql += `ORDER BY c."incidentDate" DESC, c.id DESC LIMIT :limit OFFSET :offset;`;
+    } else {
+      sql += `ORDER BY c."incidentDate" DESC, c.id DESC;`;
+    }
+
+    const crimes = await sequelize.query(
+      sql,
+      {
+        type: QueryTypes.SELECT,
+        ...(paginated
+          ? { replacements: { limit: pagination.limit, offset: pagination.offset } }
+          : {}),
+      }
     );
 
     // Fetch full media details for each crime (police/admin see all media)
@@ -898,13 +994,18 @@ export const getAllCrimes = async (req, res) => {
       })
     );
 
+    if (paginated) {
+      const meta = buildPaginationMeta(pagination.page, pagination.limit, total);
+      return res.status(200).json(buildPaginatedResponse(crimesWithMedia, meta));
+    }
+
     return res.status(200).json({
       success: true,
       data: crimesWithMedia
     });
 
   } catch (error) {
-    console.error("❌ Error fetching crimes from view:", error);
+    req.log.error({ err: error }, "Error fetching crimes from view");
     return res.status(500).json({
       success: false,
       message: "Error fetching crime records"
@@ -984,13 +1085,16 @@ export const getCrimeById = async (req, res) => {
 
     res.json({ success: true, data: crime });
   } catch (err) {
-    console.error("Error fetching crime:", err);
+    req.log.error({ err }, "Error fetching crime");
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
 
-export const updateCrime = async (req, res) => {
+export const updateCrime = withCacheInvalidation([
+  CacheKeys.PATTERN_STATS,
+  CacheKeys.PATTERN_CRIMES,
+])(async (req, res) => {
   let t;
   try {
     const { id } = req.params;
@@ -1211,7 +1315,7 @@ export const updateCrime = async (req, res) => {
             replacements: {
               crimeId: id,
               count: parseInt(mediaStats[0].count),
-              thumbnailUrl: mediaStats[0].firstthumbnail,
+              thumbnailUrl: mediaStats[0].firstThumbnail,
             },
             type: QueryTypes.UPDATE,
             transaction: t,
@@ -1228,13 +1332,16 @@ export const updateCrime = async (req, res) => {
     res.json({ success: true, message: "Crime updated successfully" });
   } catch (err) {
     if (t && !t.finished) await t.rollback();
-    console.error("Error updating crime:", err);
+    req.log.error({ err }, "Error updating crime");
     res.status(500).json({ success: false, message: "Server error" });
   }
-};
+});
 
 
-export const deleteCrime = async (req, res) => {
+export const deleteCrime = withCacheInvalidation([
+  CacheKeys.PATTERN_STATS,
+  CacheKeys.PATTERN_CRIMES,
+])(async (req, res) => {
   let t;
   try {
     const { id } = req.params;
@@ -1301,6 +1408,13 @@ export const deleteCrime = async (req, res) => {
 
     await t.commit();
 
+    // Phase 12: Cloudinary cleanup moved to a background job (the deleted
+    // rows' publicIds would otherwise be orphaned). Fire-and-forget — a
+    // queue/Redis outage must never fail the deletion response.
+    enqueueMediaCleanup(mediaRows).catch((err) =>
+      req.log.error({ err: err }, "Failed to enqueue media cleanup")
+    );
+
     res.status(200).json({
       success: true,
       message: "Crime deleted successfully",
@@ -1308,7 +1422,7 @@ export const deleteCrime = async (req, res) => {
     });
   } catch (error) {
     if (t && !t.finished) await t.rollback();
-    console.error("Delete Crime Error:", error);
+    req.log.error({ err: error }, "Delete Crime Error");
     res.status(500).json({ success: false, message: "Error deleting crime" });
   }
-};
+});

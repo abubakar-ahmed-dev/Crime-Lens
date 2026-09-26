@@ -299,8 +299,19 @@ Setup SQL creates B-tree indexes for common fields and GIST indexes for geospati
 - citizen profile indexes on `id`, `supabaseUserId`, `email`, `isProfileComplete`
 - `CrimeSubmission.submitterId`
 
-## Unknowns
+## Connection Pool
 
-- Production seed data for zones is not included in the repository.
-- Whether `activitylog` should be filled by database triggers is not implemented in current code.
-- The exact live database contents cannot be determined from code.
+`config/db.js` — Sequelize pool is environment-driven
+(`DB_POOL_MAX` default 10, `DB_POOL_MIN` default 0, acquire 30 s,
+idle 10 s). Capacity rule when scaling API replicas:
+
+```text
+API instances × DB_POOL_MAX  ≤  Supabase max_connections (measured: 60)
+```
+
+SSL is required by default (Supabase); `DB_SSL=false` opts out for local or
+CI plain Postgres.
+
+Prometheus exposes live pool state as
+`crimelens_db_pool_connections{state="used"|"available"|"waiting"}` — query
+with the state label (the gauge also carries a configured-`max` series).

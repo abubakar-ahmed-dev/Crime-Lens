@@ -1,0 +1,163 @@
+# CrimeLens full-stack compose (Phase 9; edge proxy Phase 10).
+#
+#   docker compose build
+#   docker compose up -d
+#
+# Host publishes: 80 (edge nginx — the single entrypoint for SPA + API),
+# 5001 (backend, direct API access for verification), 9090 (Prometheus),
+# 3000 (Grafana). Redis and the frontend container stay internal-only.
+# If host ports are taken (dev backend on 5001 etc.), use a local override
+# file — see docker-compose.override.yml (gitignored, not committed).
+#
+# App secrets come from db-project-backend/.env via env_file — nothing secret
+# is written here. Compose-level variables (Grafana admin creds) are
+# documented in .env-sample.
+#
+# The database stays external (Supabase) — no PostgreSQL service by design.
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: crimelens-api:latest
+    env_file: db-project-backend/.env
+    environment:
+      # In-compose overrides — these MUST differ from the host-run values:
+      # - Redis is the compose service, not localhost
+      # - behind the frontend nginx, req.ip must resolve from X-Forwarded-For
+      # - the SPA origin served on :8080
+      NODE_ENV: production
+      LOG_LEVEL: info
+      REDIS_URL: redis://redis:6379
+      TRUST_PROXY: "1"
+      CORS_ORIGINS: http://localhost:18000
+    ports:
+      - "5001:5001"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - crimelens-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    image: crimelens-web:latest
+    # Internal-only since Phase 10: the edge nginx proxies / to this
+    # service — the SPA is no longer published on its own host port.
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - crimelens-network
+
+  nginx:
+    image: nginx:1.25-alpine
+    # Edge reverse proxy + load balancer (Phase 10): the single public
+    # entrypoint. / goes to the frontend static container, /api/ to the
+    # backend pool (Docker DNS round-robins replicas; passive health
+    # checks eject failing ones). /metrics is intentionally NOT routed —
+    # Prometheus scrapes backend:5001 on the internal network.
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx-edge.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    # Exercise the full chain: edge → backend pool → /api/health
+    # (127.0.0.1, not localhost — busybox wget prefers ::1)
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - crimelens-network
+
+  worker:
+    # Background job processor (Phase 12). Same image as the API (the
+    # repository has one backend), only the entry command differs. DB-free:
+    # Cloudinary cleanup needs no Sequelize. Internal-only — no host port.
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: crimelens-api:latest
+    command: ["node", "worker.js"]
+    env_file: db-project-backend/.env
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # A worker has no HTTP server; health = process alive and redis reachable
+      test: ["CMD", "node", "-e", "const IORedis=require('ioredis'); const c=new IORedis(process.env.REDIS_URL,{retryStrategy:()=>null}); c.ping().then(()=>{c.disconnect();process.exit(0)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - crimelens-network
+
+  redis:
+    image: redis:7-alpine
+    # noeviction (Phase 12): BullMQ queues must never lose jobs to eviction.
+    # The cache-aside service and rate limiter are failure-resilient by
+    # design (a failed cache write just means a DB read), and all their keys
+    # carry TTLs, so memory stays bounded without LRU eviction.
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
+    # No host port publish: Redis is reachable only inside the compose network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - crimelens-network
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=200h
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    restart: unless-stopped
+    networks:
+      - crimelens-network
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - crimelens-network
+
+networks:
+  crimelens-network:
+    driver: bridge

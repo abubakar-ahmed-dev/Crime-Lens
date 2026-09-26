@@ -1,73 +1,55 @@
-# React + TypeScript + Vite
+# CrimeLens Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + TypeScript + Vite SPA for CrimeLens: interactive crime map
+(Leaflet + marker clustering), statistics dashboards (Recharts), citizen
+reporting, police verification, and admin controls.
 
-Currently, two official plugins are available:
+## Scripts
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev      # Vite dev server (HMR)
+npm run build    # tsc -b + production build (dist/)
+npm run lint     # ESLint — enforcing in CI (0 errors)
+npm run preview  # serve the production build locally
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Environment
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Vite bakes `VITE_*` variables at build time (public-by-design — nothing
+secret belongs here). Copy `.env-sample` to `.env`:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Variable | Purpose |
+|---|---|
+| `VITE_API_URL` | Backend API base URL |
+| `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | Citizen auth (Supabase JS client) |
+
+The production image (`Dockerfile.frontend` at the repo root) builds with
+`.env.production` when present.
+
+## Structure
+
 ```
+src/
+├── components/        # shared UI (LocationPicker, media, forms, buttons)
+├── context/           # AuthContext — dual auth: staff JWT + citizen Supabase session
+├── layouts/           # page shells (sidebar/header)
+├── pages/             # route pages: MapView, Statistics, ReportCrime,
+│                      #   Verification, AllRecords, CitizenDashboard, AuthCallback, ...
+├── routes/            # route table + role guards
+├── services/          # api.ts — axios instance + media API
+├── store/             # Redux Toolkit (role state)
+├── types/             # shared API payload types
+└── utils/             # auth headers, thumbnails, zone helpers
+```
+
+## Conventions
+
+- ESLint is **enforcing** in CI (`eslint .` must exit 0); the only allowed
+  suppressions are two documented per-file context-module exceptions.
+- Shared API payload types live in `src/types/` and
+  `src/pages/MapViewPage/components/types.tsx` — type new endpoints instead
+  of reaching for `any`.
+- Backend contract changes are frontend changes: update both in the same
+  scoped task (see `../docs/API.md`).
+
+Docs: [`docs/`](../docs/) — architecture, API reference, operations.

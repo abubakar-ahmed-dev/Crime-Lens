@@ -1,0 +1,19 @@
+# Grafana datasource auto-provisioning (Phase 8, URL updated Phase 9).
+# Mounted at /etc/grafana/provisioning/datasources inside the container.
+#
+# The URL below targets the compose-network Prometheus service (Phase 9 full
+# stack). Running Grafana in Docker against a host-published Prometheus
+# instead? Swap to: http://host.docker.internal:9090
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: crimelens-prom
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s

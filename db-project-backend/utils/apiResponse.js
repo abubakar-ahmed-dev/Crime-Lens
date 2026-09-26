@@ -7,6 +7,8 @@
  * - Error: { success: false, error: string, code?: string }
  */
 
+import { logger } from "../config/logger.js";
+
 /**
  * Success response
  * @param {Object} res - Express response object
@@ -91,7 +93,7 @@ export function validationError(res, fields, message = null) {
 export function asyncHandler(fn) {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch((err) => {
-      console.error('Unhandled async error:', err);
+      req.log.error({ err }, 'Unhandled async error');
       return errors.serverError(res, 'An unexpected error occurred');
     });
   };

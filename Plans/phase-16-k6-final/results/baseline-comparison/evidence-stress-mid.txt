@@ -1,0 +1,20 @@
+== evidence @ 2026-09-18 12:17:40 (mid-stress)
+crimelens-main-backend-1: cpu=103.09% mem=175.4MiB / 3.782GiB
+crimelens-main-nginx-1: cpu=23.63% mem=11.92MiB / 3.782GiB
+crimelens-main-worker-1: cpu=0.00% mem=30.83MiB / 3.782GiB
+crimelens-main-redis-1: cpu=1.28% mem=14MiB / 3.782GiB
+crimelens-redis-host: cpu=1.52% mem=4.484MiB / 3.782GiB
+PROM max_over_time(crimelens_db_pool_connections{state="used"}[10m])
+  {'instance': 'backend:5001', 'job': 'crimelens-api', 'state': 'used'} 10
+  {'instance': 'host.docker.internal:15003', 'job': 'crimelens-api', 'state': 'used'} 10
+  {'instance': 'host.docker.internal:5001', 'job': 'crimelens-api', 'state': 'used'} 0
+PROM avg_over_time(crimelens_db_pool_connections{state="used"}[10m])
+  {'instance': 'backend:5001', 'job': 'crimelens-api', 'state': 'used'} 4.95
+  {'instance': 'host.docker.internal:15003', 'job': 'crimelens-api', 'state': 'used'} 4.95
+  {'instance': 'host.docker.internal:5001', 'job': 'crimelens-api', 'state': 'used'} 0
+PROM max_over_time(crimelens_db_pool_connections{state="waiting"}[10m])
+  {'instance': 'backend:5001', 'job': 'crimelens-api', 'state': 'waiting'} 88
+  {'instance': 'host.docker.internal:15003', 'job': 'crimelens-api', 'state': 'waiting'} 88
+  {'instance': 'host.docker.internal:5001', 'job': 'crimelens-api', 'state': 'waiting'} 0
+PROM sum(rate(crimelens_http_requests_total{instance=~"host.docker.internal.*"}[2m]))
+  {} 374.3665942774412

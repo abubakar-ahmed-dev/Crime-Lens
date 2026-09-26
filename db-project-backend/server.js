@@ -3,9 +3,18 @@ dns.setDefaultResultOrder("ipv4first");
 
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import compression from "compression";
 import dotenv from "dotenv";
 import db from "./models/index.js";
 import { validateEnv } from "./config/envValidation.js";
+import { connectRedis, disconnectRedis } from "./config/redis.js";
+import {
+  metricsEndpoint,
+  metricsMiddleware,
+  startMetricsUpdater,
+} from "./config/prometheus.js";
+import { sanitizeInput } from "./middleware/validationMiddleware.js";
 
 import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -16,25 +25,101 @@ import zonesRoutes from "./routes/zoneRoutes.js";
 import crimeRoutes from "./routes/crimeRoutes.js";
 import citizenAuthRoutes from "./routes/citizenAuthRoutes.js";
 import mediaRoutes from "./routes/mediaRoutes.js";
+import jobRoutes from "./routes/jobRoutes.js";
+import healthRoutes from "./routes/healthRoutes.js";
+import { logger, httpLogger } from "./config/logger.js";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 // Validate environment variables before starting the server
 validateEnv();
 
 const app = express();
+
+// ---------------------------------------------------------------------------
+// Reverse-proxy support (Phase 9) — when the API runs behind nginx (compose),
+// every request arrives with the proxy's IP. Trusting one proxy hop makes
+// req.ip resolve from X-Forwarded-For; without it, per-IP rate limiting
+// (Phase 4) collapses all users into a single bucket.
+// ---------------------------------------------------------------------------
+if (process.env.TRUST_PROXY) app.set("trust proxy", Number(process.env.TRUST_PROXY));
+
+// ---------------------------------------------------------------------------
+// Structured logging (Phase 7) — first, so every request is timed end-to-end.
+// pino-http attaches req.log (with request_id) and emits one completion line
+// per request; health endpoints are excluded from auto-logging.
+// ---------------------------------------------------------------------------
+app.use(httpLogger);
+app.use((req, res, next) => {
+  if (req.id) res.setHeader("X-Request-ID", req.id);
+  next();
+});
+
+// ---------------------------------------------------------------------------
+// Security headers (Phase 5)
+// helmet() removes X-Powered-By and applies CSP/HSTS/nosniff/frameguard by
+// default. Adjustments for this API:
+//   - frameguard DENY (never framed)
+//   - CORP cross-origin so media-thumbnail redirects remain embeddable
+//   - no HSTS `preload` (irreversible; revisit when a production domain exists)
+// The legacy `xssFilter`/`hidePoweredBy` helmet options are gone in helmet 8 —
+// X-XSS-Protection is correctly sent as `0` and CSP is the real mitigation.
+// ---------------------------------------------------------------------------
+app.use(helmet({
+  frameguard: { action: "DENY" },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
+
 const corsOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
 app.use(cors({
-  origin: corsOrigins,
+  origin: corsOrigins, // requests from unlisted origins get no ACAO header
   methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
+  maxAge: 86400,
+  // Phase 3/4 diagnostic headers are useless to browser clients otherwise
+  exposedHeaders: ["X-Cache", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
 }));
 
-app.use(express.json());
+// JSON body size cap (413 on excess). Multipart uploads are bounded by their
+// multer configs instead (media: 5MB/file, CSV: 1MB).
+app.use(express.json({ limit: "1mb" }));
+
+// Strip script blocks / javascript: URIs / inline handlers from body+query
+app.use(sanitizeInput);
+
+// ---------------------------------------------------------------------------
+// HTTP compression (Phase 6)
+// gzip + brotli (compression >= 1.8 negotiates via Accept-Encoding; brotli
+// defaults to quality 4 — a sane CPU/size balance for dynamic responses).
+// Bodies under 1KB stay uncompressed; clients can opt out with the
+// x-no-compression request header. Vary: Accept-Encoding is set by the lib.
+// ---------------------------------------------------------------------------
+app.use(compression({
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.headers["x-no-compression"]) return false;
+    return compression.filter(req, res); // mime-db content-type check
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Prometheus metrics (Phase 8)
+// /metrics serves the register only (no I/O) — gauges refresh on the 30s
+// updater. Mounted at root, unauthenticated; network-level allow-listing is
+// deferred to the Nginx/Cloudflare phases. Excluded from request logging.
+// ---------------------------------------------------------------------------
+app.use(metricsMiddleware());
+app.get("/metrics", metricsEndpoint);
+
+// Health routes mounted FIRST so /health and /ready stay responsive
+// regardless of downstream route/middleware issues
+app.use("/api", healthRoutes);
 
 app.use("/api/admin", adminRoutes);
 app.use("/api/auth", authRoutes);
@@ -45,26 +130,97 @@ app.use("/api/zones", zonesRoutes);
 app.use("/api/crimes", crimeRoutes);
 app.use("/api/citizens", citizenAuthRoutes);
 app.use("/api/media", mediaRoutes);
+app.use("/api/jobs", jobRoutes);
 
 const { sequelize } = db;
 const PORT = process.env.PORT || 5001;
 
+let server;
+
 const startServer = async () => {
   try {
     await sequelize.authenticate();
-    console.log("✅ Database connection established with Supabase.");
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+    logger.info("Database connection established with Supabase");
+
+    // Redis is best-effort: startup must not fail when it is unavailable
+    await connectRedis();
+
+    // 30s refresher for pool/cache/health gauges (unref'd, no scrape I/O)
+    startMetricsUpdater();
+
+    server = app.listen(PORT, () => {
+      logger.info({ port: PORT, environment: process.env.NODE_ENV || "development" }, "Server started");
     });
   } catch (error) {
-    console.error("❌ Unable to connect to the database:", error.message);
+    logger.error({ err: error }, "Unable to connect to the database");
     process.exit(1);
   }
 };
 
 startServer();
 
-process.on("unhandledRejection", (err) => {
-  console.error("Unhandled promise rejection:", err);
-  process.exit(1);
+// ---------------------------
+// Graceful shutdown
+// Stops accepting new connections, closes the DB pool, then exits.
+// A force-exit guard bounds shutdown time even if the pool won't close
+// (e.g. database already unreachable).
+// ---------------------------
+const SHUTDOWN_TIMEOUT_MS = 5000;
+let shuttingDown = false;
+
+const gracefulShutdown = async (signal, exitCode = 0) => {
+  if (shuttingDown) return; // ignore repeated signals while already shutting down
+  shuttingDown = true;
+
+  logger.info(`${signal} received. Starting graceful shutdown`);
+
+  // Arm the force-exit guard for THIS shutdown only (unref'd so it can
+  // never keep the event loop alive during normal operation)
+  const forceExit = setTimeout(() => {
+    logger.error(`Graceful shutdown timed out after ${SHUTDOWN_TIMEOUT_MS}ms; forcing exit`);
+    process.exit(1);
+  }, SHUTDOWN_TIMEOUT_MS);
+  forceExit.unref();
+
+  // 1. Stop accepting new connections; wait for in-flight requests to finish
+  const serverClosed = new Promise((resolve) => {
+    if (!server) return resolve();
+    server.close(() => {
+      logger.info("HTTP server closed");
+      resolve();
+    });
+  });
+
+  // 2. Close the database connection pool
+  const poolClosed = sequelize
+    .close()
+    .then(() => logger.info("Database connection pool closed"))
+    .catch((error) => logger.error({ err: error }, "Error closing database pool"));
+
+  // 3. Close Redis (best-effort — must never block or fail shutdown)
+  const redisClosed = disconnectRedis().catch((error) =>
+    logger.error({ err: error }, "Error closing Redis")
+  );
+
+  await Promise.all([serverClosed, poolClosed, redisClosed]);
+
+  logger.info("Graceful shutdown completed");
+  process.exit(exitCode);
+};
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
+process.on("uncaughtException", (err) => {
+  logger.error({ err }, "Uncaught exception");
+  gracefulShutdown("UNCAUGHT_EXCEPTION", 1);
 });
+
+process.on("unhandledRejection", (err) => {
+  logger.error({ err }, "Unhandled promise rejection");
+  gracefulShutdown("UNHANDLED_REJECTION", 1);
+});
+
+// Exported for testability (graceful-shutdown verification on Windows,
+// where external SIGINT/SIGTERM delivery terminates Node unconditionally)
+export { gracefulShutdown };

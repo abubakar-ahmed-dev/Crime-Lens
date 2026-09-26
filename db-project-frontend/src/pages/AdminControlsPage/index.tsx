@@ -1,7 +1,8 @@
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from "react";
 import GreenButton from "../../components/GreenButton";
 import WhiteButton from "../../components/WhiteButton";
-import LocationPicker, { isValidLocation } from "../../components/LocationPicker";
+import LocationPicker from "../../components/LocationPicker";
+import { isValidLocation } from "../../components/locationValidation";
 import { API_BASE_URL } from "../../config/constants";
 import { getJwtAuthHeaders } from "../../utils/authHeaders";
 
@@ -123,8 +124,8 @@ export default function AdminControlsPage() {
       setBranches(branchesData.data || []);
       setAgents(agentsData.data || []);
       setZones(Array.isArray(zonesData) ? zonesData : []);
-    } catch (err: any) {
-      setError(err.message || "Failed to load admin controls");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load admin controls");
     } finally {
       setLoading(false);
     }
@@ -189,8 +190,8 @@ export default function AdminControlsPage() {
       setMessage("Branch created successfully.");
       setBranchForm(emptyBranchForm);
       await loadData();
-    } catch (err: any) {
-      setError(err.message || "Failed to create branch");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create branch");
     } finally {
       setSavingBranch(false);
     }
@@ -228,8 +229,8 @@ export default function AdminControlsPage() {
       setMessage("Police agent created successfully.");
       setAgentForm(emptyAgentForm);
       await loadData();
-    } catch (err: any) {
-      setError(err.message || "Failed to create police agent");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create police agent");
     } finally {
       setSavingAgent(false);
     }
@@ -264,8 +265,8 @@ export default function AdminControlsPage() {
       setMessage("Branch head assigned successfully.");
       setSelectedAgentId("");
       await loadData();
-    } catch (err: any) {
-      setError(err.message || "Failed to assign branch head");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to assign branch head");
     } finally {
       setAssigningHead(false);
     }
@@ -300,8 +301,8 @@ export default function AdminControlsPage() {
       setMessage("Branch head cleared.");
       setSelectedAgentId("");
       await loadData();
-    } catch (err: any) {
-      setError(err.message || "Failed to clear branch head");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear branch head");
     } finally {
       setClearingHead(false);
     }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
 import LogowithText from "../../../assets/LogowithText.svg";
 import MainBackground from "../../../assets/MainBackground.png";
 import PasswordSeeIcon from "../../../assets/PasswodSeeIcon.svg";
@@ -36,13 +36,13 @@ const LoginCreate = () => {
   };
 
   // Handle input changes
-  const handleChange = (e: any) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   // Handle form submission
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
     setSuccessMsg("");

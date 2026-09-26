@@ -1,7 +1,8 @@
 import { v2 as cloudinary } from "cloudinary";
 import dotenv from "dotenv";
+import { logger } from "./logger.js";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 // ============================================================================
 // Cloudinary Configuration
@@ -132,7 +133,7 @@ export const uploadFile = async (fileBuffer, originalName, crimeId) => {
       createdAt: result.created_at,
     };
   } catch (error) {
-    console.error("Cloudinary upload error:", error);
+    logger.error({ err: error }, "Cloudinary upload error");
     throw new Error(`Cloudinary upload failed: ${error.message}`);
   }
 };
@@ -152,7 +153,7 @@ export const uploadMultipleFiles = async (files, crimeId) => {
     const results = await Promise.all(uploadPromises);
     return results;
   } catch (error) {
-    console.error("Batch upload error:", error);
+    logger.error({ err: error }, "Batch upload error");
     throw new Error(`Batch upload failed: ${error.message}`);
   }
 };
@@ -235,7 +236,7 @@ export const deleteFile = async (publicId, resourceType = "image") => {
 
     throw new Error(`Delete failed: ${result.result}`);
   } catch (error) {
-    console.error("Cloudinary delete error:", error);
+    logger.error({ err: error }, "Cloudinary delete error");
     throw new Error(`Cloudinary delete failed: ${error.message}`);
   }
 };
@@ -259,7 +260,7 @@ export const deleteMultipleFiles = async (publicIds, resourceType = "image") => 
       message: `Deleted ${result.deleted?.length || 0} files`,
     };
   } catch (error) {
-    console.error("Batch delete error:", error);
+    logger.error({ err: error }, "Batch delete error");
     throw new Error(`Batch delete failed: ${error.message}`);
   }
 };
@@ -291,7 +292,7 @@ export const getFileInfo = async (publicId, resourceType = "image") => {
       createdAt: result.created_at,
     };
   } catch (error) {
-    console.error("Get file info error:", error);
+    logger.error({ err: error }, "Get file info error");
     throw new Error(`Failed to get file info: ${error.message}`);
   }
 };
@@ -324,7 +325,7 @@ export const getVideoDuration = async (publicId) => {
     const info = await getFileInfo(publicId, "video");
     return info.duration || 0;
   } catch (error) {
-    console.error("Get video duration error:", error);
+    logger.warn({ err: error }, "Get video duration error");
     return 0;
   }
 };

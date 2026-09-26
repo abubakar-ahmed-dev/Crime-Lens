@@ -15,6 +15,13 @@ import {
   getMyReports,
 } from "../controllers/citizenAuthController.js";
 import { authorizeCitizen } from "../middleware/authMiddleware.js";
+import { applyRateLimit } from "../middleware/rateLimiterMiddleware.js";
+import { validate } from "../middleware/validationMiddleware.js";
+import {
+  citizenRegisterSchema,
+  citizenLoginSchema,
+  googleAuthSchema,
+} from "../validators/schemas.js";
 
 const router = express.Router();
 
@@ -23,13 +30,28 @@ const router = express.Router();
  */
 
 // Register new citizen
-router.post("/register", registerCitizen);
+router.post(
+  "/register",
+  applyRateLimit("citizenAuth"),
+  validate(citizenRegisterSchema),
+  registerCitizen
+);
 
 // Login citizen
-router.post("/login", loginCitizen);
+router.post(
+  "/login",
+  applyRateLimit("citizenAuth"),
+  validate(citizenLoginSchema),
+  loginCitizen
+);
 
 // Google OAuth authentication
-router.post("/google-auth", googleAuthCitizen);
+router.post(
+  "/google-auth",
+  applyRateLimit("citizenAuth"),
+  validate(googleAuthSchema),
+  googleAuthCitizen
+);
 
 /**
  * Protected Routes (Authentication required)

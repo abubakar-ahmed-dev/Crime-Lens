@@ -79,9 +79,16 @@ const StatsCharts = () => {
   // ---------------------------
   // CUSTOM LABEL FOR BAR CHART
   // ---------------------------
-  const CustomXAxisTick = (props: any) => {
-    const { x, y, payload } = props;
-    const text = payload.value;
+  // Recharts calls tick renderers with x/y coordinates and the axis payload.
+  interface CustomXAxisTickProps {
+    x?: number;
+    y?: number;
+    payload?: { value?: string };
+  }
+
+  const CustomXAxisTick = (props: CustomXAxisTickProps) => {
+    const { x = 0, y = 0, payload } = props;
+    const text = payload?.value ?? "";
     
     // Split long names into two lines
     if (text.length > 15) {
@@ -116,7 +123,7 @@ const StatsCharts = () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/stats/crime-type-distribution`);
       // extract crime types
-      const types: CrimeType[] = res.data.map((item: any) => ({
+      const types: CrimeType[] = res.data.map((item: { crimeTypeId: number; CrimeType: { name: string } }) => ({
         id: item.crimeTypeId,
         name: item.CrimeType.name,
       }));
@@ -134,7 +141,7 @@ const StatsCharts = () => {
       const res = await axios.get(`${API_BASE_URL}/stats/crime-trend`, {
         params: { crimeTypeId: selectedCrimeType, start: startLine, end: endLine },
       });
-      const formatted: LineDataItem[] = res.data.map((item: any) => ({
+      const formatted: LineDataItem[] = res.data.map((item: { month: string; count: number }) => ({
         date: formatDate(item.month),
         crimeCount: Number(item.count),
       }));
@@ -149,7 +156,7 @@ const StatsCharts = () => {
       const res = await axios.get(`${API_BASE_URL}/stats/zone-crime-count`, {
         params: { start: startBar, end: endBar },
       });
-      const formatted: BarDataItem[] = res.data.map((item: any) => ({
+      const formatted: BarDataItem[] = res.data.map((item: { Zone?: { name?: string }; count: number }) => ({
         zone: item.Zone?.name || "Unknown",
         crimeCount: Number(item.count),
       }));
@@ -164,7 +171,7 @@ const StatsCharts = () => {
       const res = await axios.get(`${API_BASE_URL}/stats/crime-type-distribution`, {
         params: { start: startPie, end: endPie },
       });
-      const formatted: PieDataItem[] = res.data.map((item: any) => ({
+      const formatted: PieDataItem[] = res.data.map((item: { CrimeType: { name: string }; count: number }) => ({
         name: item.CrimeType.name,
         count: Number(item.count),
       }));
@@ -312,7 +319,9 @@ const StatsCharts = () => {
 
         <ResponsiveContainer width="100%" height={300}>
           <PieChart>
-            <Pie data={pieData as any[]} cx="50%" cy="50%" label outerRadius={110} dataKey="count">
+            {/* recharts v3's Pie data prop wants an indexed datum shape;
+                PieDataItem is structurally compatible but lacks the signature. */}
+            <Pie data={pieData as unknown as Record<string, unknown>[]} cx="50%" cy="50%" label outerRadius={110} dataKey="count">
               {pieData.map((_, i) => (
                 <Cell key={i} fill={COLORS[i % COLORS.length]} />
               ))}

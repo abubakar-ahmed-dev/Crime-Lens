@@ -59,7 +59,7 @@ export const getBranches = async (req, res) => {
 
     res.status(200).json({ success: true, data: branches });
   } catch (error) {
-    console.error("Get Branches Error:", error);
+    req.log.error({ err: error }, "Get Branches Error");
     res.status(500).json({ success: false, message: "Error fetching branches" });
   }
 };
@@ -86,7 +86,7 @@ export const getApprovedPoliceAgents = async (req, res) => {
 
     res.status(200).json({ success: true, data: agents });
   } catch (error) {
-    console.error("Get Police Agents Error:", error);
+    req.log.error({ err: error }, "Get Police Agents Error");
     res.status(500).json({ success: false, message: "Error fetching police agents" });
   }
 };
@@ -170,7 +170,7 @@ export const createBranch = async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
-    console.error("Create Branch Error:", error);
+    req.log.error({ err: error }, "Create Branch Error");
     res.status(500).json({ success: false, message: "Error creating branch" });
   }
 };
@@ -273,7 +273,7 @@ export const createPoliceAgent = async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
-    console.error("Create Police Agent Error:", error);
+    req.log.error({ err: error }, "Create Police Agent Error");
     res.status(500).json({ success: false, message: "Error creating police agent" });
   }
 };
@@ -375,7 +375,7 @@ export const assignBranchHead = async (req, res) => {
     });
   } catch (error) {
     await t.rollback();
-    console.error("Assign Branch Head Error:", error);
+    req.log.error({ err: error }, "Assign Branch Head Error");
     res.status(500).json({ success: false, message: "Error assigning branch head" });
   }
 };
