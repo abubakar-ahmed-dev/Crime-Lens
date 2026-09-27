@@ -48,3 +48,22 @@ allowed values; reconciling them needs a live-DB migration decision.
   DB-side (radius query tuning/index), not the web tier.
 - **Deferred phases**: Cloudflare/TLS/CDN (needs a domain), hosted
   deployment (needs a host — GHCR images are ready), real test suites.
+
+## Code Scanning (post-roadmap remediation)
+
+- **27 dismissed `js/missing-rate-limiting` alerts**: CodeQL models
+  `express-rate-limit`-style middleware and cannot see CrimeLens's
+  distributed Redis-backed `applyRateLimit` wrapper (it flagged a line
+  carrying the limiter). Tiers are verified live (429 at N+1 per tier,
+  phase-16 k6). Full justification:
+  [`Plans/security-alert-remediation/dismissal-log.md`](../Plans/security-alert-remediation/dismissal-log.md).
+  Dismissals are reversible in the Code scanning UI.
+- **`**/Plans/**` excluded from CodeQL analysis**: `Plans/` holds
+  engineering evidence including verification scripts with deliberately
+  vulnerable fixture patterns (e.g. the old ReDoS regexes kept for
+  comparison) — they are not runtime code.
+- **Trivy base-image CVEs**: runtime bases are `nginx:1.28-alpine` /
+  `node:22-alpine`; any remaining container CVEs after the bump have no
+  fixed package in Alpine yet and are re-evaluated on each base bump.
+- **Backend ESLint still not configured** — backend lint remains a CI gap
+  (frontend lint enforces, backend checks are syntax + smoke + CodeQL).
