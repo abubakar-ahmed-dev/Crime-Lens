@@ -42,10 +42,18 @@ export const uploadMedia = async (req, res) => {
 
   try {
     const { files } = req;
-    // captions must be an array — a tampered string/scalar value is treated
-    // as "no captions" (CodeQL js/type-confusion-through-parameter-tampering)
-    const rawCaptions = req.body.captions;
-    const captions = Array.isArray(rawCaptions) ? rawCaptions : [];
+    // Captions are copied into a fresh string-only array so no value can
+    // flow from the request body into captions with a non-array/non-string
+    // type (CodeQL js/type-confusion-through-parameter-tampering). Clients
+    // that send captions as an array of strings are unaffected.
+    const captions = [];
+    if (Array.isArray(req.body.captions)) {
+      for (const entry of req.body.captions) {
+        if (typeof entry === "string") {
+          captions.push(entry);
+        }
+      }
+    }
     const { crimeId: existingCrimeId } = req.body;
     const userId = req.user?.id;
     const uploadedBy = req.user?.role ? "police" : "citizen";
