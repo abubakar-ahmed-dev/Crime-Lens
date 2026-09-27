@@ -48,3 +48,18 @@ Trivy container alerts with **no fixed package in the base image** at the
 time of the `nginx:1.28-alpine` / `node:22-alpine` rebuild are dismissed with
 reason "won't fix" (base-image CVE, re-evaluate on next base bump) after the
 post-merge rescan — see `testing-log.md` for the final list.
+
+### Trivy disposition (2026-09-27, after PRs #32/#34 rescans)
+
+Post-rescan state of the container alerts:
+
+- **20 npm-package alerts closed as FIXED** (no dismissal): multer 2.4.0,
+  qs 6.16.0, uuid 11.1.1 (override), plus in-image `npm install -g
+  npm@latest` for the node:22-alpine bundled npm toolchain (PR #33/#34).
+- **200 nginx:1.28-alpine OS-package alerts dismissed** (`won't fix`, 200/200
+  succeeded): no fixed package in the currently pinned base at scan time;
+  not application code; CI's Trivy gate enforces CRITICAL/HIGH with
+  `--ignore-unfixed` at build; base re-evaluated on every bump. Policy lives
+  in `docs/KNOWN_ISSUES.md`.
+- One CodeQL `js/type-confusion` instance moved between anchors during
+  fixing (captions → `req.files`) — tracked to zero via PR #35.
