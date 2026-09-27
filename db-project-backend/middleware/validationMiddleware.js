@@ -50,23 +50,106 @@ export const validate = (schema, target = "body") => {
   };
 };
 
-const SANITIZE_PATTERNS = [
-  /<script[^>]*>[\s\S]*?<\/script>/gi,
-  /javascript:/gi,
-  /on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi,
-];
+/**
+ * Hand-rolled HTML scrubbing, implemented as linear single-pass scanners.
+ * Replaces the former backtracking regexes (CodeQL js/polynomial-redos,
+ * js/bad-tag-filter): those could degrade polynomially on adversarial input
+ * and missed `</script >`-style end tags. These scanners are worst-case O(n)
+ * and strip end tags with optional whitespace before `>`.
+ */
+
+const SCRIPT_OPEN = "<script";
+const SCRIPT_CLOSE = "</script";
+
+const isWordChar = (c) =>
+  (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || (c >= "0" && c <= "9") || c === "_";
+
+const isWhitespace = (c) => c === " " || c === "\t" || c === "\n" || c === "\r";
+
+/**
+ * Removes `<script ...>...</script>` blocks (case-insensitive, tolerant of
+ * whitespace before the end tag's `>`). An unclosed `<script` marker is
+ * left untouched, matching the previous behavior for input without a full
+ * block.
+ */
+const stripScriptBlocks = (input) => {
+  const lower = input.toLowerCase();
+  let out = "";
+  let cursor = 0;
+  for (;;) {
+    const open = lower.indexOf(SCRIPT_OPEN, cursor);
+    if (open === -1) {
+      out += input.slice(cursor);
+      return out;
+    }
+    const close = lower.indexOf(SCRIPT_CLOSE, open + SCRIPT_OPEN.length);
+    if (close === -1) {
+      out += input.slice(cursor);
+      return out;
+    }
+    const closeEnd = lower.indexOf(">", close);
+    if (closeEnd === -1) {
+      out += input.slice(cursor);
+      return out;
+    }
+    out += input.slice(cursor, open);
+    cursor = closeEnd + 1;
+  }
+};
+
+/**
+ * Removes inline event handlers (`onclick=...`, `OnLoad="..."`), scanning
+ * each character exactly once — no backtracking.
+ */
+const stripInlineEventHandlers = (input) => {
+  let out = "";
+  let i = 0;
+  const n = input.length;
+  while (i < n) {
+    let matched = false;
+    if ((input[i] === "o" || input[i] === "O") && (input[i + 1] === "n" || input[i + 1] === "N")) {
+      let j = i + 2;
+      while (j < n && isWordChar(input[j])) j += 1;
+      let k = j;
+      while (k < n && isWhitespace(input[k])) k += 1;
+      if (j > i + 2 && k < n && input[k] === "=") {
+        k += 1;
+        while (k < n && isWhitespace(input[k])) k += 1;
+        if (k < n && (input[k] === '"' || input[k] === "'")) {
+          const quote = input[k];
+          k += 1;
+          while (k < n && input[k] !== quote) k += 1;
+          if (k < n) k += 1; // consume closing quote
+          i = k;
+          matched = true;
+        } else {
+          const valueStart = k;
+          while (k < n && !isWhitespace(input[k]) && input[k] !== ">") k += 1;
+          if (k > valueStart) {
+            i = k;
+            matched = true;
+          }
+        }
+      }
+    }
+    if (!matched) {
+      out += input[i];
+      i += 1;
+    }
+  }
+  return out;
+};
 
 const sanitizeValue = (value) => {
   if (typeof value !== "string") return { value, changed: false };
-  let out = value;
-  let changed = false;
-  for (const pattern of SANITIZE_PATTERNS) {
-    if (pattern.test(out)) {
-      out = out.replace(pattern, "");
-      changed = true;
-    }
-  }
-  return { value: out, changed };
+  // Note: the former `/javascript:/gi` substring strip was removed — a
+  // single-pass substring replace cannot fully remove a scheme
+  // ("javajavascript:script:" reassembles after one pass; CodeQL
+  // js/incomplete-url-substring-sanitization) and only created a false
+  // sense of coverage. Primary XSS defenses remain React escaping + Helmet
+  // CSP + zod schema constraints.
+  const out = stripInlineEventHandlers(stripScriptBlocks(value));
+  return out === value ? { value, changed: false } : { value: out, changed: true };
 };
 
 const sanitizeInPlace = (obj) => {

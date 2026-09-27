@@ -166,6 +166,11 @@ jobs:
       - uses: github/codeql-action/init@v3
         with:
           languages: javascript-typescript
+          # Plans/** holds engineering evidence (phase logs, verification
+          # scripts with deliberately vulnerable fixture patterns) — not
+          # runtime code; analyzing it produces false positives.
+          paths-ignore: |
+            **/Plans/**
       - uses: github/codeql-action/analyze@v3
         with:
           category: "/language:javascript-typescript"
