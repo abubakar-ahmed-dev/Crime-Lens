@@ -41,11 +41,19 @@ export const uploadMedia = async (req, res) => {
   let t;
 
   try {
-    const { files } = req;
-    // Captions are copied into a fresh string-only array so no value can
-    // flow from the request body into captions with a non-array/non-string
-    // type (CodeQL js/type-confusion-through-parameter-tampering). Clients
-    // that send captions as an array of strings are unaffected.
+    // Both request-derived collections are copied into fresh arrays so no
+    // value reaches array-only operations without an explicit type check
+    // (CodeQL js/type-confusion-through-parameter-tampering, which does not
+    // model Array.isArray guards). upload.array("files") normally attaches
+    // req.files as an array; a tampered/missing value degrades to "no
+    // files" → 400. Captions keep only string entries — valid clients
+    // (array of strings) are unaffected.
+    const files = [];
+    if (Array.isArray(req.files)) {
+      for (const file of req.files) {
+        files.push(file);
+      }
+    }
     const captions = [];
     if (Array.isArray(req.body.captions)) {
       for (const entry of req.body.captions) {
@@ -59,7 +67,7 @@ export const uploadMedia = async (req, res) => {
     const uploadedBy = req.user?.role ? "police" : "citizen";
 
     // Validate files exist
-    if (!files || files.length === 0) {
+    if (files.length === 0) {
       return res.status(400).json({
         success: false,
         message: "No files provided",
