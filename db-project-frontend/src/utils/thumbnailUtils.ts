@@ -5,11 +5,31 @@
 
 /**
  * Checks if a URL is a Cloudinary URL
+ *
+ * Parses the URL and inspects the hostname (substring matching was
+ * vulnerable to spoofing like `https://evil.com/cloudinary.com/...` —
+ * CodeQL js/incomplete-url-substring-sanitization). Scheme-less legacy
+ * URLs are assumed https; unparseable input is treated as not-Cloudinary
+ * and falls through to the existing placeholder paths.
+ *
  * @param url - URL to check
  * @returns true if Cloudinary URL
  */
 const isCloudinaryUrl = (url: string): boolean => {
-  return url.includes('cloudinary.com') && (url.includes('/image/upload/') || url.includes('/video/upload/'));
+  const candidate = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`;
+  try {
+    const parsed = new URL(candidate);
+    const isCloudinaryHost =
+      parsed.hostname === 'res.cloudinary.com' ||
+      parsed.hostname === 'cloudinary.com' ||
+      parsed.hostname.endsWith('.cloudinary.com');
+    if (!isCloudinaryHost) {
+      return false;
+    }
+    return parsed.pathname.includes('/image/upload/') || parsed.pathname.includes('/video/upload/');
+  } catch {
+    return false;
+  }
 };
 
 /**
