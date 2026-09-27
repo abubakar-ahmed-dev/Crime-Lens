@@ -12,6 +12,12 @@
 
 FROM node:22-alpine
 
+# node:22-alpine ships npm 10.x whose bundled dependencies (brace-expansion,
+# picomatch, pacote, sigstore, ip-address, ...) accumulate CVEs; upgrading
+# npm in-image picks up their patched versions without waiting for a new
+# Node base release.
+RUN npm install -g npm@latest
+
 ENV NODE_ENV=production
 WORKDIR /app
 
